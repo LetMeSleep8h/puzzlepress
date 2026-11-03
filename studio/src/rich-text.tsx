@@ -183,35 +183,36 @@ export function RichTextEditor({
     if (a && f) window.getSelection()?.setBaseAndExtent(a[0], a[1], f[0], f[1]);
   });
 
+  // The model's selection, brought up to date with the DOM. `selectionchange` arrives
+  // asynchronously, so a command (Ctrl+B, a toolbar button, typed text) that runs
+  // right after the selection moved must read the live selection, not the cache.
+  const syncSelection = () => {
+    const element = root.current;
+    const selection = window.getSelection();
+    if (!element || !selection || !selection.anchorNode || !element.contains(selection.anchorNode))
+      return selRef.current;
+    const anchor = domToPos(element, selection.anchorNode, selection.anchorOffset);
+    const focus = selection.focusNode
+      ? domToPos(element, selection.focusNode, selection.focusOffset)
+      : anchor;
+    if (!anchor || !focus) return selRef.current;
+    const previous = selRef.current;
+    if (
+      previous.anchor.block === anchor.block &&
+      previous.anchor.offset === anchor.offset &&
+      previous.focus.block === focus.block &&
+      previous.focus.offset === focus.offset
+    )
+      return previous;
+    const next = { anchor, focus };
+    selRef.current = next;
+    setSel(next);
+    setPending(null);
+    return next;
+  };
+
   useEffect(() => {
-    const onSelection = () => {
-      const element = root.current;
-      const selection = window.getSelection();
-      if (
-        !element ||
-        !selection ||
-        !selection.anchorNode ||
-        !element.contains(selection.anchorNode)
-      )
-        return;
-      const anchor = domToPos(element, selection.anchorNode, selection.anchorOffset);
-      const focus = selection.focusNode
-        ? domToPos(element, selection.focusNode, selection.focusOffset)
-        : anchor;
-      if (!anchor || !focus) return;
-      const next = { anchor, focus };
-      const previous = selRef.current;
-      if (
-        previous.anchor.block === anchor.block &&
-        previous.anchor.offset === anchor.offset &&
-        previous.focus.block === focus.block &&
-        previous.focus.offset === focus.offset
-      )
-        return;
-      selRef.current = next;
-      setSel(next);
-      setPending(null);
-    };
+    const onSelection = () => void syncSelection();
     document.addEventListener('selectionchange', onSelection);
     return () => document.removeEventListener('selectionchange', onSelection);
   }, []);
@@ -224,13 +225,16 @@ export function RichTextEditor({
       event.preventDefault();
       if (disabled) return;
       const current = docRef.current;
-      const range = selRef.current;
+      const cached = selRef.current;
+      const range = syncSelection();
+      // A pending style belongs to the caret it was chosen at.
+      const pendingHere = range === cached ? pending : null;
       const [start] = ordered(range);
       switch (event.inputType) {
         case 'insertText':
         case 'insertReplacementText': {
           const text = event.data ?? event.dataTransfer?.getData('text/plain') ?? '';
-          const style = pending ?? undefined;
+          const style = pendingHere ?? undefined;
           const [next, caret] = insertText(current, range, text, style);
           commit(next, caret, null);
           return;
@@ -343,13 +347,15 @@ export function RichTextEditor({
   };
 
   function mark(key: Mark) {
-    const range = selRef.current;
+    const cached = selRef.current;
+    const range = syncSelection();
+    const pendingHere = range === cached ? pending : null;
     if (key !== 'underline' && !canStyle(key)) {
       setNotice(reason(key));
       return;
     }
     if (collapsed(range)) {
-      const current = { ...styleAt(docRef.current, range.focus), ...(pending ?? {}) };
+      const current = { ...styleAt(docRef.current, range.focus), ...(pendingHere ?? {}) };
       const on = current[key] ?? (key === 'underline' ? false : inherited(key));
       setPending({ ...current, [key]: !on });
       setNotice(`${key[0].toUpperCase()}${key.slice(1)} ${on ? 'off' : 'on'} for new text.`);
@@ -362,9 +368,11 @@ export function RichTextEditor({
     );
   }
   const style = (patch: RunStyle) => {
-    const range = selRef.current;
+    const cached = selRef.current;
+    const range = syncSelection();
+    const pendingHere = range === cached ? pending : null;
     if (collapsed(range)) {
-      setPending({ ...styleAt(docRef.current, range.focus), ...(pending ?? {}), ...patch });
+      setPending({ ...styleAt(docRef.current, range.focus), ...(pendingHere ?? {}), ...patch });
       return;
     }
     commit(styleRange(docRef.current, range, patch), range);
