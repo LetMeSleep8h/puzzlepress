@@ -2,6 +2,37 @@
 
 ## Completed scope
 
+Production run and previous-book checks on branch `feat/automotive-book-production`
+(guide: docs/production-run.md). Engine only; real books stay in puzzlepress-books.
+
+- `inventory.py`: puzzle inventories from a project (regenerated, authoritative), an
+  interior PDF (pypdf text positions; a page counts only when every listed word is
+  found in its grid) or saved JSON (`inventory_version` 1, strict). Coverage
+  complete | incomplete | unconfirmed; a PDF is complete only with a matching
+  `--expected-puzzles` and no unverified, image-only or unreadable page.
+- `duplicates.py`: exact (equal word sets, equal grids under the 8 symmetries) and
+  near (Jaccard 0.6, overlap 0.8 with 3 shared, grid agreement 0.5; configurable)
+  against previous books and within the book; replacement recommendations;
+  `clean` needs complete coverage. CLI `puzzle inventory`, `puzzle compare`.
+- `answer_key.py`: reads the built PDF back; each puzzle needs one solution grid
+  with equal letters whose bold letters spell every word and nothing else.
+- `photo_manifest.py` + `cover photos`: explicitly listed files only (no scanning),
+  read-only checks (format, pixels, aspect, cover-fit DPI: <300 warns, <150 errors),
+  optional import through `import_photo`. Windows drive paths on other systems are
+  reported, not guessed.
+- Cover `watermark` (versions 2 and 3; `cover/watermark.py`): text, opacity,
+  9 positions, scale (fraction of front width), margin, shadow, color; baked into
+  the photo's derived pixels in Vera Sans Bold; disabled renders identical bytes.
+  Blocking: outside front safe area, within 4 pt of cover text, not over one photo.
+  Studio has no watermark controls; template application/conversion may drop it.
+- `production/produce.py` + `book produce`: interior, preflight, cover and cover
+  preflight (when configured), duplicate report, photo check, publishing validation
+  (blocking / warnings / manual review / verified) and `production.json` (no times)
+  into a directory disjoint from the project and every previous source.
+- Checks: 1,807 tests (1 Windows-only skipped) on Linux, Python 3.13; Windows only through CI.
+
+## Earlier completed scope
+
 Interior design studio on branch `feat/interior-design-studio` from main
 `dafaba2`; committed, not pushed; no PR, tag, release or deployment. Guide:
 docs/interior-design.md.

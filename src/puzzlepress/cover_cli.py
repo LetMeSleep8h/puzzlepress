@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .production_cli import add_cover_actions, run_photos
 from .project import LoadedProject, load_project
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 def add_cover_command(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
     cover = commands.add_parser("cover", help="Paperback cover tools")
     actions = cover.add_subparsers(dest="cover_command", required=True)
+    add_cover_actions(actions)
     output_help = "Interior/cover directory (default: the project's output.directory)"
     inspect = actions.add_parser(
         "inspect", help="Show wrap geometry, spine and photo resolution (read-only)"
@@ -85,8 +87,10 @@ def _directory(loaded: LoadedProject, output: str | None) -> Path:
 def run_cover_command(args: argparse.Namespace) -> int:
     from .cover.issues import CoverError
 
-    loaded = load_project(args.project)
     command = args.cover_command
+    if command == "photos":
+        return run_photos(args)
+    loaded = load_project(args.project)
     try:
         if command == "import":
             return _import(loaded, args)

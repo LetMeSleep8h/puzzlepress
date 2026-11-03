@@ -11,6 +11,7 @@ from ..interior.spec import KDP_COVER, to_inches
 from .design import design_issues
 from .geometry import CoverGeometry
 from .model import CoverLayout, CoverPhoto, CoverText, CoverTextBox
+from .watermark import watermark_issues
 
 TOLERANCE = 0.01  # Points, as for interior layout validation.
 FRONT_ROLES = ("title", "subtitle", "author")
@@ -205,6 +206,13 @@ def validate_cover_layout(
                         region=f"cover.{first.role}",
                     )
                 )
+    if layout.watermark is not None:
+        issues += watermark_issues(
+            layout.watermark,
+            g.front_safe,
+            tuple(p.region for p in layout.photos),
+            tuple((t.role, t.bounds) for t in texts),
+        )
     if layout.spine.rendered != any(panel_of(t) == "spine" for t in texts):
         issues.append(
             LayoutIssue(

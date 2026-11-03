@@ -13,6 +13,7 @@ from ..interior.issues import LayoutIssue
 from ..interior.model import Anchor, Box
 from .crop import CropWindow
 from .geometry import CoverGeometry
+from .watermark import PlacedWatermark
 
 RGB = tuple[float, float, float]
 
@@ -91,6 +92,8 @@ class CoverPhoto:
     role: str = "photo"  # Version 3: `element:<id>`.
     # Translucent shapes flattened into these pixels, bottom to top (version 3).
     baked: tuple["CoverShape", ...] = ()
+    # A watermark composited into these pixels last (version 2+).
+    watermark: PlacedWatermark | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +221,7 @@ class CoverLayout:
     resolutions: tuple[ImageResolution, ...]  # One per photograph, in stack order.
     fonts: tuple[str, ...] = ()  # PostScript names of imported fonts the text uses.
     region_fills: tuple[Fill, ...] = ()  # Version 3, when regions differ.
+    watermark: PlacedWatermark | None = None  # Placed; baked into a photo if one holds it.
     # Findings that never block a build (spine variance, elements under the barcode).
     warnings: tuple[LayoutIssue, ...] = ()
 
