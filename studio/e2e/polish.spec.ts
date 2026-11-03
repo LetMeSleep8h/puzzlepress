@@ -257,8 +257,16 @@ test('rebuild: the stale banner explains, plans and reports confirmed results', 
   const banner = page.locator('.stale-banner');
   await expect(banner.getByText('This interior is out of date.')).toBeVisible();
   await expect(banner.getByText(/interior style was added/)).toBeVisible();
+  // The plan comes from GET /production, which reruns interior and cover preflight
+  // in Python: wait for that response (like /rebuild below) instead of racing it
+  // against the default assertion timeout on slower machines.
+  const planned = page.waitForResponse(
+    (r) => r.url().endsWith('/production') && r.request().method() === 'GET',
+  );
   await banner.getByRole('button', { name: 'Rebuild outdated artifacts…' }).click();
   const panel = page.getByRole('region', { name: 'Rebuild outdated artifacts' });
+  expect((await planned).status()).toBe(200);
+  await expect(panel.getByText('Checking which artifacts are out of date…')).toBeHidden();
   await expect(panel.getByText('Rebuild the interior and its preflight report')).toBeVisible();
   await noAxeViolations(page);
   await captureElement(page, panel, 'rebuild-plan');

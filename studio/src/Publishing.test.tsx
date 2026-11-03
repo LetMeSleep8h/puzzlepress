@@ -200,6 +200,10 @@ test('version 1 confirmations never count and the section upgrades on request', 
   section.attestations = { rights: true, ai_disclosure: true, metadata: true, isbn: false };
   const calls = setup({ source: legacy, draft: withConfirmation('legacy', true) });
   const user = userEvent.setup();
+  // The upgrade offer comes from the debounced Python draft check: wait for the page,
+  // then for that check, as the other tests here do, so no single wait spans both.
+  await screen.findByText('AI content disclosure is not yet declared.');
+  await waitFor(() => expect(calls.some((c) => c.url.endsWith('/draft/publishing'))).toBe(true));
   const upgrade = await screen.findByRole('button', { name: 'Upgrade publishing section' });
   const box = screen.getByRole('checkbox', { name: /accurately represent/ });
   expect(box).not.toBeChecked();
