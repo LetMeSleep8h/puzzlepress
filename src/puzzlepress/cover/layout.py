@@ -57,6 +57,7 @@ from .model import (
     SpineStatus,
 )
 from .richtext import Base, layout_rich
+from .watermark import attach, place_watermark
 
 LIGHT: RGB = (1.0, 1.0, 1.0)
 DARK: RGB = (0.106, 0.118, 0.11)
@@ -914,6 +915,29 @@ def _layout_designed(
 
 
 def layout_cover(
+    book_id: str,
+    copy: CoverCopy,
+    config: CoverConfig,
+    geometry: CoverGeometry,
+    photo: PhotoInfo | Mapping[str, PhotoInfo],
+    fonts: CoverFonts = NO_FONTS,
+) -> CoverLayout:
+    """Raises CoverError(stage 'layout') when authored text cannot be set safely.
+
+    `photo` is the decoded photograph (versions 1 and 2) or every photograph the
+    configuration places, keyed by SHA-256. A configured watermark is placed on the
+    front panel and handed to the photograph that holds it.
+    """
+    layout = _layout_cover(book_id, copy, config, geometry, photo, fonts)
+    if config.watermark is None:
+        return layout
+    placed = place_watermark(config.watermark, geometry.front)
+    if placed is None:
+        return layout
+    return replace(layout, stack=attach(layout.stack, placed), watermark=placed)
+
+
+def _layout_cover(
     book_id: str,
     copy: CoverCopy,
     config: CoverConfig,

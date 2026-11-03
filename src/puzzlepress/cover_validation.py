@@ -40,6 +40,8 @@ from .cover_config import (
     TextRole,
     TextTone,
     TitlePosition,
+    Watermark,
+    WatermarkPosition,
 )
 from .cover_design import Element, GradientDirection, Region
 from .cover_richtext import is_rich, read_rich
@@ -68,8 +70,9 @@ Choice = TypeVar(
     LetterCase,
     GradientDirection,
     Region,
+    WatermarkPosition,
 )
-V2_FIELDS = {"text", "extra", "fonts"}
+V2_FIELDS = {"text", "extra", "fonts", "watermark"}
 V3_FIELDS = {"regions", "elements"}
 # Version 1/2 fields that version 3 replaces with regions and elements.
 V3_REPLACED = {"layout", "image", "crop", "background"}
@@ -190,6 +193,9 @@ def validate_cover(
             )
     text = _text_layers(reader, data.get("text", {}), f"{path}.text", font_ids)
     extra = _extra_layers(reader, data.get("extra", []), f"{path}.extra", font_ids)
+    watermark = (
+        _watermark(reader, data["watermark"], f"{path}.watermark") if "watermark" in data else None
+    )
     regions = None
     elements: tuple[Element, ...] = ()
     if designed:
@@ -219,6 +225,7 @@ def validate_cover(
             regions=regions,
             elements=elements,
             back_rich=back_rich,
+            watermark=watermark,
         ),
         (),
     )
@@ -476,3 +483,51 @@ def _fonts(reader: _Reader, raw: object, path: str) -> tuple[CoverFont, ...]:
             )
         )
     return tuple(fonts)
+
+
+WATERMARK_FIELDS = {"enabled", "text", "opacity", "position", "scale", "margin", "shadow", "color"}
+MAX_WATERMARK_TEXT = 60
+OPACITY = (0.05, 1.0, "range")
+SCALE = (0.05, 0.8, "range")
+MARGIN = (9.0, 216.0, "range")  # Points from the front trim edges; KDP safe is 9.
+
+
+def _watermark(reader: _Reader, raw: object, path: str) -> Watermark | None:
+    data = reader.mapping(raw, path, WATERMARK_FIELDS)
+    if not isinstance(raw, dict):
+        return None
+    default = Watermark()
+    flags = {}
+    for key in ("enabled", "shadow"):
+        value = data.get(key, getattr(default, key))
+        if not isinstance(value, bool):
+            reader.issue(f"{path}.{key}", "type", f"Use true or false for {key}.")
+            value = getattr(default, key)
+        flags[key] = value
+    text = data.get("text", "")
+    if not isinstance(text, str) or not text.strip() or len(text.strip()) > MAX_WATERMARK_TEXT:
+        reader.issue(
+            f"{path}.text",
+            "text",
+            f"State the watermark text: 1..{MAX_WATERMARK_TEXT} characters on one line.",
+        )
+        text = ""
+    elif any(not ch.isprintable() for ch in text):
+        reader.issue(f"{path}.text", "text", "The watermark text must be one printable line.")
+    color = data.get("color", default.color)
+    if not isinstance(color, str) or not HEX_COLOR.fullmatch(color):
+        reader.issue(f"{path}.color", "color", "Use a #RRGGBB sRGB color.")
+        color = default.color
+    position = _choice(
+        reader, data.get("position", default.position.value), f"{path}.position", WatermarkPosition
+    )
+    return Watermark(
+        enabled=flags["enabled"],
+        text=text.strip() if isinstance(text, str) else "",
+        opacity=_number(reader, data.get("opacity", default.opacity), f"{path}.opacity", *OPACITY),
+        position=position,
+        scale=_number(reader, data.get("scale", default.scale), f"{path}.scale", *SCALE),
+        margin=_number(reader, data.get("margin", default.margin), f"{path}.margin", *MARGIN),
+        shadow=flags["shadow"],
+        color=color.lower(),
+    )

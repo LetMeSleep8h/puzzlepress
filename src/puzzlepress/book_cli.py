@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .production_cli import add_book_actions, run_produce
 from .project import load_project
 from .publication import PageKind, PlanPage, PublicationPlan, build_publication
 from .publication_verification import publication_payload, verify_publication_plan
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 def add_book_command(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
     book = commands.add_parser("book", help="Book composition tools")
     actions = book.add_subparsers(dest="book_command", required=True)
+    add_book_actions(actions)
     plan = actions.add_parser("plan", help="Plan and verify the logical publication order")
     plan.add_argument("project", help="YAML file or directory containing book.yaml")
     plan.add_argument("--json", action="store_true", help="Print the structured plan")
@@ -77,6 +79,8 @@ def run_book_command(args: argparse.Namespace) -> int:
         return run_build_command(args)
     if args.book_command == "preflight":
         return run_preflight_command(args)
+    if args.book_command == "produce":
+        return run_produce(args)
     project = load_project(args.project).project
     report, plan = build_publication(project)
     verification = verify_publication_plan(plan, project, report)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from .batch_cli import run_batch_command
+from .production_cli import add_puzzle_actions, run_compare, run_inventory
 from .wordsearch import (
     Direction,
     GenerationConfig,
@@ -18,6 +19,7 @@ from .wordsearch import (
 def add_puzzle_command(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     puzzle = commands.add_parser("puzzle", help="Standalone puzzle tools")
     actions = puzzle.add_subparsers(dest="puzzle_command", required=True)
+    add_puzzle_actions(actions)
     batch = actions.add_parser("batch", help="Generate a project batch and report quality")
     batch.add_argument("project", help="YAML file or directory containing book.yaml")
     batch.add_argument(
@@ -45,6 +47,10 @@ def add_puzzle_command(commands: argparse._SubParsersAction[argparse.ArgumentPar
 def run_puzzle_command(args: argparse.Namespace) -> int:
     if args.puzzle_command == "batch":
         return run_batch_command(args)
+    if args.puzzle_command == "inventory":
+        return run_inventory(args)
+    if args.puzzle_command == "compare":
+        return run_compare(args)
     directions = (
         tuple(Direction[name.upper().replace("-", "_")] for name in args.direction)
         if args.direction

@@ -81,7 +81,14 @@ puzzlepress plan report build/synthetic/books/production --json
 puzzlepress plan approve books/my-book --identity pp1-planning-sha256-...
 puzzlepress plan handoff books/my-book --json
 puzzlepress plan production build/synthetic/books/production
+puzzlepress puzzle inventory releases/my-first-book --expected-puzzles 60 --output inv.json
+puzzlepress puzzle compare books/my-book --previous releases/my-first-book --expected-puzzles 60
+puzzlepress cover photos books/my-book --manifest approved-photos.yaml --import
+puzzlepress book produce books/my-book --output build/production --previous inv.json
 ```
+
+Previous-book duplicate checks, photo manifests, cover watermarks and the one-command
+production run are described in [docs/production-run.md](docs/production-run.md).
 
 Commands are read-only except `book build`, which writes `interior.pdf` and an
 `interior.json` manifest to the project's output directory (here

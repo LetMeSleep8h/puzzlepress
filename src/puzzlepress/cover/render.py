@@ -30,6 +30,7 @@ from ..interior.model import Anchor, Box
 from .assets import Photo
 from .fonts import CoverFace, font_name
 from .model import CoverLayout, CoverPhoto, CoverShape, CoverText, CoverTextBox, Fill, ShadeBand
+from .watermark import bake_watermark
 
 JPEG_QUALITY = 95
 FILL_EVEN_ODD = 0  # reportlab.pdfgen.canvas.FILL_EVEN_ODD (absent from the stubs).
@@ -79,6 +80,8 @@ def prepare_photo(photo: Photo, layout: CoverPhoto) -> EncodedPhoto:
         image = _bake(image, layout, shape)
     for band in layout.shade:
         image = _apply_shade(image, layout, band)
+    if layout.watermark is not None:
+        image = bake_watermark(image, layout.placement, layout.window.scale, layout.watermark)
     bare = Image.frombytes("RGB", image.size, image.tobytes())  # No info dictionary at all.
     buffer = io.BytesIO()
     bare.save(

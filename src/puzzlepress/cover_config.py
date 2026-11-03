@@ -234,6 +234,48 @@ class CoverFont:
         return data
 
 
+class WatermarkPosition(StrEnum):
+    TOP_LEFT = "top-left"
+    TOP_CENTER = "top-center"
+    TOP_RIGHT = "top-right"
+    MIDDLE_LEFT = "middle-left"
+    CENTER = "center"
+    MIDDLE_RIGHT = "middle-right"
+    BOTTOM_LEFT = "bottom-left"
+    BOTTOM_CENTER = "bottom-center"
+    BOTTOM_RIGHT = "bottom-right"
+
+
+@dataclass(frozen=True)
+class Watermark:
+    """Text baked into the front photograph's derived pixels (version 2+).
+
+    `scale` is the text width as a fraction of the front trim width; `margin` is
+    points from the front trim edges. The source photograph is never changed.
+    """
+
+    enabled: bool = True
+    text: str = ""
+    opacity: float = 0.35
+    position: WatermarkPosition = WatermarkPosition.BOTTOM_RIGHT
+    scale: float = 0.25
+    margin: float = 27.0
+    shadow: bool = False
+    color: str = "#ffffff"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "text": self.text,
+            "opacity": self.opacity,
+            "position": self.position.value,
+            "scale": self.scale,
+            "margin": self.margin,
+            "shadow": self.shadow,
+            "color": self.color,
+        }
+
+
 @dataclass(frozen=True)
 class CoverConfig:
     image: CoverImage | None  # Versions 1 and 2; version 3 places photographs as elements.
@@ -254,6 +296,8 @@ class CoverConfig:
     elements: "tuple[Element, ...]" = ()
     # Version 2+: the back text as a rich text document; `back_text` is its plain text.
     back_rich: "RichText | None" = None
+    # Version 2+: an optional watermark baked into the front photograph's pixels.
+    watermark: Watermark | None = None
 
     @property
     def designed(self) -> bool:
@@ -310,6 +354,8 @@ class CoverConfig:
             data["extra"] = [layer.to_dict() for layer in self.extra]
         if self.fonts:
             data["fonts"] = [font.to_dict() for font in self.fonts]
+        if self.watermark is not None:
+            data["watermark"] = self.watermark.to_dict()
         return data
 
     def rgb(self) -> tuple[float, float, float]:

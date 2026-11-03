@@ -197,6 +197,29 @@ identity instead (below).
   (EXIF, GPS, XMP, ICC, IPTC) or COM segment. Tests embed camera, artist, GPS and
   comment markers and assert none reach `cover.pdf`.
 
+## Watermark
+
+Version 2 and 3 covers accept an optional `watermark`, baked by Python into the
+derived pixels of the photograph under it; the photo in `cover-assets/` is never
+changed and the PDF carries no transparency.
+
+```yaml
+watermark:
+  enabled: true          # false keeps the settings and renders exactly as without
+  text: "Photo: Your Name"   # 1..60 characters, one line (Vera Sans Bold)
+  opacity: 0.35          # 0.05..1
+  position: bottom-right # top|middle|bottom-left|center|right, or center
+  scale: 0.25            # text width as a fraction of the front trim width (0.05..0.8)
+  margin: 27             # points from the front trim edges (9..216)
+  shadow: false          # a soft dark copy offset down-right
+  color: '#ffffff'
+```
+
+Build fails, never moves it, when the watermark leaves the front safe area
+(`watermark_outside_safe_area`), comes within 4 pt of cover text
+(`watermark_overlaps_text`), or is not wholly over one photograph
+(`watermark_outside_photo`).
+
 ## Crop and resolution
 
 A focal point `(x, y)` in the upright photo and a `zoom`. The photo scales
