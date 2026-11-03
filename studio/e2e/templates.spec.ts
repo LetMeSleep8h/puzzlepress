@@ -47,9 +47,17 @@ async function capture(page: Page, name: string, fullPage: boolean) {
   await page.screenshot({ path: shot(name), fullPage });
 }
 
-function draft(page: Page) {
-  return page.waitForResponse((r) => r.url().endsWith('/draft/cover') && r.status() === 200);
+function draft(page: Page, accept: (source: Sent) => boolean = () => true) {
+  return page.waitForResponse(
+    (r) =>
+      r.url().endsWith('/draft/cover') &&
+      r.status() === 200 &&
+      accept((r.request().postDataJSON() as { source: Sent }).source),
+  );
 }
+
+const backText = (source: Sent) => JSON.stringify(source.cover.back_text ?? '');
+const isRich = (source: Sent) => typeof source.cover.back_text === 'object';
 
 async function coverReady(page: Page) {
   const image = page.locator('.cover-window img');
@@ -299,7 +307,9 @@ test('rich text: format the selection, keep it through typing and undo, save and
   await editor.click();
   await page.keyboard.press('Control+Home');
   await page.keyboard.press('Control+Shift+ArrowRight');
-  let next = draft(page);
+  // Edits reach Python after a debounce, so an earlier preview can still be in flight:
+  // wait for the preview of this edit, not merely the next response.
+  let next = draft(page, isRich);
   await page.keyboard.press('Control+b');
   await next;
   const rich = () => {
@@ -321,13 +331,13 @@ test('rich text: format the selection, keep it through typing and undo, save and
 
   // Typing at the end of the text keeps the bold word as it is.
   await page.keyboard.press('Control+End');
-  next = draft(page);
+  next = draft(page, (source) => backText(source).includes('Enjoy.'));
   await page.keyboard.type(' Enjoy.');
   await next;
   expect(rich().blocks[0].runs[0]).toEqual({ text: 'Twenty', bold: true });
   await expect(editor).toContainText('Enjoy.');
   // Undo removes the typing, not the formatting.
-  next = draft(page);
+  next = draft(page, (source) => isRich(source) && !backText(source).includes('Enjoy.'));
   await page.getByRole('button', { name: 'Undo' }).click();
   await next;
   await expect(editor).not.toContainText('Enjoy.');
