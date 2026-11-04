@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import cast
 
+from .coloring_validation import validate_coloring
 from .composition_validation import divider_issues, validate_composition
 from .content_validation import validate_word_search_content
 from .cover_validation import validate_cover
-from .engines.kind import detect_engine
+from .engines.kind import EngineKind, detect_engine
 from .errors import MAX_SEED
 from .errors import ProjectError as ProjectError
 from .errors import ValidationIssue as ValidationIssue
@@ -165,13 +166,25 @@ def validate_project(data: object) -> ValidationResult:
 
     # The engine is derived from the content section; a second engine's section, or one
     # this version cannot build, is reported rather than read with word-search rules.
-    issues.extend(detect_engine(root)[1])
+    engine, engine_issues = detect_engine(root)
+    issues.extend(engine_issues)
     word_search = None
     if "word_search" in root:
         word_search, content_issues = validate_word_search_content(root["word_search"])
         issues.extend(content_issues)
+    coloring = None
+    if engine is EngineKind.COLORING:
+        coloring, coloring_issues = validate_coloring(root["coloring"])
+        issues.extend(coloring_issues)
     composition = None
-    if "composition" in root:
+    if "composition" in root and engine is EngineKind.COLORING:
+        issue(
+            "composition",
+            "not_available_for_engine",
+            "Coloring books have no page composition in this version, so cover, interior "
+            "and publishing sections cannot be added yet. Remove the composition section.",
+        )
+    elif "composition" in root:
         composition, composition_issues = validate_composition(
             root["composition"], "word_search" in root
         )
@@ -225,6 +238,7 @@ def validate_project(data: object) -> ValidationResult:
             cover=cover,
             publishing=publishing,
             interior=interior,
+            coloring=coloring,
         ),
         (),
     )

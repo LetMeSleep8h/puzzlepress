@@ -22,16 +22,25 @@ SECTIONS: dict[EngineKind, str] = {
     EngineKind.COLORING: "coloring",
 }
 
-# Engines this version can validate, plan and build. A recognised but unavailable
-# engine is reported, never read with another engine's rules.
-AVAILABLE: frozenset[EngineKind] = frozenset({EngineKind.WORD_SEARCH})
+# The book type, in words, for listings and reports.
+LABELS: dict[EngineKind, str] = {
+    EngineKind.WORD_SEARCH: "Word search",
+    EngineKind.COLORING: "Coloring book",
+}
+
+# Engines whose section this version can validate and load. A recognised but
+# unavailable engine is reported, never read with another engine's rules. Which
+# engines can also plan and build a book is the registry's business
+# (`engines.registry.ENGINES`): coloring books load and manage artwork, but are
+# not buildable yet.
+AVAILABLE: frozenset[EngineKind] = frozenset({EngineKind.WORD_SEARCH, EngineKind.COLORING})
 
 
 def detect_engine(source: object) -> tuple[EngineKind | None, tuple[ValidationIssue, ...]]:
     """Derive the engine from a decoded source mapping.
 
     Returns None with issues when the source names more than one engine or one this
-    version cannot build. A non-mapping is left to schema validation.
+    version cannot load. A non-mapping is left to schema validation.
     """
     if not isinstance(source, dict):
         return None, ()

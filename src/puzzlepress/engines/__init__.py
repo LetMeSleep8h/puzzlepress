@@ -4,6 +4,6 @@
 registry (`engines.registry`) where a plan is built, not from models.
 """
 
-from .kind import AVAILABLE, SECTIONS, EngineKind, detect_engine
+from .kind import AVAILABLE, LABELS, SECTIONS, EngineKind, detect_engine
 
-__all__ = ["AVAILABLE", "SECTIONS", "EngineKind", "detect_engine"]
+__all__ = ["AVAILABLE", "LABELS", "SECTIONS", "EngineKind", "detect_engine"]

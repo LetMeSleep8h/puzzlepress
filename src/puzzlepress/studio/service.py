@@ -10,6 +10,7 @@ from threading import Lock
 
 from puzzlepress import __version__
 from puzzlepress.batch import generate_batch
+from puzzlepress.engines.kind import LABELS
 from puzzlepress.engines.registry import engine_for
 from puzzlepress.errors import ProjectError, ValidationIssue
 from puzzlepress.identity import build_identity
@@ -112,8 +113,7 @@ class ProjectStore:
 
 def engine_summary(project: Project) -> dict[str, str]:
     """The derived book type, named by the engine that builds it."""
-    engine = engine_for(project)
-    return {"kind": engine.kind.value, "label": engine.label}
+    return {"kind": project.engine.value, "label": LABELS[project.engine]}
 
 
 def project_detail(key: str, project: Project, revision: str | None = None) -> dict[str, object]:

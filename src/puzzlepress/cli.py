@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from . import __version__
 from .book_cli import add_book_command, run_book_command
 from .cover_cli import add_cover_command, run_cover_command
-from .engines.registry import engine_for
+from .engines.kind import LABELS
 from .identity import build_identity
 from .planning_cli import add_plan_command, run_plan_command
 from .project import load_project
@@ -61,15 +61,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "validate":
         print(f"Valid: {project.book.id} ({loaded.source_path})")
     else:
+        content: tuple[tuple[str, object], ...] = (
+            (
+                ("Artwork", len(project.coloring.artwork)),
+                ("Coloring pages", len(project.coloring.pages)),
+            )
+            if project.coloring is not None
+            else (
+                ("Content items", len(project.content.items)),
+                (
+                    "Puzzle definitions",
+                    len(project.word_search.puzzles) if project.word_search else 0,
+                ),
+            )
+        )
         for label, value in (
             ("Book ID", project.book.id),
             ("Title", project.book.title),
             ("Schema version", project.schema_version),
-            ("Engine", f"{project.engine.value} ({engine_for(project).label})"),
+            ("Engine", f"{project.engine.value} ({LABELS[project.engine]})"),
             ("Language", project.book.language),
             ("Seed", project.build.seed),
-            ("Content items", len(project.content.items)),
-            ("Puzzle definitions", len(project.word_search.puzzles) if project.word_search else 0),
+            *content,
             ("Build identity", build_identity(project)),
             ("Source", loaded.source_path),
             ("Output directory", loaded.output_directory),

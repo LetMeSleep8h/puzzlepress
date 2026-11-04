@@ -2,6 +2,7 @@
 
 from dataclasses import asdict, dataclass
 
+from .coloring_config import ColoringBook
 from .composition import Composition
 from .content import WordSearchContent
 from .cover_config import CoverConfig
@@ -50,12 +51,13 @@ class Project:
     cover: CoverConfig | None = None
     publishing: PublishingConfig | None = None
     interior: InteriorStyle | None = None
+    coloring: ColoringBook | None = None
 
     @property
     def engine(self) -> EngineKind:
         """Derived from the content section, never stored: a schema-v1 project without
         another engine's section is a word-search project (legacy ones included)."""
-        return EngineKind.WORD_SEARCH
+        return EngineKind.COLORING if self.coloring is not None else EngineKind.WORD_SEARCH
 
     def to_dict(self) -> dict[str, object]:
         """Return an independent, JSON/YAML-compatible source representation."""
@@ -81,4 +83,8 @@ class Project:
             del data["interior"]
         else:
             data["interior"] = self.interior.to_dict()
+        if self.coloring is None:
+            del data["coloring"]
+        else:
+            data["coloring"] = self.coloring.to_dict()
         return data
