@@ -361,6 +361,32 @@ def test_divider_photographs_print_on_their_theme_divider(tmp_path):
     assert built.plan.pages[number - 1].divider.theme == "Tools" and block.role == "divider_photo"
 
 
+def test_one_photograph_on_several_dividers_is_embedded_once(tmp_path):
+    # Regression: the JPEG path registered a photograph again on every page that
+    # showed it (ReportLab resets its per-page form list), which crashed the render.
+    project, source = _photo_book(tmp_path, divider_photo=True)
+    data = project.to_dict()
+    (photo,) = data["interior"]["dividers"]["photos"]
+    data["interior"]["dividers"]["photos"] = [photo, {**photo, "theme": "Engines"}]
+    project = validate_project(data).require_project()
+    built = build(project, source)
+    pages = [
+        page.number
+        for page in built.layout.pages
+        for e in page.elements
+        if isinstance(e, ImageBlock)
+    ]
+    assert len(pages) == 2
+    reader = PdfReader(io.BytesIO(built.pdf))
+    references = {
+        reader.pages[number - 1]["/Resources"]["/XObject"].raw_get(name).idnum
+        for number in pages
+        for name in reader.pages[number - 1]["/Resources"]["/XObject"]
+    }
+    assert len(references) == 1  # one image object, drawn on both divider pages
+    assert build(project, source).pdf == built.pdf
+
+
 def test_styled_interior_bytes_repeat_across_processes(tmp_path):
     project, source = _photo_book(tmp_path)
     expected = hashlib.sha256(build(project, source).pdf).hexdigest()
