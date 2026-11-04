@@ -1,0 +1,147 @@
+{
+  "revision": "sha256-826d89c9f756bfc0e80113760bccfa725a1386c1e21cbe3e717fa8fd84932d30",
+  "report": {
+    "report_version": 1,
+    "book_id": "synthetic-coloring-book",
+    "artwork": [
+      {
+        "id": "fox-in-the-ferns",
+        "title": "Fox in the Ferns",
+        "path": "coloring-assets/fox-in-the-ferns-0dfcb86a26ec.png",
+        "sha256": "0dfcb86a26ece8601d11ec6894c84b3f3edcacdd74ad04011dafa092eacbe51e",
+        "adjustments": {
+          "grayscale": true,
+          "threshold": null,
+          "brightness": 0.0,
+          "contrast": 1.0,
+          "background_cleanup": 0.0,
+          "despeckle": 0,
+          "line_weight": 0
+        },
+        "adjustments_applied": false,
+        "pages": [
+          1
+        ],
+        "inspection": {
+          "info": {
+            "sha256": "0dfcb86a26ece8601d11ec6894c84b3f3edcacdd74ad04011dafa092eacbe51e",
+            "format": "png",
+            "bytes": 40669,
+            "mode": "L",
+            "stored_pixels": [
+              2175,
+              2925
+            ],
+            "pixels": [
+              2175,
+              2925
+            ],
+            "orientation": 1,
+            "aspect_ratio": 0.7436,
+            "alpha_channel": false,
+            "transparent_pixels": false,
+            "dpi_metadata": null,
+            "effective_dpi": 300.0,
+            "art_box_inches": [
+              7.25,
+              9.75
+            ],
+            "printed_inches": [
+              7.25,
+              9.75
+            ],
+            "art_box_coverage": 1.0,
+            "ink_coverage": 0.039,
+            "background_level": 255,
+            "in_color": false,
+            "dhash": "838dad153939e700"
+          },
+          "findings": [],
+          "blocking": false
+        },
+        "error": null
+      },
+      {
+        "id": "small-owl",
+        "title": "Small owl",
+        "path": "coloring-assets/small-owl-9b20802abfbb.png",
+        "sha256": "9b20802abfbba1976817e2cc087c5ec6cb7b93fd19721341470d96645034f670",
+        "adjustments": {
+          "grayscale": true,
+          "threshold": null,
+          "brightness": 0.0,
+          "contrast": 1.0,
+          "background_cleanup": 0.0,
+          "despeckle": 0,
+          "line_weight": 0
+        },
+        "adjustments_applied": false,
+        "pages": [
+          2
+        ],
+        "inspection": {
+          "info": {
+            "sha256": "9b20802abfbba1976817e2cc087c5ec6cb7b93fd19721341470d96645034f670",
+            "format": "png",
+            "bytes": 6954,
+            "mode": "L",
+            "stored_pixels": [
+              600,
+              800
+            ],
+            "pixels": [
+              600,
+              800
+            ],
+            "orientation": 1,
+            "aspect_ratio": 0.75,
+            "alpha_channel": false,
+            "transparent_pixels": false,
+            "dpi_metadata": null,
+            "effective_dpi": 82.8,
+            "art_box_inches": [
+              7.25,
+              9.75
+            ],
+            "printed_inches": [
+              7.25,
+              9.67
+            ],
+            "art_box_coverage": 0.991,
+            "ink_coverage": 0.0294,
+            "background_level": 255,
+            "in_color": false,
+            "dhash": "217d2d2d2d193910"
+          },
+          "findings": [
+            {
+              "code": "artwork_resolution_too_low",
+              "severity": "blocking",
+              "message": "About 83 DPI when fitted to the 7.25 x 9.75 in art area; line art needs 300. Use a file of at least 2175 x 2925 pixels.",
+              "actual": "83 DPI",
+              "required": "at least 300 DPI"
+            }
+          ],
+          "blocking": true
+        },
+        "error": null
+      }
+    ],
+    "pages": 2,
+    "unreferenced_files": [],
+    "blocking": 1,
+    "duplicates": {
+      "report_version": 1,
+      "confirmed": {
+        "same_file": [],
+        "repeated_pages": []
+      },
+      "possible": {
+        "method": "difference hash within 10 of 64 bits and 16 x 16 gray map within 6.5 levels; a heuristic, not proof",
+        "similar": []
+      },
+      "not_compared": [],
+      "complete": true
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "key": "coloring-demo",
+  "revision": "sha256-826d89c9f756bfc0e80113760bccfa725a1386c1e21cbe3e717fa8fd84932d30",
+  "source": {
+    "schema_version": 1,
+    "book": {
+      "id": "synthetic-coloring-book",
+      "title": "Synthetic Coloring Book",
+      "language": "en",
+      "subtitle": null,
+      "description": null,
+      "author": null,
+      "imprint": null
+    },
+    "build": {
+      "seed": "1"
+    },
+    "content": {
+      "items": []
+    },
+    "output": {
+      "directory": "../build/synthetic-coloring-book"
+    },
+    "coloring": {
+      "version": 1,
+      "artwork": [
+        {
+          "id": "fox-in-the-ferns",
+          "path": "coloring-assets/fox-in-the-ferns-0dfcb86a26ec.png",
+          "sha256": "0dfcb86a26ece8601d11ec6894c84b3f3edcacdd74ad04011dafa092eacbe51e",
+          "title": "Fox in the Ferns",
+          "adjustments": {
+            "grayscale": true,
+            "threshold": null,
+            "brightness": 0.0,
+            "contrast": 1.0,
+            "background_cleanup": 0.0,
+            "despeckle": 0,
+            "line_weight": 0
+          }
+        },
+        {
+          "id": "small-owl",
+          "path": "coloring-assets/small-owl-9b20802abfbb.png",
+          "sha256": "9b20802abfbba1976817e2cc087c5ec6cb7b93fd19721341470d96645034f670",
+          "title": "Small owl",
+          "adjustments": {
+            "grayscale": true,
+            "threshold": null,
+            "brightness": 0.0,
+            "contrast": 1.0,
+            "background_cleanup": 0.0,
+            "despeckle": 0,
+            "line_weight": 0
+          }
+        }
+      ],
+      "pages": [
+        {
+          "artwork": "fox-in-the-ferns"
+        },
+        {
+          "artwork": "small-owl"
+        }
+      ],
+      "layout": {
+        "blank_reverse": true,
+        "border": "none"
+      }
+    }
+  },
+  "identity": "pp1-sha256-4dca3728e33ca00e7f316812bbdde41d4b18e7a2c42f205b27054097d09999a0",
+  "engine_version": "0.1.0",
+  "engine": {
+    "kind": "coloring",
+    "label": "Coloring book"
+  },
+  "validation": {
+    "valid": true,
+    "issues": []
+  }
+}

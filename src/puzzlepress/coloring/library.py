@@ -16,7 +16,7 @@ file stays in coloring-assets; it can be moved to the project trash only through
 the asset library, and only once nothing references it.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -219,8 +219,15 @@ class LibraryReport:
         }
 
 
-def library_report(project_directory: Path, project: Project) -> LibraryReport:
-    """Every artwork entry with its pages, file facts and findings, plus duplicates."""
+def library_report(
+    project_directory: Path,
+    project: Project,
+    inspect: Callable[[bytes, str], Inspection] = inspect_artwork,
+) -> LibraryReport:
+    """Every artwork entry with its pages, file facts and findings, plus duplicates.
+
+    `inspect` may be a cache over `inspect_artwork` keyed by the verified bytes.
+    """
     book = require_coloring(project)
     pages: dict[str, list[int]] = {}
     for number, page in enumerate(book.pages, start=1):
@@ -231,7 +238,7 @@ def library_report(project_directory: Path, project: Project) -> LibraryReport:
         inspection: Inspection | None = None
         failure: ArtworkError | None = None
         try:
-            inspection = inspect_artwork(read_artwork(project_directory, item), item.path)
+            inspection = inspect(read_artwork(project_directory, item), item.path)
         except ArtworkError as error:
             failure = error.about(item.path)
         inspections[item.id] = inspection

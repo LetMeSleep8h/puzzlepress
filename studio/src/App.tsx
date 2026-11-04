@@ -13,6 +13,7 @@ import { Publishing } from './Publishing';
 import { Planning } from './Planning';
 import { Interior } from './Interior';
 import { useDraft } from './draft';
+import { ColoringNav, ColoringWorkspace } from './Coloring';
 
 function usePath(allow: (next: string, current: string) => boolean) {
   const [path, setPath] = useState(window.location.pathname);
@@ -168,24 +169,36 @@ function ProjectWorkspace({
   const result = generation?.report.puzzles.find((p) => p.id === puzzleId);
   const count = project.source?.word_search?.puzzles.length ?? 0;
   const book = project.source?.book;
+  const heading = (
+    <header className="project-heading">
+      <h1>
+        <a href={base} aria-current={section === 'overview' ? 'page' : undefined}>
+          {book?.title ?? projectKey}
+        </a>
+      </h1>
+      <p className="muted">
+        {book?.subtitle && <span>{book.subtitle} · </span>}
+        {book?.id} · {book?.language}
+        {(dirty || planDirty) && (
+          <span className="draft-chip">
+            <span aria-hidden="true" className="status-mark" /> Unsaved draft
+          </span>
+        )}
+      </p>
+    </header>
+  );
+  // Coloring books have their own, smaller workspace; nothing word-search mounts.
+  if (project.engine?.kind === 'coloring' && project.source?.coloring)
+    return (
+      <>
+        {heading}
+        <ColoringNav base={base} section={section} />
+        <ColoringWorkspace project={project} section={section} />
+      </>
+    );
   return (
     <>
-      <header className="project-heading">
-        <h1>
-          <a href={base} aria-current={section === 'overview' ? 'page' : undefined}>
-            {book?.title ?? projectKey}
-          </a>
-        </h1>
-        <p className="muted">
-          {book?.subtitle && <span>{book.subtitle} · </span>}
-          {book?.id} · {book?.language}
-          {(dirty || planDirty) && (
-            <span className="draft-chip">
-              <span aria-hidden="true" className="status-mark" /> Unsaved draft
-            </span>
-          )}
-        </p>
-      </header>
+      {heading}
       <ProjectNav base={base} section={section} count={count} />
       {project.source && (
         <DraftWorkspace
@@ -350,7 +363,7 @@ export function App() {
     first.current = false;
   }, [path]);
   const match = path.match(
-    /^\/books\/([^/]+)(?:\/(puzzles|quality|edit|book|interior|print|cover|publishing|planning)(?:\/([^/]+))?)?\/?$/,
+    /^\/books\/([^/]+)(?:\/(puzzles|quality|edit|book|interior|print|cover|publishing|planning|artwork)(?:\/([^/]+))?)?\/?$/,
   );
   const isLibrary = path === '/' || path === '/books' || path === '/books/';
   return (
@@ -386,6 +399,7 @@ export function App() {
                   'cover',
                   'publishing',
                   'planning',
+                  'artwork',
                 ].includes(match[2]) && match[3]
               ) ? (
               <ProjectWorkspace

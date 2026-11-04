@@ -4596,3 +4596,71 @@ button.primary.danger {
     grid-template-columns: minmax(0, 1fr) minmax(420px, 560px);
   }
 }
+
+/* Coloring-book artwork library: ruled rows, square thumbnails of Python rasters. */
+.artwork-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.artwork-import p {
+  margin: 0;
+}
+.artwork-list {
+  list-style: none;
+  margin: var(--space-2) 0 var(--space-4);
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.artwork-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.artwork-thumb {
+  width: 120px;
+  height: 155px;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.artwork-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+.artwork-body h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.artwork-body .plain-list {
+  margin: var(--space-1) 0;
+}
+.artwork-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.artwork-confirm p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.plain-list {
+  list-style: none;
+  padding: 0;
+}
+.plain-list li + li {
+  margin-top: 4px;
+}
+@media (max-width: 560px) {
+  .artwork-row {
+    grid-template-columns: 1fr;
+  }
+}
