@@ -9,6 +9,7 @@ import hashlib
 import io
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from reportlab.pdfbase import pdfdoc
@@ -20,6 +21,7 @@ from .model import (
     Anchor,
     Face,
     ImageBlock,
+    ImageEncoding,
     InteriorLayout,
     LetterGrid,
     Panel,
@@ -28,12 +30,27 @@ from .model import (
     TextLine,
 )
 
-# Encoded grayscale photographs by (physical page, element role).
-EncodedImages = Mapping[tuple[int, str], tuple[bytes, tuple[int, int]]]
+
+@dataclass(frozen=True)
+class LosslessImage:
+    """Exact DeviceGray samples, deflated: 1 or 8 bits per pixel, rows byte-padded."""
+
+    samples: bytes
+    size: tuple[int, int]
+    bits: int
+
+
+# Encoded images by (physical page, element role): a photograph's DeviceGray JPEG
+# and its size, or line art's lossless samples.
+EncodedImages = Mapping[tuple[int, str], tuple[bytes, tuple[int, int]] | LosslessImage]
 
 
 def render_pdf(layout: InteriorLayout, images: EncodedImages | None = None) -> bytes:
-    """Draw `layout`; `images` holds each ImageBlock's encoded DeviceGray JPEG."""
+    """Draw `layout`; `images` holds each ImageBlock's encoded pixels.
+
+    An element type the renderer does not know is an error, never drawn as
+    something else.
+    """
     buffer = io.BytesIO()
     size = (layout.spec.trim.width, layout.spec.trim.height)
     # A TrueType initial font keeps ReportLab from adding an unembedded Helvetica.
@@ -66,9 +83,21 @@ def render_pdf(layout: InteriorLayout, images: EncodedImages | None = None) -> b
             elif isinstance(element, ImageBlock):
                 if images is None or (page.number, element.role) not in images:
                     raise ValueError(f"No encoded image for {element.role} on page {page.number}")
-                _image(canvas, element, *images[(page.number, element.role)])
-            else:
+                payload = images[(page.number, element.role)]
+                if element.encoding is ImageEncoding.LOSSLESS:
+                    if not isinstance(payload, LosslessImage):
+                        raise ValueError(f"{element.role} is line art and needs lossless samples")
+                    _lossless(canvas, element, payload)
+                else:
+                    if isinstance(payload, LosslessImage):
+                        raise ValueError(f"{element.role} is a JPEG photograph, not line art")
+                    _image(canvas, element, *payload)
+            elif isinstance(element, LetterGrid):
                 _grid(canvas, element)
+            else:
+                raise ValueError(
+                    f"Unsupported layout element {type(element).__name__} on page {page.number}"
+                )
         canvas.showPage()
     canvas.save()
     return buffer.getvalue()
@@ -138,6 +167,37 @@ def _image(canvas: Canvas, block: ImageBlock, jpeg: bytes, size: tuple[int, int]
     path = canvas.beginPath()
     path.rect(box.x, box.y, box.width, box.height)
     canvas.clipPath(path, stroke=0, fill=0)
+    canvas.translate(placement.x, placement.y)
+    canvas.scale(placement.width, placement.height)
+    raw._code.append(f"/{registered} Do")
+    canvas.restoreState()
+    raw._formsinuse.append(name)
+
+
+def _lossless(canvas: Canvas, block: ImageBlock, art: LosslessImage) -> None:
+    """Embed exact samples as one FlateDecode DeviceGray XObject at its placement.
+
+    No clip, smoothing or interpolation: the placement is the printed box itself.
+    """
+    if art.bits not in (1, 8):
+        raise ValueError("Line art is embedded at 1 or 8 bits per pixel")
+    name = "PPLineArt" + hashlib.sha256(art.samples).hexdigest()[:16]
+    raw: Any = canvas  # ReportLab's private registration API (pinned 5.0.x).
+    if name not in raw._formsinuse:
+        image: Any = pdfdoc.PDFImageXObject(name)
+        image.width, image.height = art.size
+        image.bitsPerComponent = art.bits
+        image.colorSpace = "DeviceGray"
+        image.streamContent = art.samples
+        image._filters = ("FlateDecode",)
+        image.mask = None
+        registered = raw._doc.getXObjectName(name)
+        raw._setXObjects(image)
+        raw._doc.Reference(image, registered)
+        raw._doc.addForm(name, image)
+    registered = raw._doc.getXObjectName(name)
+    placement = block.placement
+    canvas.saveState()
     canvas.translate(placement.x, placement.y)
     canvas.scale(placement.width, placement.height)
     raw._code.append(f"/{registered} Do")

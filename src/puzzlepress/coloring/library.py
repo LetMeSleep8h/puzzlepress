@@ -185,7 +185,7 @@ class ArtworkEntryReport:
             "path": self.artwork.path,
             "sha256": self.artwork.sha256,
             "adjustments": self.artwork.adjustments.to_dict(),
-            "adjustments_applied": False,
+            "adjustments_applied": True,
             "pages": list(self.pages),
             "inspection": self.inspection.to_dict() if self.inspection else None,
             "error": self.error.to_dict() if self.error else None,

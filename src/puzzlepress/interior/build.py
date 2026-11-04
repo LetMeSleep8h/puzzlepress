@@ -2,7 +2,9 @@
 
 project -> generation -> plan -> plan verification -> digest binding -> layout
 -> layout validation -> PDF -> PDF inspection -> atomic write of PDF + manifest.
-`build_interior` is pure; `write_interior` is the single write boundary.
+`build_interior` is pure; `write_interior` is the single write boundary. Coloring
+books take the same steps with prepared artwork instead of generated puzzles
+(`interior.coloring`), plus an independent decode of every embedded drawing.
 """
 
 import hashlib
@@ -11,12 +13,14 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from reportlab import Version as REPORTLAB_VERSION
 
 from .. import __version__
 from ..batch import BatchReport
-from ..engines.registry import engine_for
+from ..engines.kind import EngineKind
+from ..engines.registry import EngineContent, engine_for
 from ..identity import IDENTITY_VERSION
 from ..models import Project
 from ..publication import PublicationPlan
@@ -30,6 +34,9 @@ from .render import render_pdf
 from .spec import PrintSpecification, to_inches
 from .validation import validate_layout
 
+if TYPE_CHECKING:  # Imported lazily: coloring artwork reads import this package.
+    from ..coloring.content import ColoringContent
+
 MANIFEST_VERSION = 1
 PDF_NAME = "interior.pdf"
 MANIFEST_NAME = "interior.json"
@@ -38,7 +45,8 @@ PREFLIGHT_NAME = "preflight.json"
 
 @dataclass(frozen=True)
 class InteriorBuild:
-    report: BatchReport
+    # The content the plan binds to: generated puzzles, or prepared coloring artwork.
+    report: EngineContent
     plan: PublicationPlan
     layout: InteriorLayout
     pdf: bytes
@@ -65,21 +73,20 @@ def build_interior(
 ) -> InteriorBuild:
     """Run the full pipeline in memory. Raises ProjectError or InteriorError.
 
-    `source_directory` is the project folder; it is read only when the interior
-    style prints photographs from cover-assets.
+    `source_directory` is the project folder; it is read when the interior style
+    prints photographs from cover-assets, and for every coloring book's artwork.
     """
     from .images import InteriorPhotos, encode_gray, load_photos
 
+    if project.engine is EngineKind.COLORING:
+        return _build_coloring(project, spec, source_directory)
     engine = engine_for(project)
     report, plan = engine.build_publication(project, source_directory)
     verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
     if not isinstance(report, BatchReport):
-        raise InteriorError(
-            "engine",
-            (LayoutIssue("engine_not_buildable", "Coloring interiors cannot be laid out yet."),),
-        )
+        raise TypeError("Word-search plans bind to generated puzzles")
     style = project.interior
     photos = load_photos(source_directory, style.images() if style else ())
     placed = InteriorPhotos(style_images(style), {k: v.info for k, v in photos.items()})
@@ -103,6 +110,59 @@ def build_interior(
     return InteriorBuild(report, plan, layout, pdf, manifest, facts)
 
 
+def _coloring_publication(
+    project: Project, source_directory: Path | None
+) -> "tuple[ColoringContent, PublicationPlan]":
+    from ..coloring.content import ColoringContent
+
+    engine = engine_for(project)
+    content, plan = engine.build_publication(project, source_directory)
+    verification = engine.verify_publication(plan, project, content)
+    if not verification.valid:
+        raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
+    if not isinstance(content, ColoringContent):
+        raise TypeError("Coloring plans bind to prepared artwork")
+    return content, plan
+
+
+def _coloring_layout(
+    project: Project, spec: PrintSpecification, content: "ColoringContent", plan: PublicationPlan
+) -> InteriorLayout:
+    from .coloring import layout_coloring, validate_coloring_layout
+
+    assert project.coloring is not None
+    border = project.coloring.layout.border
+    layout = layout_coloring(plan, content, spec, border)
+    issues = validate_coloring_layout(layout, plan, content, border)
+    if issues:
+        raise InteriorError("layout_validation", issues)
+    return layout
+
+
+def _build_coloring(
+    project: Project, spec: PrintSpecification, source_directory: Path | None
+) -> InteriorBuild:
+    """Prepare, plan, verify, lay out, render, then reopen and decode every drawing."""
+    from .coloring import embedded_images, encode_art, image_integrity
+
+    content, plan = _coloring_publication(project, source_directory)
+    layout = _coloring_layout(project, spec, content, plan)
+    pdf = render_pdf(layout, encode_art(layout, content))
+    facts = read_pdf_facts(pdf)
+    pdf_issues = (facts,) if isinstance(facts, LayoutIssue) else contract_issues(facts, layout)
+    if not pdf_issues:
+        images = embedded_images(pdf)
+        if isinstance(images, LayoutIssue):
+            pdf_issues = (images,)
+        else:
+            pdf_issues = image_integrity(images, layout, content)
+    if pdf_issues:
+        raise InteriorError("pdf_verification", pdf_issues)
+    assert not isinstance(facts, LayoutIssue)
+    manifest = coloring_manifest(layout, pdf, plan, content)
+    return InteriorBuild(content, plan, layout, pdf, manifest, facts)
+
+
 # Manifest fields that, together, are the interior identity's inputs. `style`
 # (the resolved interior style) is an input only when the book has one, so
 # interiors without a style keep their identities.
@@ -115,7 +175,9 @@ IDENTITY_INPUTS = (
     "pdf_library",
     "fonts",
 )
-OPTIONAL_INPUTS = ("style",)
+# `coloring` (renderer, preparation, image library and deflate implementation) is
+# present only for coloring books, so word-search identities never change.
+OPTIONAL_INPUTS = ("style", "coloring")
 
 
 def toolchain() -> dict[str, object]:
@@ -136,7 +198,10 @@ def interior_identity(inputs: dict[str, object]) -> str:
 
 
 def interior_manifest(
-    layout: InteriorLayout, pdf: bytes, style: dict[str, object] | None = None
+    layout: InteriorLayout,
+    pdf: bytes,
+    style: dict[str, object] | None = None,
+    coloring: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Deterministic traceability record. It contains no timestamps or paths."""
     spec = layout.spec
@@ -148,6 +213,8 @@ def interior_manifest(
     }
     if style is not None:
         inputs["style"] = style
+    if coloring is not None:
+        inputs["coloring"] = coloring
     return {
         "manifest_version": MANIFEST_VERSION,
         "book_id": layout.book_id,
@@ -166,6 +233,51 @@ def interior_manifest(
             "bytes": len(pdf),
         },
         "warnings": [issue.to_dict() for issue in layout.warnings],
+    }
+
+
+def coloring_manifest(
+    layout: InteriorLayout, pdf: bytes, plan: PublicationPlan, content: "ColoringContent"
+) -> dict[str, object]:
+    """The shared manifest, with the coloring identity inputs, each printed drawing,
+    the composition's counts, and (for traceability only) the rendering environment.
+    """
+    from .coloring import ART_ROLE, coloring_toolchain, environment
+
+    blocks = {
+        page.number: element
+        for page in layout.pages
+        for element in page.elements
+        if isinstance(element, ImageBlock) and element.role == ART_ROLE
+    }
+    artwork = []
+    for page in plan.pages:
+        ref = page.artwork
+        if ref is None:
+            continue
+        art = content.art[ref.id]
+        block = blocks[page.index]
+        artwork.append(
+            {
+                "page": page.index,
+                "id": ref.id,
+                "source_sha256": ref.source,
+                "prepared": ref.prepared,
+                "pixels": [art.width, art.height],
+                "bits": art.bits,
+                "effective_dpi": round(block.effective_dpi, 2),
+                "placement_in": [
+                    round(to_inches(block.placement.width), 4),
+                    round(to_inches(block.placement.height), 4),
+                ],
+            }
+        )
+    return {
+        **interior_manifest(layout, pdf, coloring=coloring_toolchain()),
+        "engine": EngineKind.COLORING.value,
+        "environment": environment(),
+        "artwork": artwork,
+        "composition": plan.statistics.coloring_dict(),
     }
 
 
@@ -348,7 +460,7 @@ def sample_roles(layout: InteriorLayout, plan: PublicationPlan) -> dict[int, lis
     solution page when it holds fewer; and the first title, divider and
     instructions pages.
     """
-    from ..publication import PageKind
+    from ..publication import REVERSE_BLANK_REASON, PageKind
 
     roles: dict[int, list[str]] = {}
 
@@ -356,6 +468,18 @@ def sample_roles(layout: InteriorLayout, plan: PublicationPlan) -> dict[int, lis
         if number is not None:
             roles.setdefault(number, []).append(role)
 
+    if plan.engine is EngineKind.COLORING:
+        # The title page, the first drawing and its blank back, and the first divider.
+        for kind, role in (
+            (PageKind.TITLE_PAGE, "title"),
+            (PageKind.COLORING, "coloring"),
+            (PageKind.DIVIDER, "divider"),
+        ):
+            mark(next((p.index for p in plan.pages if p.kind is kind), None), role)
+        reverse = next((p for p in plan.pages if p.blank_reason == REVERSE_BLANK_REASON), None)
+        mark(reverse.index if reverse else None, "reverse_blank")
+        assert len(layout.pages) == len(plan.pages)
+        return roles
     kinds = [page.kind for page in plan.pages]
     puzzle_kinds = (PageKind.PUZZLE, PageKind.PUZZLE_WORDS)
     for kind, role in (
@@ -400,16 +524,15 @@ def sample_interior(
 
     from .images import InteriorPhotos, encode_gray, load_photos
 
+    if project.engine is EngineKind.COLORING:
+        return _sample_coloring(project, spec, source_directory)
     engine = engine_for(project)
     report, plan = publication or engine.build_publication(project, source_directory)
     verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
     if not isinstance(report, BatchReport):
-        raise InteriorError(
-            "engine",
-            (LayoutIssue("engine_not_buildable", "Coloring interiors cannot be laid out yet."),),
-        )
+        raise TypeError("Word-search plans bind to generated puzzles")
     style = project.interior
     photos = load_photos(source_directory, style.images() if style else ())
     placed = InteriorPhotos(style_images(style), {k: v.info for k, v in photos.items()})
@@ -426,6 +549,31 @@ def sample_interior(
         for element in page.elements
         if isinstance(element, ImageBlock)
     }
+    return InteriorSample(
+        render_pdf(sample, encoded),
+        tuple(
+            SamplePage(page.number, page.kind, page.folio, tuple(roles[page.number]))
+            for page in chosen
+        ),
+        len(layout.pages),
+        layout.warnings,
+    )
+
+
+def _sample_coloring(
+    project: Project, spec: PrintSpecification, source_directory: Path | None
+) -> InteriorSample:
+    """The whole coloring book prepared, laid out and validated; a few pages drawn."""
+    from dataclasses import replace
+
+    from .coloring import encode_art
+
+    content, plan = _coloring_publication(project, source_directory)
+    layout = _coloring_layout(project, spec, content, plan)
+    roles = sample_roles(layout, plan)
+    chosen = [page for page in layout.pages if page.number in roles]
+    sample = replace(layout, pages=tuple(chosen))
+    encoded = {k: v for k, v in encode_art(layout, content).items() if k[0] in roles}
     return InteriorSample(
         render_pdf(sample, encoded),
         tuple(

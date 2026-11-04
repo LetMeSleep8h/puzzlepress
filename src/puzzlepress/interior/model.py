@@ -159,12 +159,21 @@ class Panel:
         return self.box.expanded(self.stroke_width / 2)
 
 
+class ImageEncoding(StrEnum):
+    """How an image's pixels are embedded; each has its own renderer branch."""
+
+    JPEG = "jpeg"  # A styled grayscale photograph (DCTDecode).
+    LOSSLESS = "lossless"  # Prepared coloring line art, embedded exactly (FlateDecode).
+
+
 @dataclass(frozen=True)
 class ImageBlock:
-    """A grayscale photograph: the source window `pixels`, drawn at `placement`.
+    """A grayscale image: the source window `pixels`, drawn at `placement`.
 
     It is clipped to `box`, its printed area, which lies inside the live area.
     `effective_dpi` is source pixels per printed inch (uniform on both axes).
+    `sha256` names the source: a photograph's file digest, or for line art the
+    `sha256-` digest of its prepared pixels.
     """
 
     role: str
@@ -174,6 +183,7 @@ class ImageBlock:
     pixels: tuple[int, int, int, int]
     effective_dpi: float
     max_dpi: float
+    encoding: ImageEncoding = ImageEncoding.JPEG
 
     @property
     def bounds(self) -> Box:

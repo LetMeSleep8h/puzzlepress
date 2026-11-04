@@ -126,10 +126,10 @@ def test_invalid_coloring_compositions_are_reported(tmp_path, change, expected):
 def test_word_search_composition_rejects_coloring_settings():
     composed = load_project(Path("books/composition-demo")).project
     data = composed.to_dict()
-    data["composition"]["page_numbers"]["show_artwork"] = True  # type: ignore[index]
+    data["composition"]["page_numbers"]["show_artwork"] = True
     assert ("composition.page_numbers.show_artwork", "unknown_field") in codes(data)
     data = composed.to_dict()
-    data["composition"]["artwork"] = {"start": "recto"}  # type: ignore[index]
+    data["composition"]["artwork"] = {"start": "recto"}
     assert ("composition.artwork", "unknown_field") in codes(data)
 
 
@@ -168,7 +168,7 @@ def test_divider_entries_round_trip(tmp_path):
     assert isinstance(coloring, dict)
     coloring["pages"].insert(0, {"divider": {"title": "Woodland", "text": "Two\nlines"}})
     project = validate_project(data).require_project()
-    assert project.to_dict()["coloring"]["pages"][0] == {  # type: ignore[index]
+    assert project.to_dict()["coloring"]["pages"][0] == {
         "divider": {"title": "Woodland", "text": "Two\nlines"}
     }
 
@@ -284,7 +284,7 @@ def test_consecutive_dividers_each_start_recto(tmp_path):
     directory = composed_coloring_book(tmp_path / "book", 1, front=0, dividers={0: "Part one"})
     project = load_project(directory).project
     data = project.to_dict()
-    data["coloring"]["pages"].insert(0, {"divider": {"title": "Book one"}})  # type: ignore[index]
+    data["coloring"]["pages"].insert(0, {"divider": {"title": "Book one"}})
     (directory / "book.yaml").write_text(
         __import__("puzzlepress").dump_project(validate_project(data).require_project()),
         encoding="utf-8",
@@ -379,7 +379,7 @@ def test_preparation_settings_change_identity_and_prepared_digest(tmp_path):
     project = load_project(directory).project
     before, content = plan_of(directory)
     data = project.to_dict()
-    data["coloring"]["artwork"][0]["adjustments"]["line_weight"] = 1  # type: ignore[index]
+    data["coloring"]["artwork"][0]["adjustments"]["line_weight"] = 1
     changed = validate_project(data).require_project()
     after_content, after = ENGINES[EngineKind.COLORING].build_publication(changed, directory)
     assert build_identity(changed) != build_identity(project)
@@ -431,7 +431,7 @@ def test_plan_requires_content_from_the_same_source(tmp_path):
 # -------------------------------------------------------------- corrupted plans
 
 
-def corrupt(plan: PublicationPlan, pages: list) -> PublicationPlan:  # type: ignore[type-arg]
+def corrupt(plan: PublicationPlan, pages: list) -> PublicationPlan:
     return replace(plan, pages=tuple(pages))
 
 
@@ -441,7 +441,7 @@ def test_verifier_catches_corrupted_plans(tmp_path):
     pages = list(plan.pages)
     art = [i for i, p in enumerate(pages) if p.kind is PageKind.COLORING]
 
-    def check(changed: list, code: str) -> None:  # type: ignore[type-arg]
+    def check(changed: list, code: str) -> None:
         assert code in verified(corrupt(plan, changed), directory, content)
 
     # Two drawings swapped: their content no longer follows the authored order.

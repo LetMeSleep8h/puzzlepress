@@ -62,7 +62,8 @@ def test_upload_lists_inspects_and_thumbnails_artwork(client, library):
     assert imported["id"] == "fox-in-the-ferns" and imported["page"] == 1
     (entry,) = data["report"]["artwork"]
     assert entry["inspection"]["info"]["effective_dpi"] == 300.0
-    assert entry["adjustments_applied"] is False and entry["pages"] == [1]
+    # Interval 4: interior builds print the saved settings.
+    assert entry["adjustments_applied"] is True and entry["pages"] == [1]
     assert data["revision"] != empty["revision"]
     stored = library / "colors" / imported["path"]
     assert stored.read_bytes() == png(1)

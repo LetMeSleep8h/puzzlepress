@@ -30,8 +30,9 @@ EPSILON = 0.01
 
 
 def validate_layout(
-    layout: InteriorLayout, plan: PublicationPlan, report: BatchReport
+    layout: InteriorLayout, plan: PublicationPlan, report: BatchReport | None
 ) -> tuple[LayoutIssue, ...]:
+    """`report` is None for books without generated puzzles (coloring books)."""
     issues: list[LayoutIssue] = []
     spec = layout.spec
     if len(layout.pages) != len(plan.pages):
@@ -46,7 +47,7 @@ def validate_layout(
         return tuple(issues)
     errors, _ = page_count_checks(spec, len(layout.pages))
     issues.extend(errors)
-    puzzles = {r.id: r.puzzle for r in report.puzzles if r.puzzle is not None}
+    puzzles = {r.id: r.puzzle for r in report.puzzles if r.puzzle is not None} if report else {}
     trim = Box(0.0, 0.0, spec.trim.width, spec.trim.height)
     margins = spec.margins
     spread = {
