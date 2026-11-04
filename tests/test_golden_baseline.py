@@ -1,16 +1,20 @@
 """Every demo book still produces exactly the outputs pinned before the engine refactor.
 
 The baseline (`tests/fixtures/golden/baseline.json`) was recorded by
-`tests/golden_baseline.py` from the engine at main `693aa00` (branch commit `270d3dd`
-adds only documentation) before any engine change. Never rewrite it to make this
-test pass: a difference is a behavior change to explain.
+`tests/golden_baseline.py` from the engine at main `693aa00` (branch commits `270d3dd`
+and `a9e076a` add only documentation and tests) before any engine change. Never
+rewrite it to make this test pass: a difference is a behavior change to explain.
+
+Baseline version 2 re-recorded the same pre-refactor engine with the corrected
+stdout normalization (see `golden_baseline.py`). Only five JSON stdout digests
+changed, and they equal the values Linux CI computed for version 1's run.
 """
 
 import json
 
 import pytest
 
-from tests.golden_baseline import BASELINE, SOURCE_ONLY, collect, encode, toolchain
+from tests.golden_baseline import BASELINE, PDF_WRITERS, SOURCE_ONLY, collect, encode, toolchain
 
 
 @pytest.fixture(scope="module")
@@ -52,6 +56,27 @@ def test_source_only_outputs_match(pinned, current):
                 found += _differences(
                     record.get(key), current["books"][name].get(key), f"/{name}/{key}"
                 )
+    assert found == []
+
+
+def _pdfs(record: dict) -> dict[str, str]:
+    return {
+        f"{group}/{name}": digest
+        for group in ("interior_files", "produce_files")
+        for name, digest in record.get(group, {}).items()
+        if name.endswith(".pdf")
+    }
+
+
+def test_pdf_files_match(pinned, current):
+    """Interior and cover PDFs need only the same writing libraries, not the same pypdf."""
+    installed = toolchain()
+    wanted = {name: pinned["toolchain"][name] for name in PDF_WRITERS}
+    if {name: installed[name] for name in PDF_WRITERS} != wanted:
+        pytest.skip(f"PDF bytes were pinned under {wanted}; installed {installed}.")
+    found: list[str] = []
+    for name, record in pinned["books"].items():
+        found += _differences(_pdfs(record), _pdfs(current["books"][name]), f"/{name}")
     assert found == []
 
 
