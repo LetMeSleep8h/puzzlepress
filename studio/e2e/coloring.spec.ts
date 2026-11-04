@@ -103,3 +103,57 @@ test('coloring artwork: import, check, refuse SVG, find look-alikes, remove', as
   await page.setViewportSize({ width: 390, height: 900 });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
+
+test('line-art preparation: preview, findings, difference, save, reload, reset', async ({
+  page,
+}) => {
+  await page.goto('/books/coloring-prepare/artwork');
+  const row = page.locator('.artwork-row', { hasText: 'Fine detail' });
+  await row.getByRole('button', { name: 'Prepare line art…' }).click();
+  const panel = row.getByRole('region', { name: /Prepare .Fine detail. for printing/ });
+  await expect(panel.getByText('Preview shows these settings')).toBeVisible({ timeout: 20000 });
+  await expect(panel.getByText('No findings')).toBeVisible();
+  await expect(panel.getByRole('img', { name: 'Original: Fine detail' })).toBeVisible();
+  await expect(panel.getByRole('img', { name: 'Prepared: Fine detail' })).toBeVisible();
+
+  // Thinning destroys the 1 and 2 px lines: Python blocks it and the preview follows.
+  await panel.getByRole('combobox', { name: 'Line weight' }).selectOption('-1');
+  await expect(panel.getByText(/Most fine lines .* are gone/)).toBeVisible({ timeout: 20000 });
+  await expect(panel.getByText('Blocking').first()).toBeVisible();
+  await expect(panel.getByText('Unsaved settings.')).toBeVisible();
+  await panel.getByText('Difference', { exact: true }).click();
+  await expect(panel.getByRole('img', { name: 'Difference: Fine detail' })).toBeVisible();
+  await expect(panel.getByText(/red: ink removed/)).toBeVisible();
+
+  // A real range input, moved by keyboard, re-previews; thickening keeps fine lines.
+  await panel.getByRole('combobox', { name: 'Line weight' }).selectOption('1');
+  const contrast = panel.getByRole('slider', { name: 'Contrast' });
+  await contrast.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(contrast).toHaveValue('1.05');
+  await expect(panel.getByText('Preview shows these settings')).toBeVisible({ timeout: 20000 });
+  await expect(panel.getByText(/Most fine lines/)).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Save settings' }).click();
+  await expect(panel.getByText(/Settings saved. The original file is unchanged/)).toBeVisible();
+
+  await page.reload();
+  await row.getByRole('button', { name: 'Prepare line art…' }).click();
+  await expect(panel.getByRole('combobox', { name: 'Line weight' })).toHaveValue('1');
+  await expect(panel.getByText('Saved settings.')).toBeVisible({ timeout: 20000 });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  await panel.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(panel.getByRole('combobox', { name: 'Line weight' })).toHaveValue('0');
+  await panel.getByRole('button', { name: 'Save settings' }).click();
+  await expect(panel.getByText(/Settings saved/)).toBeVisible();
+  await page.reload();
+  await row.getByRole('button', { name: 'Prepare line art…' }).click();
+  await expect(panel.getByRole('button', { name: 'Reset to defaults' })).toBeDisabled();
+
+  for (const width of [1440, 1024, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await noOverflow(page);
+  }
+  await expect(panel.getByText('Preview shows these settings')).toBeVisible({ timeout: 20000 });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});

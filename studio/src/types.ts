@@ -90,6 +90,28 @@ export interface ColoringSource {
   pages: { artwork: string }[];
   layout: { blank_reverse: boolean; border: string };
 }
+/** Line-art preparation settings, as Python normalizes them (invert only when set). */
+export interface Adjustments {
+  grayscale: boolean;
+  threshold: number | null;
+  brightness: number;
+  contrast: number;
+  background_cleanup: number;
+  despeckle: number;
+  line_weight: number;
+  invert?: boolean;
+}
+export interface Preparation {
+  artwork: string;
+  key: string;
+  preparation_version: number;
+  adjustments: Adjustments;
+  saved_adjustments: Adjustments;
+  measures: Record<string, number | number[] | string[] | null>;
+  findings: ArtworkFinding[];
+  blocking: boolean;
+  images: { original: string; prepared: string; difference: string };
+}
 export interface ArtworkFinding {
   code: string;
   severity: 'blocking' | 'warning';
@@ -103,6 +125,7 @@ export interface ArtworkEntry {
   path: string;
   sha256: string;
   pages: number[];
+  adjustments: Adjustments;
   adjustments_applied: boolean;
   inspection: {
     info: {

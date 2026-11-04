@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AdjustPanel } from './AdjustPanel';
 import { ApiError, request, upload } from './api';
 import type { ArtworkEntry, ColoringListing, Project } from './types';
 import { Empty, ErrorState, Loading, Status } from './ui';
@@ -255,6 +256,8 @@ function Artwork({ projectKey }: { projectKey: string }) {
               entry={entry}
               busy={busy}
               remove={remove}
+              revision={listing.revision}
+              onSaved={(next) => setListing(next)}
             />
           ))}
         </ul>
@@ -318,13 +321,18 @@ function ArtworkRow({
   entry,
   busy,
   remove,
+  revision,
+  onSaved,
 }: {
   projectKey: string;
   entry: ArtworkEntry;
   busy: boolean;
   remove: (entry: ArtworkEntry, withPages: boolean) => Promise<void>;
+  revision: string;
+  onSaved: (listing: ColoringListing) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [withPages, setWithPages] = useState(false);
   const info = entry.inspection?.info;
   const findings = entry.inspection?.findings ?? [];
@@ -413,11 +421,31 @@ function ArtworkRow({
             <p className="small muted">The original file stays in the project.</p>
           </div>
         ) : (
-          <button type="button" disabled={busy} onClick={() => setConfirming(true)}>
-            Remove…
-          </button>
+          <div className="artwork-actions">
+            {info && (
+              <button
+                type="button"
+                aria-expanded={adjusting}
+                onClick={() => setAdjusting((open) => !open)}
+              >
+                {adjusting ? 'Close preparation' : 'Prepare line art…'}
+              </button>
+            )}
+            <button type="button" disabled={busy} onClick={() => setConfirming(true)}>
+              Remove…
+            </button>
+          </div>
         )}
       </div>
+      {adjusting && info && (
+        <AdjustPanel
+          projectKey={projectKey}
+          entry={entry}
+          title={title}
+          revision={revision}
+          onSaved={onSaved}
+        />
+      )}
     </li>
   );
 }

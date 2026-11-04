@@ -117,7 +117,19 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
     import_photo(books / "design-demo", photo_bytes(900, 600), "spare-photo.jpg")
     import_photo(books / "template-demo", photo_bytes(900, 600), "spare-photo.jpg")
     # Coloring artwork: an empty SYNTHETIC coloring book; the spec imports its drawings.
-    from coloring_helpers import write_coloring_book  # noqa: E402
+    from coloring_helpers import (  # noqa: E402
+        coloring_source,
+        encode,
+        fine_detail,
+        write_coloring_book,
+    )
+
+    from puzzlepress.coloring.library import import_files  # noqa: E402
 
     write_coloring_book(books / "coloring-demo")
+    # Line-art preparation: a SYNTHETIC drawing with known 1, 2, 3 and 6 px lines.
+    source = coloring_source("preparation-acceptance")
+    source["book"]["title"] = "Preparation Acceptance Book"  # type: ignore[index]
+    write_coloring_book(books / "coloring-prepare", source)
+    import_files(books / "coloring-prepare", [("Fine detail.png", encode(fine_detail()))])
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)
