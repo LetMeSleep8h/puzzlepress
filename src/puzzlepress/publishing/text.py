@@ -170,6 +170,12 @@ PUZZLE_CLAIM = re.compile(
     re.IGNORECASE,
 )
 SOLUTIONS = re.compile(r"\b(?:solutions?|answer\s+keys?|answers)\b", re.IGNORECASE)
+# Coloring descriptions count drawings ("40 coloring pages", "twenty designs").
+DRAWING_CLAIM = re.compile(
+    rf"(?<![x×]\s)(?<![x×])\b({_NUMBER})\b(?!\s?[x×])"
+    rf"{_GAP}[\s-]+(?:colou?ring[\s-]+pages?|drawings?|designs?|illustrations?|pictures?)\b",
+    re.IGNORECASE,
+)
 
 
 def number_value(text: str) -> int:
@@ -179,6 +185,11 @@ def number_value(text: str) -> int:
     if words[-1] == "hundred":
         return 100
     return sum(_TENS.get(w, 0) + _UNITS.get(w, 0) for w in words)
+
+
+def drawing_claims(text: str) -> list[tuple[str, int]]:
+    """Each (phrase, number) in which a coloring description counts its drawings."""
+    return [(m.group(0), number_value(m.group(1))) for m in DRAWING_CLAIM.finditer(text)]
 
 
 def puzzle_claims(text: str) -> list[tuple[str, int]]:

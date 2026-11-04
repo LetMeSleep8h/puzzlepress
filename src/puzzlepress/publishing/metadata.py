@@ -16,20 +16,19 @@ from ..publishing_config import (
     ContributorRole,
     IsbnMode,
     PublishingConfig,
+    RightsBasis,
 )
 from . import text
 from .identity import publishing_identity
 from .isbn import check_isbn
 from .model import Area, Collector, Finding, Outcome, RuleResult, Scope, Severity
-from .review import COVERS, review_identity
+from .review import covers, review_identity
 from .rules import (
     KDP_METADATA,
-    KDP_RULES_CHECKED,
-    METADATA_CODES,
     PAPERBACK_LANGUAGES,
-    RULES,
-    RULESET_ID,
-    RULESET_VERSION,
+    WORD_SEARCH_RULESET,
+    PublishingRuleset,
+    ruleset_for,
 )
 
 ATTESTATION_TEXT = {
@@ -39,7 +38,41 @@ ATTESTATION_TEXT = {
     "and audience accurately represent this book.",
     "isbn": "My ISBN is registered with this title, author and imprint exactly as entered.",
 }
+COLORING_ATTESTATION_TEXT = {
+    **ATTESTATION_TEXT,
+    "rights": "I hold the rights to publish this book's artwork, cover images and text, on the "
+    "basis I declared; owning a copy of a file is not that right.",
+}
 KINDS = ("text", "images", "translations")
+ARTWORK_KINDS = (("interior_artwork", "interior artwork"), ("cover_artwork", "cover artwork"))
+RIGHTS_KINDS = (
+    ("interior_artwork", "interior artwork"),
+    ("cover_artwork", "cover artwork"),
+    ("text", "text (captions, dividers, front and back matter, description)"),
+)
+# The more an origin needs disclosing, the higher; KDP's images answer is the highest.
+_ORIGIN_RANK = {ContentOrigin.HUMAN: 0, ContentOrigin.AI_ASSISTED: 1, ContentOrigin.AI_GENERATED: 2}
+
+
+def attestation_text(name: str, coloring: bool) -> str:
+    """The statement confirmation `name` asks the author to make, for this kind of book."""
+    return (COLORING_ATTESTATION_TEXT if coloring else ATTESTATION_TEXT)[name]
+
+
+def images_answer(disclosure: AiDisclosure) -> ContentOrigin | None:
+    """KDP's images answer implied by a coloring book's artwork origins.
+
+    KDP's AI question has one images answer covering cover and interior images and
+    artwork, so it is the most disclosing of the two. None while either is
+    undeclared. A cover without artwork (`none`) contributes nothing.
+    """
+    origins = [disclosure.interior_artwork, disclosure.cover_artwork]
+    if any(o is None or o is ContentOrigin.UNKNOWN for o in origins):
+        return None
+    ranked = [o for o in origins if o in _ORIGIN_RANK]
+    if not ranked:
+        return None
+    return max(ranked, key=lambda origin: _ORIGIN_RANK[origin])
 
 
 def kdp_ai_answers(disclosure: AiDisclosure) -> dict[str, dict[str, str]]:
@@ -81,24 +114,33 @@ class Confirmation:
     state: str
     current: str  # Review identity of the covered content now.
     confirmed: str | None  # The stored review identity.
+    coloring: bool = False  # Wording for a coloring book's artwork.
+
+    @property
+    def statement(self) -> str:
+        return attestation_text(self.name, self.coloring)
+
+    @property
+    def covers(self) -> str:
+        return covers(self.name, self.coloring)
 
     @property
     def message(self) -> str:
         return {
             "confirmed": "It applies to the content as it is now.",
             "stale": "Something it covers changed after you confirmed it: "
-            f"{COVERS[self.name]}. Review and confirm again (restoring exactly what you "
+            f"{self.covers}. Review and confirm again (restoring exactly what you "
             "reviewed also restores it).",
             "legacy": "Saved as yes or no by publishing version 1, which did not record what "
             "you reviewed. Upgrade the section and confirm again.",
-            "unconfirmed": f"It covers {COVERS[self.name]}.",
+            "unconfirmed": f"It covers {self.covers}.",
         }[self.state]
 
     def to_dict(self) -> dict[str, object]:
         return {
             "name": self.name,
-            "statement": ATTESTATION_TEXT[self.name],
-            "covers": COVERS[self.name],
+            "statement": self.statement,
+            "covers": self.covers,
             "required": self.required,
             "state": self.state,
             "current": self.current,
@@ -127,7 +169,11 @@ def confirmations(project: Project) -> tuple[Confirmation, ...]:
             if stored == current
             else "stale"
         )
-        states.append(Confirmation(name, name in required, state, current, stored))
+        states.append(
+            Confirmation(
+                name, name in required, state, current, stored, project.coloring is not None
+            )
+        )
     return tuple(states)
 
 
@@ -138,6 +184,7 @@ class MetadataReport:
     findings: tuple[Finding, ...]
     results: tuple[RuleResult, ...]
     confirmations: tuple[Confirmation, ...] = ()
+    ruleset: PublishingRuleset = WORD_SEARCH_RULESET
 
     def _blocking(self, *scopes: Scope) -> bool:
         return any(
@@ -172,9 +219,9 @@ class MetadataReport:
         return {
             "report_version": 2,
             "ruleset": {
-                "id": RULESET_ID,
-                "version": RULESET_VERSION,
-                "kdp_rules_checked": KDP_RULES_CHECKED,
+                "id": self.ruleset.id,
+                "version": self.ruleset.version,
+                "kdp_rules_checked": self.ruleset.checked,
             },
             "book_id": self.book_id,
             "publishing_identity": self.publishing_identity,
@@ -198,7 +245,8 @@ class MetadataReport:
 
 def validate_metadata(project: Project) -> MetadataReport:
     """Evaluate every metadata, disclosure and attestation rule. Pure."""
-    c = Collector(RULES)
+    ruleset = ruleset_for(project.coloring is not None)
+    c = Collector(ruleset.rules)
     config = project.publishing
     states = confirmations(project)
     if config is None:
@@ -208,7 +256,7 @@ def validate_metadata(project: Project) -> MetadataReport:
             field="publishing",
             action="Start the publishing metadata.",
         )
-        for code in METADATA_CODES:
+        for code in ruleset.metadata_codes:
             if code != "publishing_configured":
                 c.skip(code, "No publishing metadata.")
     else:
@@ -219,13 +267,17 @@ def validate_metadata(project: Project) -> MetadataReport:
         _audience(c, config)
         _classification(c, project, config)
         _disclosure(c, config)
+        if project.coloring is not None:
+            _artwork_disclosure(c, config)
+            _content_rights(c, config)
         _attestations(c, states)
     return MetadataReport(
         project.book.id,
         publishing_identity(project),
         tuple(sorted(c.findings, key=Finding.sort_key)),
-        c.results(METADATA_CODES),
+        c.results(ruleset.metadata_codes),
         states,
+        ruleset,
     )
 
 
@@ -442,6 +494,9 @@ def _description(c: Collector, project: Project, config: PublishingConfig) -> No
             "phrases in descriptions.",
             field=field,
         )
+    if project.coloring is not None:
+        _drawing_claims(c, project, body, field)
+        return
     words = project.word_search
     puzzles = len(words.puzzles) if words else 0
     for phrase, claimed in text.puzzle_claims(body):
@@ -624,9 +679,72 @@ def _audience(c: Collector, config: PublishingConfig) -> None:
         )
 
 
+def _drawing_claims(c: Collector, project: Project, body: str, field: str) -> None:
+    """A coloring description's counts of drawings or coloring pages match the book."""
+    book = project.coloring
+    assert book is not None
+    pages = len(book.artwork_pages)
+    drawings = len({artwork_id for _, artwork_id in book.artwork_pages})
+    for phrase, claimed in text.drawing_claims(body):
+        if claimed not in (pages, drawings):
+            counted = (
+                f"{pages} coloring pages"
+                if pages == drawings
+                else f"{pages} coloring pages showing {drawings} different drawings"
+            )
+            c.fail(
+                "description_claims",
+                f"'{phrase}' claims {claimed}; the book has {counted}.",
+                field=field,
+                actual=claimed,
+                required=pages,
+                action="Correct the count; PuzzlePress never edits your description.",
+            )
+    mentioned = text.first(text.SOLUTIONS, body)
+    if mentioned:
+        c.fail(
+            "description_claims",
+            f"The description mentions '{mentioned}', but a coloring book has no solutions.",
+            field=field,
+            action="Remove the mention.",
+        )
+
+
 def _classification(c: Collector, project: Project, config: PublishingConfig) -> None:
+    if project.coloring is not None:
+        _coloring_classification(c, config)
+    else:
+        _word_search_classification(c, config)
+    _isbn(c, project, config)
+
+
+def _coloring_classification(c: Collector, config: PublishingConfig) -> None:
+    """KDP's Low-Content Books page (2026-11-04) names coloring books among the books
+    that are "not generally low-content"; it does not say they never are."""
     low = config.low_content
-    mode = config.isbn.mode
+    if low is None:
+        c.fail(
+            "low_content_decided",
+            "Decide whether this is a low-content book. KDP lists coloring books as "
+            "'not generally low-content' (it describes low-content books as repetitive pages "
+            "to fill in, such as journals and log books) and rejects a wrong choice.",
+            field="publishing.low_content",
+            action="Choose a classification; PuzzlePress does not choose for you.",
+        )
+    elif low:
+        c.fail(
+            "low_content_review",
+            "Marked low-content. KDP lists coloring books as not generally low-content. "
+            "Confirm this exception: low-content books get no free KDP ISBN, no series and "
+            "no Expanded Distribution.",
+            field="publishing.low_content",
+        )
+    else:
+        c.not_applicable("low_content_review", "Not low-content.")
+
+
+def _word_search_classification(c: Collector, config: PublishingConfig) -> None:
+    low = config.low_content
     if low is None:
         c.fail(
             "low_content_decided",
@@ -644,6 +762,11 @@ def _classification(c: Collector, project: Project, config: PublishingConfig) ->
         )
     else:
         c.not_applicable("low_content_review", "Not low-content.")
+
+
+def _isbn(c: Collector, project: Project, config: PublishingConfig) -> None:
+    low = config.low_content
+    mode = config.isbn.mode
     if mode is IsbnMode.UNDECIDED:
         c.fail(
             "isbn_decided",
@@ -738,11 +861,124 @@ def _disclosure(c: Collector, config: PublishingConfig) -> None:
         c.note("ai_disclosure_required", "Nothing declared AI-generated.")
 
 
+def _artwork_disclosure(c: Collector, config: PublishingConfig) -> None:
+    """Coloring books: who or what drew the interior and cover artwork.
+
+    KDP's Content Guidelines (2026-11-04): AI-generated images "include cover and
+    interior images and artwork" and must be disclosed even after substantial edits;
+    AI-assisted content (your own work edited or refined with AI tools) need not be.
+    """
+    disclosure = config.ai_disclosure
+    declared = True
+    for kind, label in ARTWORK_KINDS:
+        origin = getattr(disclosure, kind)
+        if origin is None or origin is ContentOrigin.UNKNOWN:
+            declared = False
+            c.fail(
+                "artwork_origin_declared",
+                f"Declare who or what created the {label}. KDP counts cover and interior "
+                "artwork as images, and AI-generated images must be disclosed even if you "
+                "edited them substantially.",
+                field=f"publishing.ai_disclosure.{kind}",
+                action="Choose human, AI-assisted (your own drawing refined with AI tools) or "
+                "AI-generated"
+                + (", or none for a cover without artwork." if kind == "cover_artwork" else "."),
+            )
+    if not declared:
+        c.skip("artwork_origin_consistent", "Artwork origins are not declared.")
+        return
+    implied = images_answer(disclosure)
+    if implied is None:
+        c.note("artwork_origin_consistent", "No artwork origin bears on the images answer.")
+        return
+    if disclosure.images is not implied:
+        c.fail(
+            "artwork_origin_consistent",
+            f"KDP's images answer is '{disclosure.images.value}', but the artwork origins "
+            f"imply '{implied.value}': KDP asks one images question for cover and interior "
+            "artwork together.",
+            field="publishing.ai_disclosure.images",
+            actual=disclosure.images.value,
+            required=implied.value,
+            action=f"Set images to {implied.value}, or correct the artwork origins.",
+        )
+
+
+def _content_rights(c: Collector, config: PublishingConfig) -> None:
+    """Coloring books: the declared basis for publishing each kind of content.
+
+    Recorded, never verified. KDP's Content Guidelines make the publisher
+    responsible for rights, refuse copyrighted content freely available on the web
+    unless provided by the owner, and may ask for proof that content is public domain.
+    """
+    rights = config.content_rights
+    if rights is None:
+        c.fail(
+            "content_rights_declared",
+            "Declare on what basis you may publish the interior artwork, cover artwork and "
+            "text. Having an image file is not a right to publish it.",
+            field="publishing.content_rights",
+            action="Record your rights declaration in Publishing.",
+        )
+        c.skip("content_rights_review", "No rights declaration.")
+        return
+    for kind, label in RIGHTS_KINDS:
+        basis: RightsBasis = getattr(rights, kind)
+        if basis is RightsBasis.UNDECIDED:
+            c.fail(
+                "content_rights_declared",
+                f"Declare the rights basis for the {label}.",
+                field=f"publishing.content_rights.{kind}",
+                action="Choose own work, commissioned, licensed, public domain or AI tool terms.",
+            )
+            continue
+        advice = {
+            RightsBasis.LICENSED: "Keep the licence and check that it allows commercial "
+            "print-on-demand sale; record its name and source in the notes.",
+            RightsBasis.PUBLIC_DOMAIN: "KDP may ask for proof that the content is in the "
+            "public domain; keep your evidence and record the source in the notes.",
+            RightsBasis.AI_TOOL_TERMS: "Check that the AI tool's terms allow commercial "
+            "print use. PuzzlePress cannot tell whether AI-generated images can be owned or "
+            "protected by copyright where you publish.",
+            RightsBasis.COMMISSIONED: "Keep the agreement that grants you the publishing rights.",
+        }.get(basis)
+        if advice is not None:
+            c.fail(
+                "content_rights_review",
+                f"The {label} is declared {basis.value.replace('_', ' ')}. {advice}",
+                field=f"publishing.content_rights.{kind}",
+            )
+    disclosure = config.ai_disclosure
+    for kind, label in ARTWORK_KINDS:
+        origin = getattr(disclosure, kind)
+        if origin is ContentOrigin.AI_GENERATED and getattr(rights, kind) is RightsBasis.OWN_WORK:
+            c.fail(
+                "content_rights_review",
+                f"The {label} is declared AI-generated and your own work. PuzzlePress "
+                "cannot decide whether AI-generated images are your own work or protected by "
+                "copyright; check the tool's terms and consider 'AI tool terms'.",
+                field=f"publishing.content_rights.{kind}",
+            )
+    cover_origin = disclosure.cover_artwork
+    if (
+        rights.cover_artwork is RightsBasis.NONE
+        and cover_origin is not None
+        and cover_origin is not ContentOrigin.NONE
+    ):
+        c.fail(
+            "content_rights_review",
+            "The cover artwork rights say the cover has no artwork, but its origin is "
+            f"declared '{cover_origin.value}'. Make the two agree.",
+            field="publishing.content_rights.cover_artwork",
+        )
+    c.note("content_rights_review", "Declarations recorded as written; not verified.")
+
+
 def _attestations(c: Collector, states: tuple[Confirmation, ...]) -> None:
     for state in states:
         if not state.required or state.state == "confirmed":
             continue
-        statement = ATTESTATION_TEXT[state.name]
+        statement = state.statement
         c.fail(
             "attestations",
             f"Not confirmed: {statement}"

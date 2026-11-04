@@ -509,3 +509,98 @@ METADATA_CODES: tuple[str, ...] = tuple(
     if rule.scope in (Scope.METADATA, Scope.DISCLOSURE, Scope.ATTESTATION)
     or rule.code == "description_claims"
 )
+
+
+# ---------------------------------------------------------------- coloring books
+
+# A separate ruleset, so word-search reports and packages keep their bytes. Shared
+# rules keep their codes and wording; coloring adds artwork origin and rights
+# declarations. KDP's Content Guidelines (G200672390) and Low-Content Books
+# (GGE5T76TWKA85DJM) pages were re-read for these on 2026-11-04 (COLORING_CHECKED).
+COLORING_RULESET_ID = "puzzlepress-kdp-publishing-coloring"
+COLORING_RULESET_VERSION = 1
+COLORING_CHECKED = "2026-11-04"
+
+_COLORING_ADDITIONS: tuple[Rule, ...] = (
+    Rule(
+        "artwork_origin_declared",
+        Scope.DISCLOSURE,
+        Severity.ERROR,
+        "Interior and cover artwork origin declared",
+        Basis.KDP_REQUIREMENT,
+        CONTENT,
+    ),
+    Rule(
+        "artwork_origin_consistent",
+        Scope.DISCLOSURE,
+        Severity.ERROR,
+        "KDP's images answer agrees with the artwork origins",
+        Basis.KDP_REQUIREMENT,
+        CONTENT,
+    ),
+    Rule(
+        "content_rights_declared",
+        Scope.DISCLOSURE,
+        Severity.ERROR,
+        "Rights basis declared for interior artwork, cover artwork and text",
+        Basis.PUZZLEPRESS_RULE,
+        CONTENT,
+    ),
+    Rule(
+        "content_rights_review",
+        Scope.DISCLOSURE,
+        Severity.WARNING,
+        "Rights declarations that need evidence or a closer look",
+        Basis.HUMAN_REVIEW,
+        CONTENT,
+    ),
+)
+
+
+def _with_additions(
+    rules: tuple[Rule, ...], after: str, added: tuple[Rule, ...]
+) -> tuple[Rule, ...]:
+    index = next(i for i, rule in enumerate(rules) if rule.code == after) + 1
+    return rules[:index] + added + rules[index:]
+
+
+_COLORING_RULES = _with_additions(_RULES, "ai_disclosure_required", _COLORING_ADDITIONS)
+
+
+@dataclass(frozen=True)
+class PublishingRuleset:
+    """One engine's publishing rule catalogue, in report order."""
+
+    id: str
+    version: int
+    checked: str  # When the official pages behind it were last read.
+    rules: dict[str, Rule]
+    codes: tuple[str, ...]
+    metadata_codes: tuple[str, ...]
+
+
+def _ruleset(id: str, version: int, checked: str, rules: tuple[Rule, ...]) -> PublishingRuleset:
+    return PublishingRuleset(
+        id,
+        version,
+        checked,
+        {rule.code: rule for rule in rules},
+        tuple(rule.code for rule in rules),
+        tuple(
+            rule.code
+            for rule in rules
+            if rule.scope in (Scope.METADATA, Scope.DISCLOSURE, Scope.ATTESTATION)
+            or rule.code == "description_claims"
+        ),
+    )
+
+
+WORD_SEARCH_RULESET = _ruleset(RULESET_ID, RULESET_VERSION, KDP_RULES_CHECKED, _RULES)
+COLORING_RULESET = _ruleset(
+    COLORING_RULESET_ID, COLORING_RULESET_VERSION, COLORING_CHECKED, _COLORING_RULES
+)
+
+
+def ruleset_for(coloring: bool) -> PublishingRuleset:
+    """The publishing ruleset for a coloring book, or the word-search one."""
+    return COLORING_RULESET if coloring else WORD_SEARCH_RULESET

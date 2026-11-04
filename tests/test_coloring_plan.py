@@ -133,11 +133,16 @@ def test_word_search_composition_rejects_coloring_settings():
     assert ("composition.artwork", "unknown_field") in codes(data)
 
 
-@pytest.mark.parametrize("section", ["cover", "publishing", "interior"])
-def test_coloring_books_take_no_cover_publishing_or_interior_style_yet(tmp_path, section):
+def test_coloring_books_take_cover_and_publishing_but_no_interior_style(tmp_path):
+    # Interval 5: covers and publishing metadata are the shared sections; interior
+    # styles (grids, word lists, solution pages) stay word search.
     data = coloring_data(tmp_path)
-    data[section] = {"version": 1}
-    assert codes(data) == [(section, "not_available_for_engine")]
+    data["interior"] = {"version": 1}
+    assert codes(data) == [("interior", "not_available_for_engine")]
+    for section in ("cover", "publishing"):
+        data = coloring_data(tmp_path)
+        data[section] = {"version": 1}
+        assert not [code for _, code in codes(data) if code == "not_available_for_engine"]
 
 
 @pytest.mark.parametrize(

@@ -152,7 +152,7 @@ def test_word_search_and_coloring_conflict(garden):
     assert not any(path.startswith("coloring.") for path, _ in found)
 
 
-def test_coloring_books_take_a_coloring_composition_but_no_cover_or_publishing_yet():
+def test_coloring_books_take_a_coloring_composition_cover_and_publishing():
     # Interval 4: a coloring composition is accepted; word-search settings are not.
     data = source()
     data["composition"] = {"solutions": {"placement": "omit"}}
@@ -160,9 +160,15 @@ def test_coloring_books_take_a_coloring_composition_but_no_cover_or_publishing_y
     data = source()
     data["composition"] = {"artwork": {"start": "recto"}}
     assert codes(data) == []
+    # Interval 5: covers and publishing metadata use the shared sections; like a
+    # word-search book's, they need a composition. Interior styles stay word search.
     data = source()
     data["publishing"] = {"version": 2}
-    assert codes(data) == [("publishing", "not_available_for_engine")]
+    assert codes(data) == [("publishing", "requires_composition")]
+    data["composition"] = {"artwork": {"start": "recto"}}
+    assert codes(data) == []
+    data["interior"] = {"version": 1}
+    assert ("interior", "not_available_for_engine") in codes(data)
 
 
 def test_valid_coloring_book_is_buildable_and_needs_a_composition(tmp_path):
