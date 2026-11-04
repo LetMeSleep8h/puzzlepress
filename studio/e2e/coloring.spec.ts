@@ -55,7 +55,7 @@ test('coloring artwork: import, check, refuse SVG, find look-alikes, remove', as
 
   await page.goto('/books/coloring-demo');
   const nav = page.getByRole('navigation', { name: 'Project' });
-  await expect(nav.getByRole('link')).toHaveText(['Overview', 'Artwork']);
+  await expect(nav.getByRole('link')).toHaveText(['Overview', 'Artwork', 'Print proof']);
   await expect(page.getByRole('main')).not.toHaveText(WORD_SEARCH_TERMS);
   await page.getByRole('link', { name: 'Open the artwork library' }).click();
   await expect(page.getByRole('heading', { name: 'Artwork library' })).toBeVisible();
@@ -155,5 +155,46 @@ test('line-art preparation: preview, findings, difference, save, reload, reset',
     await noOverflow(page);
   }
   await expect(panel.getByText('Preview shows these settings')).toBeVisible({ timeout: 20000 });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test('coloring print proof: build, every page, blank backs, findings, export', async ({ page }) => {
+  test.setTimeout(180000); // A real build: preparation, layout, render and preflight.
+  await page.goto('/books/coloring-print/print');
+  await expect(page.getByText('No interior has been built.')).toBeVisible();
+  await page.getByRole('button', { name: 'Build interior' }).click();
+  await expect(page.getByText('Interior built and preflight complete.')).toBeVisible({
+    timeout: 120000,
+  });
+  const verdict = page.getByLabel('Preflight status');
+  await expect(verdict.getByText('Valid')).toBeVisible();
+  // Title, copyright, a drawing and its blank back, the divider and its back, a drawing
+  // and its back: eight physical pages, drawings and the divider on right-hand pages.
+  const thumbs = page.getByRole('navigation', { name: 'Pages' }).getByRole('button');
+  await expect(thumbs).toHaveCount(8);
+  await expect(thumbs.nth(2)).toHaveAccessibleName(/^Page 3 · Recto \(right\) · Coloring page/);
+  await expect(thumbs.nth(3)).toHaveAccessibleName('Page 4 · Verso (left) · Intentional blank');
+  await expect(thumbs.nth(4)).toHaveAccessibleName(/^Page 5 · Recto \(right\) · divider/);
+  await thumbs.nth(3).click();
+  await expect(page.getByText('Blank: back of the coloring page').first()).toBeVisible();
+  await thumbs.nth(4).click();
+  await expect(page.getByText('Section divider: Woodland').first()).toBeVisible();
+  // Placement preview: Python's element bounds drawn over the real page raster.
+  await thumbs.nth(2).click();
+  await page.getByRole('checkbox', { name: /Element bounds/ }).check();
+  await expect(page.locator('.overlay-element').first()).toBeVisible();
+  const findings = page.getByRole('region', { name: 'Preflight findings' });
+  await expect(findings.getByText(/prints at \d+ DPI/).first()).toBeVisible();
+  await expect(page.getByRole('main')).not.toHaveText(WORD_SEARCH_TERMS);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('link', { name: 'Download interior.pdf' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('interior.pdf');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  for (const width of [1440, 1024, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await noOverflow(page);
+  }
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });

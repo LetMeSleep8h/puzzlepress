@@ -145,7 +145,9 @@ export function AdjustPanel({
       );
       onSaved(next);
       setError(undefined);
-      setMessage('Settings saved. The original file is unchanged.');
+      setMessage(
+        'Settings saved. The original file is unchanged. Rebuild the interior in Print proof to print them.',
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err : new ApiError('Saving failed.', 'failed'));
     }

@@ -27,6 +27,7 @@ const KIND_NAMES: Record<string, string> = {
   puzzle: 'Puzzle',
   solutions: 'Solutions',
   blank: 'Intentional blank',
+  coloring: 'Coloring page',
 };
 const ZOOMS = [50, 75, 100, 150, 200, 300];
 // 100% is physical size at the CSS reference of 96 px per inch.
@@ -45,6 +46,13 @@ const SEVERITY = {
   warning: { tone: 'review', label: 'Warning' },
   info: { tone: 'neutral', label: 'Info' },
 } as const;
+// The coloring ruleset's info findings ask for a person's judgement; they never block.
+const COLORING_RULESET = 'puzzlepress-kdp-coloring';
+const REVIEW = { tone: 'neutral', label: 'Manual review' } as const;
+
+function severityOf(finding: PreflightFinding, review: boolean) {
+  return review && finding.severity === 'info' ? REVIEW : SEVERITY[finding.severity];
+}
 
 function sideName(side: string | null) {
   return side === 'recto' ? 'Recto (right)' : side === 'verso' ? 'Verso (left)' : 'Side unknown';
@@ -234,13 +242,15 @@ function FindingItem({
   rule,
   selected,
   onSelect,
+  review = false,
 }: {
   finding: PreflightFinding;
   rule?: PreflightRule;
   selected: boolean;
   onSelect: () => void;
+  review?: boolean;
 }) {
-  const severity = SEVERITY[finding.severity];
+  const severity = severityOf(finding, review);
   const where =
     finding.physical_page === null
       ? 'Whole book'
@@ -307,6 +317,10 @@ function RuleList({ title, rules }: { title: string; rules: PreflightRule[] }) {
 function Verdict({ report }: { report: PreflightReport }) {
   const errors = report.findings.filter((f) => f.severity === 'error').length;
   const warnings = report.findings.filter((f) => f.severity === 'warning').length;
+  const reviews =
+    report.ruleset.id === COLORING_RULESET
+      ? report.findings.filter((f) => f.severity === 'info').length
+      : 0;
   return (
     <dl className="print-verdict" aria-label="Preflight status">
       <div>
@@ -334,6 +348,7 @@ function Verdict({ report }: { report: PreflightReport }) {
         <dd>
           <a href="#print-findings">
             {errors} blocking · {warnings} {warnings === 1 ? 'warning' : 'warnings'}
+            {reviews > 0 && ` · ${reviews} to review`}
           </a>
         </dd>
       </div>
@@ -360,10 +375,11 @@ function Findings({
   onSelect: (index: number) => void;
 }) {
   const rules = new Map(report.rules.map((r) => [r.code, r]));
+  const review = report.ruleset.id === COLORING_RULESET;
   const groups: [string, PreflightFinding['severity']][] = [
     ['Blocking', 'error'],
     ['Warnings', 'warning'],
-    ['Information', 'info'],
+    [review ? 'Manual review' : 'Information', 'info'],
   ];
   return (
     <section
@@ -401,6 +417,7 @@ function Findings({
                   rule={rules.get(finding.rule)}
                   selected={selected === index}
                   onSelect={() => onSelect(index)}
+                  review={review}
                 />
               ))}
             </ul>
@@ -792,14 +809,23 @@ export function Print({ project, dirty }: { project: Project; dirty: boolean }) 
       setBusy(false);
     }
   };
+  const coloring = project.engine?.kind === 'coloring';
   if (!project.source?.composition)
     return (
       <section className="notice">
         <h2>No book composition</h2>
-        <p>
-          Print proofs need a composed book. Choose Book to start a composition, save it, then
-          return here to build the interior.
-        </p>
+        {coloring ? (
+          <p>
+            Print proofs need a composed book. Add a <code>composition</code> section to book.yaml
+            (front matter, where the artwork starts, page numbers), then return here to build the
+            interior.
+          </p>
+        ) : (
+          <p>
+            Print proofs need a composed book. Choose Book to start a composition, save it, then
+            return here to build the interior.
+          </p>
+        )}
       </section>
     );
   if (error) return <ErrorState error={error} retry={() => setAttempt((n) => n + 1)} />;
@@ -889,21 +915,40 @@ export function Print({ project, dirty }: { project: Project; dirty: boolean }) 
                 >
                   Rebuild interior
                 </button>
-                <button
-                  type="button"
-                  className="small-button"
-                  aria-expanded={rebuilding}
-                  onClick={() => setRebuilding((open) => !open)}
-                >
-                  Rebuild outdated artifacts…
-                </button>
+                {!coloring && (
+                  <button
+                    type="button"
+                    className="small-button"
+                    aria-expanded={rebuilding}
+                    onClick={() => setRebuilding((open) => !open)}
+                  >
+                    Rebuild outdated artifacts…
+                  </button>
+                )}
               </div>
             </div>
           )}
           {STATE_NOTES[status.state] && (
             <p className={`print-state ${status.state}`}>{STATE_NOTES[status.state]}</p>
           )}
-          {rebuilding && (
+          {coloring && status.preview && (
+            <p className="small">
+              <a
+                className="button small-button"
+                href={`${base}/pdf?pdf=${status.preview.pdf_sha256}`}
+                download="interior.pdf"
+                // A file, not a Studio page: a target keeps the client router out of it.
+                target="_blank"
+                rel="noopener"
+              >
+                Download interior.pdf
+              </a>{' '}
+              <span className="muted">
+                {status.preview.page_count} pages, exactly the file preflight inspected.
+              </span>
+            </p>
+          )}
+          {rebuilding && !coloring && (
             <RebuildPanel
               projectKey={project.key}
               revision={project.revision}

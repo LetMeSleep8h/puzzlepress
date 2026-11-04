@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AdjustPanel } from './AdjustPanel';
 import { ApiError, request, upload } from './api';
+import { Print } from './Print';
 import type { ArtworkEntry, ColoringListing, Project } from './types';
 import { Empty, ErrorState, Loading, Status } from './ui';
 
-// Coloring books in this version: an artwork library only. Every fact, finding and
-// duplicate below is Python's; the browser only displays it and sends files.
-const SECTIONS: [string, string][] = [['artwork', 'Artwork']];
+// Coloring books in this version: an artwork library and print proofs of the built
+// interior. Every fact, finding, page and duplicate below is Python's; the browser
+// only displays it and sends files.
+const SECTIONS: [string, string][] = [
+  ['artwork', 'Artwork'],
+  ['print', 'Print proof'],
+];
 
 export function ColoringNav({ base, section }: { base: string; section: string }) {
   return (
@@ -39,10 +44,13 @@ export function ColoringNav({ base, section }: { base: string; section: string }
 export function ColoringWorkspace({ project, section }: { project: Project; section: string }) {
   if (section === 'overview') return <ColoringOverview project={project} />;
   if (section === 'artwork') return <Artwork projectKey={project.key} />;
+  // Coloring sources are edited as files and through the artwork panel, which saves
+  // directly, so the print proof never has unsaved Studio changes to warn about.
+  if (section === 'print') return <Print project={project} dirty={false} />;
   return (
     <Empty title="Not available for coloring books yet">
-      This version imports and checks coloring-book artwork. Page layout, print proofs, covers and
-      publishing for coloring books are not available yet.
+      This version imports, prepares and prints coloring-book artwork. Covers and publishing for
+      coloring books are not available yet.
     </Empty>
   );
 }
@@ -81,7 +89,11 @@ function ColoringOverview({ project }: { project: Project }) {
             </div>
             <div>
               <dt>Coloring pages</dt>
-              <dd>{coloring.pages.length}</dd>
+              <dd>{coloring.pages.filter((page) => 'artwork' in page).length}</dd>
+            </div>
+            <div>
+              <dt>Section dividers</dt>
+              <dd>{coloring.pages.filter((page) => 'divider' in page).length}</dd>
             </div>
             <div>
               <dt>Blank reverse pages</dt>
@@ -105,8 +117,8 @@ function ColoringOverview({ project }: { project: Project }) {
             Open the artwork library
           </a>
           <p className="small muted">
-            Page layout, print proofs, covers and publishing for coloring books are not available in
-            this version.
+            Print proof builds the interior PDF from the prepared artwork and checks it. Covers and
+            publishing for coloring books are not available in this version.
           </p>
         </section>
       </div>

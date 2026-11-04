@@ -132,4 +132,16 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
     source["book"]["title"] = "Preparation Acceptance Book"  # type: ignore[index]
     write_coloring_book(books / "coloring-prepare", source)
     import_files(books / "coloring-prepare", [("Fine detail.png", encode(fine_detail()))])
+    # Coloring print proofs: a SYNTHETIC composed book with two drawings and a divider.
+    from coloring_helpers import composed_coloring_book  # noqa: E402
+
+    composed_coloring_book(books / "coloring-print", 2, dividers={1: "Woodland"}, border="thin")
+    source = books / "coloring-print" / "book.yaml"
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        .replace("id: synthetic-coloring-book", "id: coloring-print-acceptance")
+        .replace("title: Synthetic Coloring Book", "title: Print Acceptance Coloring Book")
+        .replace("../build/synthetic-coloring-book", "../../build/coloring-print"),
+        encoding="utf-8",
+    )
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)

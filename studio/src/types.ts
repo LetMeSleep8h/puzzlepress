@@ -87,7 +87,8 @@ export interface Project {
 export interface ColoringSource {
   version: number;
   artwork: { id: string; path: string; sha256: string; title: string | null }[];
-  pages: { artwork: string }[];
+  /** Publication order: a drawing, or a section divider. */
+  pages: ({ artwork: string } | { divider: { title: string; text?: string } })[];
   layout: { blank_reverse: boolean; border: string };
 }
 /** Line-art preparation settings, as Python normalizes them (invert only when set). */
@@ -283,9 +284,11 @@ export interface Measure {
   unit: string | null;
   comparison: string | null;
 }
+/** `info` never blocks; the coloring ruleset uses it for manual-review prompts. */
+export type PreflightSeverity = 'error' | 'warning' | 'info';
 export interface PreflightFinding {
   rule: string;
-  severity: 'error' | 'warning' | 'info';
+  severity: PreflightSeverity;
   scope: 'structural' | 'kdp';
   category: string;
   message: string;
@@ -303,7 +306,7 @@ export interface PreflightRule {
   code: string;
   scope: 'structural' | 'kdp';
   category: string;
-  severity: 'error' | 'warning' | 'info';
+  severity: PreflightSeverity;
   title: string;
   description: string;
   basis: string;
