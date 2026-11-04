@@ -250,6 +250,15 @@ test('templates: browse without saving, preview, apply, undo, save and reuse', a
   expect((await created).status()).toBe(200);
   const mine = page.getByRole('list', { name: 'Your templates' });
   await expect(mine.getByRole('heading', { name: 'Harbour house style' })).toBeVisible();
+  // Regression: a click on Export downloads the file; the client router used to
+  // swallow it and show "This Studio page does not exist".
+  const [exported] = await Promise.all([
+    page.waitForEvent('download'),
+    mine.getByRole('link', { name: 'Export Harbour house style as a file' }).click(),
+  ]);
+  expect(exported.suggestedFilename()).toMatch(/\.json$/);
+  await expect(page).toHaveURL(/\/books\/template-demo\/cover$/);
+  await expect(page.getByRole('list', { name: 'Your templates' })).toBeVisible();
   // Built-in templates are protected.
   await expect(page.getByRole('button', { name: 'Delete Bold Garage' })).toHaveCount(0);
   await noAxeViolations(page);

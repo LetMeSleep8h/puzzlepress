@@ -55,7 +55,14 @@ test('coloring artwork: import, check, refuse SVG, find look-alikes, remove', as
 
   await page.goto('/books/coloring-demo');
   const nav = page.getByRole('navigation', { name: 'Project' });
-  await expect(nav.getByRole('link')).toHaveText(['Overview', 'Artwork', 'Print proof']);
+  await expect(nav.getByRole('link')).toHaveText([
+    'Overview',
+    'Artwork',
+    'Pages',
+    'Cover',
+    'Print proof',
+    'Publishing',
+  ]);
   await expect(page.getByRole('main')).not.toHaveText(WORD_SEARCH_TERMS);
   await page.getByRole('link', { name: 'Open the artwork library' }).click();
   await expect(page.getByRole('heading', { name: 'Artwork library' })).toBeVisible();

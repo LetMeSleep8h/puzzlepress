@@ -144,4 +144,14 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
         .replace("../build/synthetic-coloring-book", "../../build/coloring-print"),
         encoding="utf-8",
     )
+    # Coloring Pages composer: a SYNTHETIC composed book with three drawings.
+    composed_coloring_book(books / "coloring-pages", 3, border="thin")
+    source = books / "coloring-pages" / "book.yaml"
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        .replace("id: synthetic-coloring-book", "id: coloring-pages-acceptance")
+        .replace("title: Synthetic Coloring Book", "title: Pages Acceptance Coloring Book")
+        .replace("../build/synthetic-coloring-book", "../../build/coloring-pages"),
+        encoding="utf-8",
+    )
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)
