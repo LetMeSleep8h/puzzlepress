@@ -360,6 +360,14 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
             headers={"Cache-Control": "private, max-age=31536000, immutable"},
         )
 
+    @app.get("/api/projects/{key}/interior/pdf")
+    def interior_pdf(key: str, pdf: str) -> Response:
+        return Response(
+            printing.pdf(key, pdf),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="interior.pdf"'},
+        )
+
     @app.get("/api/projects/{key}/interior/pages/{page}")
     def interior_page(key: str, page: int, size: str, pdf: str) -> Response:
         image = printing.page_image(key, page, size, pdf)

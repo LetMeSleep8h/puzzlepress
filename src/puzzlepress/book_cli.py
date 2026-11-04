@@ -249,6 +249,7 @@ def run_preflight_command(args: argparse.Namespace) -> int:
     from .interior import InteriorError
     from .interior.build import check_output_directory, write_preflight_report
     from .preflight import Severity, preflight_interior, read_interior_artifacts, report_bytes
+    from .preflight.coloring import RULESET_ID as COLORING_RULESET
 
     loaded = load_project(args.project)
     source = loaded.source_path.parent
@@ -286,7 +287,9 @@ def run_preflight_command(args: argparse.Namespace) -> int:
             binary.flush()
     else:
         profile = report.profile or {}
-        print(f"Preflight: {report.book_id} (ruleset {_ruleset()})")
+        print(
+            f"Preflight: {report.book_id} (ruleset {report.ruleset.id} v{report.ruleset.version})"
+        )
         print(f"Interior: {directory}")
         if report.page_count is not None:
             print(f"Pages: {report.page_count} | profile {profile.get('id', 'unknown')}")
@@ -296,7 +299,10 @@ def run_preflight_command(args: argparse.Namespace) -> int:
             print(f"PDF SHA-256: {pdf['pdf']['sha256']}")
         print(f"Structural: {'VALID' if report.structurally_valid else 'INVALID'}")
         print(f"KDP readiness: {'READY' if report.kdp_ready else 'NOT READY'}")
-        for severity, heading in ((Severity.ERROR, "Blocking"), (Severity.WARNING, "Warnings")):
+        headings = [(Severity.ERROR, "Blocking"), (Severity.WARNING, "Warnings")]
+        if report.ruleset.id == COLORING_RULESET:  # Its info findings are review prompts.
+            headings.append((Severity.INFO, "Manual review"))
+        for severity, heading in headings:
             found = [f for f in report.findings if f.severity is severity]
             print(f"{heading}: {len(found) or 'none'}")
             for finding in found:
@@ -315,12 +321,6 @@ def run_preflight_command(args: argparse.Namespace) -> int:
             print(f"Report: {written}")
         print("Preflight checks the constraints PuzzlePress models; Amazon KDP decides acceptance.")
     return 0 if report.kdp_ready and not write_failed else 1
-
-
-def _ruleset() -> str:
-    from .preflight import RULESET_ID, RULESET_VERSION
-
-    return f"{RULESET_ID} v{RULESET_VERSION}"
 
 
 def _describe_issue(issue: "LayoutIssue") -> str:

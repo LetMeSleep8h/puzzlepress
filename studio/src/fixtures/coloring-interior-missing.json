@@ -1,0 +1,21 @@
+{
+  "key": "coloring-print",
+  "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
+  "ruleset": 1,
+  "profiles": [
+    {
+      "id": "paperback-8.5x11",
+      "description": "8.5 x 11 in paperback interior, black ink on white paper, no bleed",
+      "paper": "white"
+    },
+    {
+      "id": "paperback-8.5x11-cream",
+      "description": "8.5 x 11 in paperback interior, black ink on cream paper, no bleed",
+      "paper": "cream"
+    }
+  ],
+  "profile": "paperback-8.5x11",
+  "state": "missing",
+  "report": null,
+  "preview": null
+}

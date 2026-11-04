@@ -1,0 +1,103 @@
+{
+  "key": "coloring-print",
+  "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
+  "source": {
+    "schema_version": 1,
+    "book": {
+      "id": "synthetic-coloring-book",
+      "title": "Synthetic Coloring Book",
+      "language": "en",
+      "subtitle": null,
+      "description": null,
+      "author": null,
+      "imprint": null
+    },
+    "build": {
+      "seed": "1"
+    },
+    "content": {
+      "items": []
+    },
+    "output": {
+      "directory": "../build/synthetic-coloring-book"
+    },
+    "composition": {
+      "front_matter": [
+        {
+          "kind": "title_page"
+        },
+        {
+          "kind": "copyright_page",
+          "text": "Copyright 2026 Synthetic Author. All rights reserved."
+        }
+      ],
+      "artwork": {
+        "start": "recto"
+      },
+      "back_matter": [],
+      "page_numbers": {
+        "scheme": "continuous",
+        "show_front_matter": false,
+        "show_artwork": true,
+        "show_back_matter": true
+      }
+    },
+    "coloring": {
+      "version": 1,
+      "artwork": [
+        {
+          "id": "drawing-1",
+          "path": "coloring-assets/drawing-1-bbacb2e7eb49.png",
+          "sha256": "bbacb2e7eb49ecf6260d52bd59ea6b77ac74e0fb8df9f6da61ea52c2730dcc27",
+          "title": "drawing 1",
+          "adjustments": {
+            "grayscale": true,
+            "threshold": null,
+            "brightness": 0.0,
+            "contrast": 1.0,
+            "background_cleanup": 0.0,
+            "despeckle": 0,
+            "line_weight": 0
+          }
+        },
+        {
+          "id": "drawing-2",
+          "path": "coloring-assets/drawing-2-2ba3e0c790ee.png",
+          "sha256": "2ba3e0c790ee37d97f875d828d33eca7059e93aabf62e4d29cb199d4e7122581",
+          "title": "drawing 2",
+          "adjustments": {
+            "grayscale": true,
+            "threshold": null,
+            "brightness": 0.0,
+            "contrast": 1.0,
+            "background_cleanup": 0.0,
+            "despeckle": 0,
+            "line_weight": 0
+          }
+        }
+      ],
+      "pages": [
+        {
+          "artwork": "drawing-1"
+        },
+        {
+          "artwork": "drawing-2"
+        }
+      ],
+      "layout": {
+        "blank_reverse": true,
+        "border": "thin"
+      }
+    }
+  },
+  "identity": "pp1-sha256-f229dfb2559e19d094664cc576abe5d646d9b1b4f108cefbc9af764777fdf032",
+  "engine_version": "0.1.0",
+  "engine": {
+    "kind": "coloring",
+    "label": "Coloring book"
+  },
+  "validation": {
+    "valid": true,
+    "issues": []
+  }
+}

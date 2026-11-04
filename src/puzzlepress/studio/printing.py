@@ -29,7 +29,6 @@ from puzzlepress.interior.model import Box, InteriorLayout
 from puzzlepress.interior.spec import PROFILES, PrintSpecification
 from puzzlepress.models import Project
 from puzzlepress.preflight import (
-    RULESET_VERSION,
     InteriorArtifacts,
     Outcome,
     PreflightResult,
@@ -38,6 +37,7 @@ from puzzlepress.preflight import (
     report_bytes,
 )
 from puzzlepress.preflight.context import parse_manifest
+from puzzlepress.preflight.engine import ruleset_for
 from puzzlepress.preflight.rules import ink_bounds, kdp_safe_area
 from puzzlepress.project import resolve_output_directory
 from puzzlepress.publication import PageKind, PublicationPlan
@@ -121,10 +121,11 @@ class PrintService:
     def _status(self, key: str, built: PreflightResult | None = None) -> dict[str, object]:
         project, revision, source, directory = self._locate(key)
         artifacts = read_interior_artifacts(directory)
+        _, ruleset = ruleset_for(project)
         base: dict[str, object] = {
             "key": key,
             "revision": revision,
-            "ruleset": RULESET_VERSION,
+            "ruleset": ruleset,
             "profiles": [
                 {"id": spec.profile_id, "description": spec.description, "paper": spec.paper.value}
                 for spec in PROFILES.values()
@@ -138,7 +139,7 @@ class PrintService:
             revision,
             _digest(artifacts.pdf),
             _digest(artifacts.manifest),
-            str(RULESET_VERSION),
+            ":".join(map(str, ruleset_for(project))),
         )
         cached = self._reports.get(cache_key)
         if cached is None:
@@ -287,6 +288,18 @@ class PrintService:
             raise StudioError(
                 503, "preview_unavailable", "Install the studio extra (pypdfium2) for previews."
             ) from error
+
+    def pdf(self, key: str, pdf_digest: str) -> bytes:
+        """The built interior.pdf, only while it is the file the caller previewed."""
+        if not DIGEST.fullmatch(pdf_digest):
+            raise StudioError(422, "invalid_request", "Supply the PDF digest being exported.")
+        _, _, _, directory = self._locate(key)
+        pdf = read_interior_artifacts(directory).pdf
+        if pdf is None:
+            raise StudioError(404, "interior_missing", "No interior has been built.")
+        if hashlib.sha256(pdf).hexdigest() != pdf_digest:
+            raise StudioError(409, "preview_stale", "The interior changed. Reload the print proof.")
+        return pdf
 
     def page_image(self, key: str, page: int, size: str, pdf_digest: str) -> bytes:
         if size not in SCALES:

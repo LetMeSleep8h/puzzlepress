@@ -183,7 +183,9 @@ def _lossless(canvas: Canvas, block: ImageBlock, art: LosslessImage) -> None:
         raise ValueError("Line art is embedded at 1 or 8 bits per pixel")
     name = "PPLineArt" + hashlib.sha256(art.samples).hexdigest()[:16]
     raw: Any = canvas  # ReportLab's private registration API (pinned 5.0.x).
-    if name not in raw._formsinuse:
+    # Registered once per document (as ReportLab's drawImage does), so a drawing
+    # printed on several pages is embedded once and referenced from each.
+    if raw._doc.idToObject.get(raw._doc.getXObjectName(name)) is None:
         image: Any = pdfdoc.PDFImageXObject(name)
         image.width, image.height = art.size
         image.bitsPerComponent = art.bits
