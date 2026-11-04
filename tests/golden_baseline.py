@@ -14,6 +14,9 @@ as `\n` and made those digests platform-dependent (found by Linux CI). Written
 files are hashed as produced, so an absolute path or time in them, or in JSON
 stdout, shows up as instability between two runs.
 
+Baseline version 3 records which zlib family compressed the pinned PDFs (classic
+zlib 1.3.1, Python 3.13 on Windows); the pinned values are version 2's, unchanged.
+
 Write the baseline (only from an unchanged engine):
     python tests/golden_baseline.py --write
 Check two fresh runs agree without writing:
@@ -31,12 +34,13 @@ import re
 import shutil
 import sys
 import tempfile
+import zlib
 from importlib.metadata import version
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "tests" / "fixtures" / "golden" / "baseline.json"
-BASELINE_VERSION = 2
+BASELINE_VERSION = 3
 
 # (name, source folder; None writes the synthetic production book)
 BOOKS = (
@@ -52,14 +56,24 @@ BOOKS = (
 # (PDF bytes, interior/cover identities, reports that embed them) also depends on
 # the library versions recorded under `toolchain`.
 SOURCE_ONLY = ("build_identity", "validate", "plan", "batch", "generate")
-# What writes the PDF files: ReportLab draws them, Pillow encodes their images and
-# PyYAML reads the source. pypdf only reads them back (for reports), so a pypdf
-# release cannot change PDF bytes but may change report bytes.
-PDF_WRITERS = ("reportlab", "pillow", "PyYAML")
+# What writes the PDF files: ReportLab draws them, Pillow encodes their images,
+# PyYAML reads the source and Python's zlib compresses every stream. pypdf only
+# reads them back (for reports), so a pypdf release cannot change PDF bytes but may
+# change report bytes.
+PDF_WRITERS = ("reportlab", "pillow", "PyYAML", "zlib")
+
+
+def zlib_family() -> str:
+    """Which deflate implementation Python links. Python 3.14's Windows builds ship
+    zlib-ng, which compresses identical input to different (valid) bytes than classic
+    zlib; Linux builds use the system's classic zlib. Classic zlib releases share one
+    deflate output, so the family, not the release, is what the bytes depend on."""
+    return "zlib-ng" if "zlib-ng" in zlib.ZLIB_RUNTIME_VERSION else "zlib"
 
 
 def toolchain() -> dict[str, str]:
-    return {name: version(name) for name in ("reportlab", "pillow", "pypdf", "PyYAML")}
+    versions = {name: version(name) for name in ("reportlab", "pillow", "pypdf", "PyYAML")}
+    return {**versions, "zlib": zlib_family()}
 
 
 def _digest(data: bytes) -> str:

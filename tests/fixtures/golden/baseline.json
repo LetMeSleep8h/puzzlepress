@@ -1,5 +1,5 @@
 {
-  "baseline_version": 2,
+  "baseline_version": 3,
   "books": {
     "composition-demo": {
       "batch": {
@@ -262,6 +262,7 @@
     "PyYAML": "6.0.3",
     "pillow": "12.3.0",
     "pypdf": "6.19.0",
-    "reportlab": "5.0.1"
+    "reportlab": "5.0.1",
+    "zlib": "zlib"
   }
 }
