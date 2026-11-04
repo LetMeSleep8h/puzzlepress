@@ -9,6 +9,7 @@ the asset library can restore.
 import argparse
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -16,11 +17,16 @@ from .coloring.inspection import inspect_artwork
 from .coloring.issues import ArtworkError, ArtworkFinding, ImportRejected
 from .coloring.library import (
     LibraryReport,
+    adjust_artwork,
     import_files,
     library_report,
+    prepare_entry,
     remove_artwork,
     require_coloring,
 )
+from .coloring.prepare import Prepared, prepared_png, preview_png
+from .coloring_config import Adjustments
+from .coloring_validation import validate_adjustments
 from .cover.assets import MAX_ASSET_BYTES
 from .project import load_project
 
@@ -75,6 +81,38 @@ def add_coloring_command(commands: "argparse._SubParsersAction[argparse.Argument
     )
     removed.add_argument("--json", action="store_true", help="Print a structured result")
 
+    setting_help = (
+        "Adjustment KEY=VALUE over the saved settings (repeatable): grayscale, invert "
+        "(true/false), threshold (0.05..0.95 or null), brightness (-1..1), contrast "
+        "(0.25..4), background_cleanup (0..1), despeckle (0..5), line_weight (-2..2)"
+    )
+    prepared = actions.add_parser(
+        "prepare", help="Preview line-art preparation: measures and findings; nothing is saved"
+    )
+    prepared.add_argument("project", help=project_help)
+    prepared.add_argument("artwork", metavar="ID", help="Artwork ID")
+    prepared.add_argument(
+        "--set", action="append", default=[], metavar="KEY=VALUE", help=setting_help
+    )
+    prepared.add_argument("--reset", action="store_true", help="Preview the default settings")
+    prepared.add_argument(
+        "--output",
+        metavar="DIR",
+        help="Write <ID>-original.png, -prepared.png and -difference.png here (outside the book)",
+    )
+    prepared.add_argument("--json", action="store_true", help="Print a structured result")
+
+    adjusted = actions.add_parser(
+        "adjust", help="Save an artwork's preparation settings in book.yaml (original untouched)"
+    )
+    adjusted.add_argument("project", help=project_help)
+    adjusted.add_argument("artwork", metavar="ID", help="Artwork ID")
+    adjusted.add_argument(
+        "--set", action="append", default=[], metavar="KEY=VALUE", help=setting_help
+    )
+    adjusted.add_argument("--reset", action="store_true", help="Restore the default settings")
+    adjusted.add_argument("--json", action="store_true", help="Print a structured result")
+
 
 def _dump(value: object) -> None:
     print(json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2, allow_nan=False))
@@ -120,6 +158,8 @@ def run_coloring_command(args: argparse.Namespace) -> int:
         return _import(args)
     if command == "remove":
         return _remove(args)
+    if command in ("prepare", "adjust"):
+        return _prepare_or_adjust(args)
     loaded = load_project(args.project)
     require_coloring(loaded.project)
     if command == "inspect" and args.file:
@@ -313,3 +353,111 @@ def _remove(args: argparse.Namespace) -> int:
         if "trash_error" in result:
             print(f"  Not moved to the trash: {result['trash_error']}", file=sys.stderr)
     return 1 if "trash_error" in result else 0
+
+
+def _value(text: str) -> object:
+    lowered = text.strip().lower()
+    if lowered in ("true", "false"):
+        return lowered == "true"
+    if lowered in ("null", "none"):
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        return text
+
+
+def _settings(args: argparse.Namespace, saved: Adjustments) -> Adjustments:
+    if args.reset and args.set:
+        raise ArtworkError("conflicting_options", "Use --reset or --set, not both.", "settings")
+    if args.reset:
+        return Adjustments()
+    data = saved.to_dict()
+    for item in args.set:
+        key, sep, raw = item.partition("=")
+        if not sep or not key.strip():
+            raise ArtworkError("invalid_setting", f"Expected KEY=VALUE, got {item!r}.", item)
+        data[key.strip()] = _value(raw)
+    adjustments, issues = validate_adjustments(data)
+    if adjustments is None:
+        first = issues[0]
+        raise ArtworkError(first.code, first.message, first.path)
+    return adjustments
+
+
+def _write_previews(
+    directory: Path, source: Path, prepared: Prepared, artwork_id: str
+) -> list[str]:
+    folder = directory.resolve()
+    book = source.parent.resolve()
+    if folder == book or folder.is_relative_to(book):
+        raise ArtworkError(
+            "output_inside_source",
+            "Write previews outside the book folder; derived images are not authored source.",
+            str(directory),
+        )
+    folder.mkdir(parents=True, exist_ok=True)
+    written = []
+    for kind, data in (
+        ("original", preview_png(prepared, "original", side=100_000)),
+        ("prepared", prepared_png(prepared)),
+        ("difference", preview_png(prepared, "difference", side=100_000)),
+    ):
+        target = folder / f"{artwork_id}-{kind}.png"
+        staged = folder / f".{target.name}.tmp"
+        staged.write_bytes(data)
+        os.replace(staged, target)
+        written.append(str(target))
+    return written
+
+
+def _prepare_or_adjust(args: argparse.Namespace) -> int:
+    loaded = load_project(args.project)
+    book = require_coloring(loaded.project)
+    item = book.artwork_by_id(args.artwork)
+    try:
+        if item is None:
+            raise ArtworkError("unknown_artwork", "No artwork has this ID.", args.artwork)
+        adjustments = _settings(args, item.adjustments)
+        if args.coloring_command == "adjust":
+            saved = adjust_artwork(loaded.source_path, args.artwork, adjustments)
+            result: dict[str, object] = {
+                "artwork": saved.id,
+                "adjustments": saved.adjustments.to_dict(),
+            }
+            prepared = prepare_entry(
+                loaded.source_path.parent, load_project(args.project).project, args.artwork
+            )
+        else:
+            prepared = prepare_entry(
+                loaded.source_path.parent, loaded.project, args.artwork, adjustments
+            )
+            result = {"artwork": args.artwork}
+        if getattr(args, "output", None):
+            result["written"] = _write_previews(
+                Path(args.output), loaded.source_path, prepared, args.artwork
+            )
+    except ArtworkError as error:
+        print(f"{error.subject or args.artwork} [{error.code}]: {error.message}", file=sys.stderr)
+        return 1
+    result.update(prepared.to_dict())
+    if args.json:
+        _dump(result)
+    else:
+        verb = "Saved settings for" if args.coloring_command == "adjust" else "Preview of"
+        print(f"{verb} '{args.artwork}' ({prepared.key})")
+        settings = ", ".join(f"{k}={v}" for k, v in prepared.adjustments.to_dict().items())
+        print(f"  settings: {settings}")
+        for key, value in prepared.measures.to_dict().items():
+            print(f"  {key}: {value}")
+        for finding in prepared.findings:
+            print(_finding_line(finding))
+        if not prepared.findings:
+            print("  No preparation findings.")
+        for path in result.get("written", []):  # type: ignore[attr-defined]
+            print(f"  wrote {path}")
+    return 1 if prepared.blocking else 0

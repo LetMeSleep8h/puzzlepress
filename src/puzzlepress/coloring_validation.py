@@ -38,6 +38,7 @@ _ADJUSTMENT_FIELDS = {
     "background_cleanup",
     "despeckle",
     "line_weight",
+    "invert",
 }
 
 
@@ -99,6 +100,7 @@ def _adjustments(reader: _Reader, raw: object, path: str) -> Adjustments:
         ),
         despeckle=_integer(reader, data.get("despeckle"), f"{path}.despeckle", 0, 5),
         line_weight=_integer(reader, data.get("line_weight"), f"{path}.line_weight", -2, 2),
+        invert=_flag(reader, data.get("invert"), f"{path}.invert", False),
     )
 
 
@@ -211,3 +213,12 @@ def validate_coloring(value: object) -> tuple[ColoringBook | None, tuple[Validat
     if reader.issues:
         return None, tuple(reader.issues)
     return ColoringBook(COLORING_VERSION, tuple(artwork), tuple(pages), layout), ()
+
+
+def validate_adjustments(
+    value: object, path: str = "adjustments"
+) -> tuple[Adjustments | None, tuple[ValidationIssue, ...]]:
+    """Adjustment settings from a CLI or Studio request, with the schema's own rules."""
+    reader = _Reader()
+    adjustments = _adjustments(reader, value, path)
+    return (None if reader.issues else adjustments), tuple(reader.issues)

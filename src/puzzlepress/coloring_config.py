@@ -29,21 +29,22 @@ class Border(StrEnum):
 
 @dataclass(frozen=True)
 class Adjustments:
-    """Line-art preparation settings, stored with the artwork and applied by Python.
-
-    Recorded in this version only: no build reads them yet.
+    """Line-art preparation settings over the original, applied in Python by
+    `coloring.prepare` (order and meaning are documented there). No build reads
+    them yet; the defaults reproduce the original's gray levels.
     """
 
-    grayscale: bool = True
+    grayscale: bool = True  # Luma; false takes each pixel's darkest channel.
     threshold: float | None = None  # None keeps gray levels; else 0.05..0.95 black point.
     brightness: float = 0.0  # -1..1
     contrast: float = 1.0  # 0.25..4
-    background_cleanup: float = 0.0  # 0..1: how much near-white is lifted to white.
-    despeckle: int = 0  # 0..5: specks up to this many pixels removed.
+    background_cleanup: float = 0.0  # 0..1: paper stretched to white, then near-white lifted.
+    despeckle: int = 0  # 0..5: isolated marks up to 0/4/9/16/36/64 pixels removed.
     line_weight: int = 0  # -2..2: thin (negative) or thicken (positive) lines.
+    invert: bool = False  # For white-on-black artwork.
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        data: dict[str, object] = {
             "grayscale": self.grayscale,
             "threshold": self.threshold,
             "brightness": self.brightness,
@@ -52,6 +53,10 @@ class Adjustments:
             "despeckle": self.despeckle,
             "line_weight": self.line_weight,
         }
+        if self.invert:
+            # Only when set, so books saved before `invert` existed keep their bytes.
+            data["invert"] = True
+        return data
 
 
 @dataclass(frozen=True)
