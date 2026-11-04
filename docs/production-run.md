@@ -88,3 +88,33 @@ Determinism: no times are recorded and PDFs are rendered in ReportLab invariant
 mode, so the same source, seed and toolchain (engine, ReportLab, Pillow, fonts)
 give byte-identical files. A different toolchain version can change PDF bytes;
 `production.json` records it.
+
+### Coloring books
+
+`book produce` packages a coloring book with the same writers and checks, and a
+different shape of run (`puzzlepress.production.coloring`). `--previous`,
+`--expected-puzzles` and `--photos` compare word-search puzzles and photographs
+and are refused for coloring books (`not_applicable_for_engine`).
+
+| File | Content |
+| --- | --- |
+| `interior.pdf`, `interior.json`, `preflight.json` | Interior and its coloring preflight (`puzzlepress-kdp-coloring` v2) |
+| `cover.pdf`, `cover.json`, `cover-preflight.json` | Cover, when configured |
+| `artwork-integrity.json` | Each printed drawing: pinned original SHA-256, prepared pixel digest, pixels, bits, DPI, placement, pages and its preflight findings; the integrity rules' outcomes |
+| `artwork-duplicates.json`/`.md` | Same file under two entries, drawings on several pages, look-alike pairs (heuristic), and anything not compared |
+| `publishing-readiness.json`, `kdp-metadata.json` | Readiness of the run's own files, and the KDP field values (with a publishing section) |
+| `publishing/` | The KDP package (only when readiness passes; see publishing.md) |
+| `publishing-validation.json`/`.md` | Blocking, warnings, manual review, verified |
+| `production.json` | Version 2: `engine`, `environment` (Python, Pillow, zlib), status (`ready_for_manual_kdp_submission` or `blocked`), package path, the guarantee statement and every file's SHA-256, including `publishing/` |
+
+The run is all-or-nothing. Everything is written to a staging directory beside
+DIR, every file is read back against the manifest, and only then is the staged
+directory swapped into place; the previous output stays until then. A failed or
+interrupted run removes its staging directory and leaves DIR as it was. A lock
+file `.<DIR name>.produce.lock` beside DIR refuses a second run for the same output
+(`production_in_progress`); after a crash, delete it by hand. A completed run with
+blocking findings is written in full but reported as `blocked`, and no package is
+written. Manual review always lists the artwork, Print Previewer, printed-proof,
+cover and rights items: automated checks cannot guarantee KDP acceptance or judge
+a drawing. When the previous run recorded another Python, Pillow or zlib, a warning
+says the files differ for that reason (coloring PDF bytes depend on deflate).

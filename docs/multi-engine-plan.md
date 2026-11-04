@@ -4,11 +4,25 @@ Status: branch `feat/multi-engine-coloring`, cut from main `693aa00`. The author
 approved D1-D6 as recommended. Interval 1 (foundation, merged as PR #15),
 Interval 2 (coloring schema, artwork import and library, merged as PR #16),
 Interval 3 (line-art preparation) and Interval 4 (composition, lossless interior
-and coloring preflight; guide [coloring.md](coloring.md)) are implemented;
-Intervals 5-7 are not. Interval 4 differs from section 3 in three places: dividers
+and coloring preflight; guide [coloring.md](coloring.md)) are merged (PR #18).
+Interval 5 (cover, publishing, production, and the Studio Pages composer; guide
+[coloring-publishing.md](coloring-publishing.md)) is implemented on branch
+`feat/coloring-publishing`; Interval 6's remaining Studio items (project creation
+API and type picker, generic undo/redo hook, zoom and pan) and Interval 7 are not.
+Interval 4 differs from section 3 in three places: dividers
 and reverse blanks live in `coloring.pages` and `coloring.layout` (composition has
 only `artwork.start`); manual-review prompts use the existing `info` severity; and
 no auto-crop or per-page placement was built.
+
+Interval 5 differs from section 3.7 and 3.9 as follows. `{page_count}` and
+`{trim_size}` are live cover variables filled in by the cover layout, not
+apply-time bindings; `{puzzle_count}` simply has no value on a coloring cover
+(its text is left out) rather than a `binding_not_applicable` finding. Publishing
+uses a separate ruleset (`puzzlepress-kdp-publishing-coloring`) like D3, with
+artwork origins and a rights declaration in the publishing section, outside build
+identity. The Pages composer (section 3.9) landed early, in Interval 5, with a
+local undo history rather than the generic hook. Coloring production is staged
+and swapped atomically; the word-search run is unchanged.
 
 ## 1. What the repository is today
 

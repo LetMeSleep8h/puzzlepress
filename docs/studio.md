@@ -45,6 +45,13 @@ are grouped in workflow order; every earlier URL is unchanged:
 | Review | Quality | `/books/{key}/quality` |
 | Publish | Publishing | `/books/{key}/publishing` |
 
+A coloring book has its own navigation: Overview, Artwork, Pages, Cover, Print
+proof and Publishing (routes `/artwork`, `/pages`, `/cover`, `/print`,
+`/publishing`); no puzzle, solution or word wording appears in it. Pages, Cover
+and Publishing share one draft, as below; Artwork saves imports and preparation
+settings directly, and a clean draft reloads the saved source when you return to
+it (see [coloring-publishing.md](coloring-publishing.md)).
+
 Puzzles, Book, Interior, Cover and Publishing share one draft of `book.yaml`; Plan has its
 own draft of `planning.yaml`. Switching sections keeps both drafts, the project
 header shows **Unsaved draft** while either has edits, and leaving the project asks

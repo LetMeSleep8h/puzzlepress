@@ -24,10 +24,27 @@ the book's identity.
 
 Element coordinates are authored for an 8.5 x 11 in trim and scaled by the trim
 ratio. `"width": "spine"` resolves to the spine width computed from the current
-interior build. Text in elements may use bindings: `{title}`, `{subtitle}`,
-`{author}`, `{imprint}`, `{puzzle_count}`, `{theme_count}` and `{solutions}`.
-These come from the book itself. A binding without a value removes its element
-rather than printing an empty placeholder. Bindings never invent an author,
+interior build. Text in elements may use two kinds of variable:
+
+| Variable | Kind | Value |
+| --- | --- | --- |
+| `{title}` (the book title), `{subtitle}`, `{author}`, `{imprint}` | binding | Book details |
+| `{puzzle_count}`, `{theme_count}`, `{solutions}` | binding | Word-search books only |
+| `{artwork_count}` | binding | Coloring books: coloring pages in `coloring.pages` |
+| `{page_count}` | live | The built interior's page count |
+| `{trim_size}` | live | The built interior's trim, written `8.5 x 11 in` |
+
+**Bindings** come from the book itself and are resolved once, when the template is
+applied: the text box then holds ordinary words. A binding without a value removes
+its element rather than printing an empty placeholder, so a word-search binding
+never prints on a coloring cover. **Live variables** stay in the cover's text as
+written; Python's cover layout fills them in from the verified interior it sizes
+the spine from, so rebuilding the interior with another page count changes the
+printed number with the spine width and makes the old cover out of date. Only
+these exact tokens are variables; other text in braces is literal, so existing
+covers keep their bytes, and there is no escape for printing `{page_count}`
+itself. A binding typed into a text box by hand prints literally; Studio's Checks
+tab warns about it (`template_binding_in_text`). Bindings never invent an author,
 ISBN, price, rating, testimonial or endorsement.
 
 A file is limited to 256 KB. Control characters are refused, and every value is
