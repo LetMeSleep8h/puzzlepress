@@ -1,5 +1,6 @@
 {
   "engine_version": "0.1.0",
+  "engine": { "kind": "word_search", "label": "Word search" },
   "identity": "pp1-sha256-8703370cf1e035a05a0b7463685c9ae119b4d05f06ad871df4a7bdcfe8588501",
   "key": "publishing-demo",
   "revision": "sha256-f0a2d580662567de7dce79afeba37f6c360678ae0c8f0ec25dca4db154a687b6",

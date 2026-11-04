@@ -35,9 +35,15 @@ output:
 | `content.items` | Ordered nonempty strings; omitted content/items defaults to an empty list. Duplicates and order are preserved. No puzzle-specific rules apply. |
 | `output.directory` | Relative path from the resolved YAML file's directory; defaults to `../build/<book.id>`. |
 | `word_search` | Optional banks, explicit difficulty profiles, themed puzzle definitions, and quality settings. See [batch schema](batch-quality.md). Omit for legacy projects; null is rejected. |
+| `coloring` | Recognised, not yet available: a source with it fails `engine_unavailable`; with `word_search` too, `engine_conflict`. Never read with word-search rules. |
 | `composition` | Optional book composition: front/back matter, solution and page-number policy. Requires `word_search`. See [book composition](book-composition.md). |
 | `cover` | Optional versioned paperback cover: photograph, crop, type and fill. Requires `composition`. Excluded from build identity. See [cover](cover.md). |
 | `publishing` | Optional versioned KDP paperback metadata, AI disclosure and author confirmations. Requires `composition`. Excluded from build identity. See [publishing](publishing.md). |
+
+The content engine is derived from the content section, never authored: a source
+without another engine's section (legacy ones included) is a `word_search` book.
+`inspect` prints it and Studio's project detail reports it; it is not serialized
+and not part of build identity.
 
 A book plan is not part of `book.yaml`: it is a separate versioned document,
 `planning.yaml`, beside it, with its own identity and revision. No build reads it.

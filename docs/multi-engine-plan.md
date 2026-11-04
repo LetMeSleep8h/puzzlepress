@@ -1,9 +1,8 @@
 # Multi-engine architecture and coloring book engine: assessment and plan
 
-Status: Phase 0 (audit) deliverable on branch `feat/multi-engine-coloring`, cut
-from main `693aa00`. Nothing in this document is implemented yet. The decisions
-marked **Decision** need the author's answer before the interval that depends on
-them starts.
+Status: branch `feat/multi-engine-coloring`, cut from main `693aa00`. The author
+approved D1-D6 as recommended. Interval 1 (foundation) is implemented; the
+coloring engine (Intervals 2-7) is not.
 
 ## 1. What the repository is today
 
@@ -66,9 +65,9 @@ every demo book and the synthetic production book:
 ### 3.1 Engine kind and dispatch (no plugin framework)
 
 - The engine kind is **derived**, never authored twice:
-  - `word_search` when that section is present;
-  - `coloring` when a new `coloring` section is present;
-  - `legacy` when there is neither.
+  - `coloring` when a `coloring` section is present;
+  - otherwise `word_search`, including legacy sources with neither section (the
+    author's Interval 1 requirement: existing projects default to word search).
 
   The two sections are mutually exclusive (`engine_conflict`). This needs no schema version bump, because the change is additive like every earlier section.
 - `puzzlepress/engines/` holds:
@@ -306,7 +305,7 @@ report; and a commit on this branch. Studio suites run from Interval 6 on.
 
 | # | Interval | Depends on | Acceptance |
 | --- | --- | --- | --- |
-| 1 | **Foundation**: golden compatibility test captured on main values; derived engine kind; `engines/` protocol and registry wrapping word search; dispatch at the seams; `engine` in project detail and Library | none | Golden test byte-equal; all 1,8xx existing tests pass unchanged; `legacy`/`word_search` kinds reported; no output or identity changes |
+| 1 | **Foundation**: golden compatibility test captured on main values; derived engine kind; `engines/` protocol and registry wrapping word search; dispatch at the seams; `engine` in project detail and Library | none | Golden test byte-equal; all 1,8xx existing tests pass unchanged; every existing book reported as `word_search`; no output or identity changes |
 | 2 | **Artwork library**: `coloring` schema v1 (artwork, pages), `coloring-assets/` import, inspection (format, pixels, mode, DPI at the art box), exact/near duplicates, asset-library and trash integration, CLI `coloring import / inspect` | 1, D1, D5 | Import never overwrites; corrupt, oversized, unsupported and SVG files rejected with codes; duplicates found; identity includes digests; tests for each |
 | 3 | **Line-art preparation**: deterministic pipeline, measures, thin-line findings, comparison renders | 2 | Same input and settings give the same pixels across processes; thin-line regressions detected on synthetic art; originals untouched |
 | 4 | **Coloring interior**: composition `artwork` block, plan kinds, parity verifier, lossless image renderer branch, layout and validation, `book build`, coloring preflight ruleset, `books/coloring-demo` from a synthetic art generator | 3, D2, D3, D4 | PDF reopened and inspected (sizes, boxes, Flate images, DPI); parity proven with and without blanks; byte-identical rebuilds; word-search golden unchanged |

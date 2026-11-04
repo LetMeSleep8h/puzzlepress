@@ -53,6 +53,8 @@ export interface Project {
   revision?: string;
   identity?: string;
   engine_version?: string;
+  /** Derived by Python from the content section; never authored. */
+  engine?: { kind: string; label: string };
   validation: { valid: boolean; issues: Issue[] };
   source?: {
     schema_version: number;

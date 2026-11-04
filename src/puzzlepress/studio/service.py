@@ -10,12 +10,12 @@ from threading import Lock
 
 from puzzlepress import __version__
 from puzzlepress.batch import generate_batch
+from puzzlepress.engines.registry import engine_for
 from puzzlepress.errors import ProjectError, ValidationIssue
 from puzzlepress.identity import build_identity
 from puzzlepress.models import Project
 from puzzlepress.project import resolve_output_directory
-from puzzlepress.publication import build_publication
-from puzzlepress.publication_verification import publication_payload, verify_publication_plan
+from puzzlepress.publication_verification import publication_payload
 from puzzlepress.wordsearch import verify_word_search
 from puzzlepress.yaml_io import parse_project
 
@@ -110,6 +110,12 @@ class ProjectStore:
         return projects
 
 
+def engine_summary(project: Project) -> dict[str, str]:
+    """The derived book type, named by the engine that builds it."""
+    engine = engine_for(project)
+    return {"kind": engine.kind.value, "label": engine.label}
+
+
 def project_detail(key: str, project: Project, revision: str | None = None) -> dict[str, object]:
     source = project.to_dict()
     source["build"] = {"seed": str(project.build.seed)}
@@ -119,6 +125,7 @@ def project_detail(key: str, project: Project, revision: str | None = None) -> d
         "source": source,
         "identity": build_identity(project),
         "engine_version": __version__,
+        "engine": engine_summary(project),
         "validation": {"valid": True, "issues": []},
     }
 
@@ -158,8 +165,9 @@ class StudioService:
         with self.exclusive():
             if project.composition is None:
                 raise StudioError(422, "no_composition", "This project has no book composition.")
-            report, plan = build_publication(project)
-            verification = verify_publication_plan(plan, project, report)
+            engine = engine_for(project)
+            report, plan = engine.build_publication(project)
+            verification = engine.verify_publication(plan, project, report)
             if not verification.valid:
                 raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
             return publication_payload(report, plan, verification)

@@ -48,6 +48,7 @@ def test_discovery_and_detail(client, garden, library):
     assert detail["source"]["build"]["seed"] == "2026"
     assert detail["source"]["word_search"] == garden.word_search.to_dict()
     assert detail["validation"] == {"valid": True, "issues": []}
+    assert detail["engine"] == {"kind": "word_search", "label": "Word search"}
 
 
 def test_discover_added_project_and_invalid_source(client, library):

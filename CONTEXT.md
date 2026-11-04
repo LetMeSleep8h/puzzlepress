@@ -2,7 +2,36 @@
 
 ## Completed scope
 
-Production run and previous-book checks on branch `feat/automotive-book-production`
+Multi-engine Interval 1 (foundation) on branch `feat/multi-engine-coloring`;
+committed locally, not pushed. Plan and decisions D1-D6: docs/multi-engine-plan.md.
+
+- `engines/kind.py`: `EngineKind` (word_search, coloring), derived from the content
+  section and never stored. Every existing project, legacy ones included, is
+  word_search. `detect_engine` on raw source: `engine_conflict` (both sections) and
+  `engine_unavailable` (coloring: recognised, not buildable in 0.1.0), each at path
+  `coloring`. Word-search validation issues and their order are unchanged.
+- `Project.engine` is a property, so `to_dict`, YAML and build identity are untouched.
+- `engines/registry.py`: `ContentEngine` protocol (kind, label, build_publication,
+  verify_publication) and `WordSearchEngine`, which delegates to the existing
+  functions. `engine_for(project)` dispatches `book plan`, `book build`,
+  `sample_interior`, Studio plan previews and print samples. Produce, readiness,
+  cover and preflight are unchanged (they consume the built interior).
+- `inspect` prints `Engine: word_search (Word search)`. Studio project detail adds
+  `engine` {kind, label}; Library rows show Type and Overview shows Book type.
+  Navigation is unchanged.
+- Golden baseline (`tests/golden_baseline.py`, `tests/fixtures/golden/baseline.json`,
+  `tests/test_golden_baseline.py`): recorded from the unchanged engine (commit
+  a9e076a) for the four demos, the legacy fixture and the synthetic production book:
+  build identities, `validate`, `puzzle batch --json`, `book plan --json`, interior
+  PDF/manifest, interior and cover preflight JSON, cover PDF/manifest, publishing
+  validate/inspect JSON, every `book produce` file and `puzzle generate`, with exit
+  codes and stderr. Two runs with different hash seeds, working directories and
+  scratch roots agree. Human-readable stdout prints absolute paths, so the scratch
+  root and separators are normalized there only. PDF-dependent values are compared
+  only under the recorded ReportLab 5.0.1, Pillow 12.3.0, pypdf 6.19.0, PyYAML
+  6.0.3 (skipped with a reason otherwise); source-only values always.
+
+Earlier: production run and previous-book checks on branch `feat/automotive-book-production`
 (guide: docs/production-run.md). Engine only; real books stay in puzzlepress-books.
 
 - `inventory.py`: puzzle inventories from a project (regenerated, authoritative), an
@@ -482,6 +511,25 @@ reload. Canonical YAML loses comments/formatting. One Studio process per library
 small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
+
+Multi-engine foundation, 2026-11-03 (Windows, Python 3.13):
+
+- Python: **1823 passed, 8 skipped** (symlink permission, Windows drive paths);
+  scratch `--basetemp`, `-p no:cacheprovider`. Golden baseline: all outputs equal
+  the pre-refactor values (also run on the unchanged engine before committing).
+  Ruff lint and format, strict mypy (133 files), pip check, `git diff --check`.
+  AGENTS CLI commands exit as on main (into a scratch directory: this machine's
+  `.pytest_cache` denies writes); `publish validate`/`inspect` exit 1 on
+  publishing-demo on both.
+- Frontend: tsc, ESLint, build; Prettier passes with `--end-of-line auto` (CRLF
+  checkout only otherwise). Vitest **91/91** twice on an idle machine; while the
+  Python suite ran alongside, 1-13 timing-dependent tests timed out (same 5 s
+  limits; they pass alone and idle). Playwright **33/34**: `templates.spec.ts`
+  rich text fails at line 320 (`runs[0]` not bold `Twenty`) identically on main
+  `693aa00` code and this branch, twice each. The browser specs rewrite
+  `docs/images/studio/*.png`; those captures were restored, not committed.
+- Not verified: the golden PDF digests on Linux/macOS (pinned on Windows; same
+  library versions are expected to give the same bytes, as CI's `cmp` shows per OS).
 
 Interior design studio, 2026-10-18 (Windows, Python 3.13):
 

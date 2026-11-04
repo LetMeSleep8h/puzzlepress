@@ -31,6 +31,8 @@ test('library exposes real project content, accessible shell and search', async 
   expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute('href', '#main');
   expect(await screen.findByRole('link', { name: 'Garden Word Searches' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Automotive Word Search' })).toBeInTheDocument();
+  const garden = screen.getByRole('link', { name: 'Garden Word Searches' }).closest('article')!;
+  expect(within(garden).getByText('Type').nextElementSibling).toHaveTextContent('Word search');
   await user.type(screen.getByRole('searchbox'), 'garden');
   expect(screen.queryByRole('link', { name: 'Automotive Word Search' })).not.toBeInTheDocument();
   await user.clear(screen.getByRole('searchbox'));
@@ -48,6 +50,7 @@ test('project navigation reuses one generation and preserves stable deep links',
   ).toBeInTheDocument();
   expect(location.pathname).toBe('/books/garden-demo');
   expect(screen.getByRole('main')).toHaveFocus();
+  expect(screen.getByText('Book type').nextElementSibling).toHaveTextContent('Word search');
   await user.click(screen.getByRole('link', { name: 'Generate & review puzzles' }));
   await user.click(await screen.findByRole('link', { name: 'In the Flower Bed' }));
   expect(await screen.findByRole('table')).toBeInTheDocument();
