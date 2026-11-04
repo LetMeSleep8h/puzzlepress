@@ -34,6 +34,14 @@ answer page, a divider, instructions, the title page), for Studio previews;
 `answer_layouts` reports how every solutions-per-page choice prints the book's
 grids, using the solution renderer's own geometry.
 
+Coloring books take the same pipeline with prepared artwork in place of generated
+puzzles (`interior.coloring`): the same plan rules, matter templates, folio band,
+validation, writer and inspection, plus a lossless line-art branch (`ImageBlock`
+with `encoding: lossless`, embedded as FlateDecode DeviceGray) and an independent
+decode of every embedded drawing. The renderer refuses an element type it does not
+know, and an image whose payload does not match its encoding, instead of drawing it
+as something else. See [coloring.md](coloring.md#interior).
+
 ## Interior styles
 
 An optional `interior` section restyles the same plan

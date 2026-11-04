@@ -2,8 +2,44 @@
 
 ## Completed scope
 
-Multi-engine Interval 3 (line-art preparation) on branch `feat/multi-engine-coloring`;
-committed locally, not pushed. Guide: docs/coloring.md (Line-art preparation).
+Multi-engine Interval 4 (coloring composition, lossless interior, coloring preflight)
+on branch `feat/multi-engine-coloring`; committed locally, not pushed. Guide:
+docs/coloring.md (Composition and page parity, Interior, Preflight).
+
+- Composition for coloring books: front matter, `artwork.start` (recto default),
+  back matter, page numbers with `show_artwork`; puzzle and solution settings are
+  `not_applicable_for_engine`. `coloring.pages` takes `{divider: {title, text?}}`.
+  Cover, publishing and interior style stay refused for coloring books; `book
+  produce` refuses them.
+- `coloring/content.py`: used originals read and verified, prepared with saved
+  settings (`prepared_pixels`, the preview pipeline without measures), kept as
+  packed deflated samples (1 bit when two-level, else 8). `coloring/plan.py`: plan
+  with explicit blanks (`section_recto_start`, `artwork_recto_start`,
+  `divider_recto_start`, `reverse_blank`) and an independent verifier (order,
+  parity, reverse blanks, prepared digests, numbering). Registry holds both engines;
+  content is engine-specific (`EngineContent`) and callers narrow it.
+- `interior/coloring.py`: layout reusing the classic matter and divider templates;
+  art contain-fitted and centred in the live area above the folio band, inside an
+  optional thin or double border; `ImageBlock.encoding` `lossless` embedded as
+  FlateDecode DeviceGray, once per document; every embedded image decoded again and
+  compared with its prepared digest. The renderer refuses unknown elements and
+  mismatched encodings. Coloring manifest: `coloring` identity input (renderer and
+  preparation versions, Pillow, zlib implementation), artwork records, composition
+  counts, environment (traceability only). Word-search manifests, identities and
+  outputs are unchanged.
+- `preflight/coloring.py`: ruleset `puzzlepress-kdp-coloring` v1 (55 rules; shared
+  rules reused by code). Rendering environment, image integrity, artwork sources,
+  parity, placement, DPI with pixels needed, line quality from the preparation
+  measures, duplicates; look-alike art and large changes are `info`, presented as
+  manual review. The shared severity scale and ruleset are unchanged.
+- Preparation gains `line_core_level` and `faint_lines` (warning; found in the
+  sample review). Studio: coloring Print proof (thumbnails of every page, blank
+  backs, overlays, findings, `GET /interior/pdf` export, stale banner). Samples:
+  `tests/coloring_samples.py`; previews in `docs/images/coloring/interior-*.png`.
+- Fixed in passing: `write_interior`'s read-back check now fails as `write_failed`
+  under a concurrent writer instead of a raw PermissionError (Windows).
+
+Earlier: multi-engine Interval 3 (line-art preparation), on the same branch.
 
 - `coloring/prepare.py`: in-memory pipeline over the verified original (luma or
   darkest-channel gray, invert, brightness/contrast, background cleanup, despeckle
@@ -576,6 +612,28 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Coloring composition, interior and preflight, 2026-11-04 (Windows):
+
+- Python 3.13: **2101 passed, 9 skipped** (symlink permission, Windows drive paths),
+  including the golden test 4/4 against baseline v3 (word-search outputs, PDFs,
+  manifests and reports byte-identical). Ruff lint and format, strict mypy (150
+  files), pip check, `git diff --check`. AGENTS CLI commands exit as on main (both
+  `publish` commands exit 1 on main too; scratch output directories).
+- Python 3.14.6 (zlib-ng) against 3.13 (classic zlib), same sample book: each
+  builds deterministically with different PDF bytes; a build preflighted in the
+  other environment reports `coloring_rendering_environment`, leaves
+  `pdf_matches_layout` not evaluated and still passes `coloring_image_integrity`;
+  a build preflighted where it was built is valid and ready.
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build. Vitest
+  **103/103 (an earlier full run under load timed out 2-3 Composer, Cover and Editor tests that pass alone and on rerun)**. Playwright **36/37: all three coloring specs pass (artwork, preparation, print proof with axe and four widths); templates.spec.ts rich text fails as before. Rewritten docs/images/studio captures restored**.
+- Samples (synthetic): simple 8 pages, detailed 18, sections 29 (ready), single-sided
+  12; 0.19-0.38 MB; build 0.7-2.0 s, preflight 3.6-6.4 s. Scale: 60 drawings / 122
+  pages build 8.4 s, preflight 37.7 s; 150 / 302 pages build 19.7 s (96 MB peak),
+  preflight 92.8 s (132 MB peak, 1,028 MB before keeping measures only).
+- Visual review of the contact sheets and Studio captures at 1440 and 390 px. It
+  found the pale pencil page (`faint_lines` added); the previews are synthetic and
+  real artwork still needs a person's review.
+
 Line-art preparation and the Python 3.14 CI repair, 2026-11-04 (Windows):
 
 - Python 3.13: **1971 passed, 9 skipped** (symlink permission, Windows drive
@@ -761,6 +819,22 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
   status and 15 recorded file digests were identical before and after.
 
 ## Limits and decisions for review
+
+Coloring interior (Interval 4): 8.5 x 11 in, no bleed, one art box for every page
+(no auto-crop, captions, per-page placement or scale); no composition or page-order
+editor in Studio; covers, publishing, production and packages not available for
+coloring books. Preflight re-prepares every drawing (about 0.6 s each) and is the
+slow step. Thresholds are synthetic-calibrated conventions; the fine-line and detail
+measures ignore original line work lighter than gray 128, so faint pencil lines that
+contrast pushes to white are not reported. Coloring PDFs are byte-reproducible only
+with the recorded zlib implementation and Pillow. The 300-entry caps were not
+measured at their limit. Found, not fixed (outside this interval): Studio's client
+router intercepts the cover-template Export link (`download` without `target`),
+so that download does not start from a click (read in code, not tried in a
+browser); the photograph JPEG path checks registration per page, so a layout that
+places one photograph on two pages fails to render (`redefining named object`,
+verified with a direct render; whether a real interior style can do that was not
+checked).
 
 Line-art preparation (Interval 3): thresholds are conventions measured on
 synthetic drawings only (fine-line retention never fell between 0.05 and 0.99

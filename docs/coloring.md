@@ -1,11 +1,12 @@
-# Coloring books: schema, artwork, library and line-art preparation
+# Coloring books: artwork, preparation, composition and interior
 
-This version can represent a coloring book, validate it, import, inspect and
-de-duplicate its artwork, and prepare line art for black-ink printing (preview,
-measure and save settings), from the CLI or Studio. It cannot yet lay out pages,
-build an interior, make a cover or package a coloring book: those commands refuse
-coloring books (`engine_not_buildable`). Plan:
-[multi-engine-plan.md](multi-engine-plan.md).
+This version can represent a coloring book, import, inspect and de-duplicate its
+artwork, prepare line art for black-ink printing, compose the book (front matter,
+section dividers, blank reverse pages, page numbers), build a deterministic PDF
+interior from the prepared pixels, and preflight it, from the CLI or Studio. It
+cannot yet make a cover, publishing metadata or a package for a coloring book:
+those sections are refused (`not_available_for_engine`) and `book produce` refuses
+coloring books. Plan: [multi-engine-plan.md](multi-engine-plan.md).
 
 ## Source
 
@@ -34,10 +35,22 @@ coloring:
         line_weight: 0                   # -2..2
         invert: true                     # optional; written only when true
   pages:                                 # publication order
+    - {divider: {title: Woodland, text: Animals of the forest.}}   # optional
     - {artwork: fox-in-the-ferns}
   layout:
     blank_reverse: true                  # default: single-sided, blank backs
     border: none                         # none | thin | double
+composition:                             # required to plan or build
+  front_matter:                          # title_page, copyright_page, instructions
+    - {kind: title_page}
+    - {kind: copyright_page, text: "Copyright 2026 ..."}
+  artwork: {start: recto}                # recto (default) | any
+  back_matter: []                        # about, notes
+  page_numbers:
+    scheme: continuous                   # continuous | roman_front_matter
+    show_front_matter: false
+    show_artwork: true                   # numbers on coloring pages
+    show_back_matter: true
 ```
 
 | Rule | Code |
@@ -47,13 +60,17 @@ coloring:
 | `path` is `coloring-assets/<stem>-<12 hex>.png\|jpg`: no other folder, no `..`, no backslash | `path` |
 | `sha256` is 64 lowercase hex digits and starts with the name's 12 hex | `sha256`, `sha256_mismatch` |
 | Pages name existing artwork; an artwork may be on several pages (reported as a duplicate) | `unknown_artwork` |
-| At most 300 artwork and 300 pages (provisional: no coloring interior is measured yet) | `count` |
-| No `composition` yet, so no `cover`, `interior` or `publishing` either | `not_available_for_engine`, `requires_composition` |
+| A divider has a one-line title (<=200) and optional text (<=600, line breaks allowed) | `required`, `text` |
+| At most 300 artwork and 300 page entries | `count` |
+| Composition: puzzle and solution settings (`puzzles`, `solutions`, `show_solutions`) do not apply | `not_applicable_for_engine` |
+| No `cover`, `publishing` or `interior` style section yet | `not_available_for_engine` |
 
 Defaults are normalized, so omitted and explicit values hash equally. The section
-is part of build identity (envelope `coloring_version: 1`); artwork enters by its
-pinned SHA-256, never by reading files. Word-search projects serialize exactly as
-before and keep their identities.
+and the composition are part of build identity (envelope `coloring_version: 1`,
+`composition_version: 1`); artwork enters by its pinned SHA-256 and settings, never
+by reading files. Word-search projects serialize exactly as before and keep their
+identities: a coloring composition serializes only front matter, `artwork`, back
+matter and page numbers (with `show_artwork`, never `show_solutions`).
 
 ## Artwork requirements
 
@@ -62,8 +79,9 @@ before and keep their identities.
 - SVG is refused (`svg_not_supported`): vector files can carry scripts and remote
   references, and there is no safe SVG renderer yet. Export a PNG instead.
 - Full-page art needs at least 2175 x 2925 px: 300 DPI over 7.25 x 9.75 in, the
-  live area of the 8.5 x 11 in profile. That is the largest area art can print in,
-  so the measured DPI is the lowest the drawing can have in a book.
+  live area of the 8.5 x 11 in profile. Inspection measures against that area. A
+  built page prints the drawing inside the art box (see Interior), which is smaller,
+  so the printed DPI is at least the inspected one.
 - Black lines on white. Color, gray paper and transparency are reported, not
   converted.
 
@@ -201,15 +219,154 @@ transparent; yellow lines), each under 15 settings:
   despeckle 4. The warning was lowered from 20 to 5 after that review.
 - Breaks: thinning the dense pattern twice split 1 region into 22,717.
 - Paper: the noisy scan 224 (tint), 255 after cleanup 0.6; pencil 246.
+- Line core (darkest tenth of the line work): black strokes 0, thin anti-aliased
+  ones 43, the pencil sketch 96 at defaults, 77 at contrast 1.6, 48 at contrast 2.5
+  and 0 with a 0.7 threshold; one-pixel black lines reduced to half size 129-132.
+  Added after a visual review of the sample books, where the pencil page at
+  contrast 1.6 printed visibly pale yet passed every other check.
 
 Timing here (Windows, Python 3.13): 0.6-2.5 s for a full page, up to 3 s for the
 dense pattern; mostly-ink pages stop at the scan bound in under 1 s.
 
 ![Original, prepared and difference for seven cases](images/coloring/preparation-samples.png)
 
+## Composition and page parity
+
+`book plan` lists every page. Pages follow the source exactly: front matter, then
+`coloring.pages` (drawings and dividers), then back matter. Odd PDF pages are
+right-hand (recto) pages. Blank pages are inserted only for parity, and each is a
+plan page with a reason:
+
+| Blank | When |
+| --- | --- |
+| `section_recto_start` | `artwork.start: recto` and the front matter ends on a right-hand page |
+| `artwork_recto_start` | with blank reverses, a coloring page would fall on a left-hand page |
+| `divider_recto_start` | a divider would fall on a left-hand page |
+| `reverse_blank` | the blank back of a single-sided coloring page or divider |
+
+With `blank_reverse: true` (the default) every coloring page is recto and backed by
+a `reverse_blank`, whatever `artwork.start` says. Dividers always start recto and,
+with blank reverses, take a blank back too, so drawings after them stay recto.
+With `blank_reverse: false` drawings print on both sides after a recto section
+start. A blank run is at most one page.
+
+Page numbers count every physical page. Blank and divider pages never print one;
+front matter, coloring pages and back matter follow `show_front_matter`,
+`show_artwork` and `show_back_matter`. Roman front matter counts the front matter
+and the blank that ends it. The plan is verified independently before layout:
+order against `coloring.pages`, parity, reverse blanks, numbering and each page's
+prepared digest. A plan without coloring pages is incomplete (`no_coloring_pages`),
+and so is one whose drawing cannot be read or prepared (`artwork_unavailable`):
+`book plan` exits 1 and `book build` writes nothing.
+
+## Interior
+
+`book build` lays out one physical page per plan page, never reordering, adding or
+removing pages. Title, copyright, instructions, about and notes pages and dividers
+use the classic templates. A coloring page holds its drawing:
+
+- **Art box.** The live area above the 24 pt page-number band, 7.25 x 9.4167 in. It
+  is the same whether or not numbers print, so turning numbers off never moves art.
+  A `thin` border (1 pt) or `double` border (1.5 + 0.75 pt, 4 pt apart) is drawn
+  inside the live area, and the art keeps 12 pt inside it: 6.89 x 9.06 in and
+  6.74 x 8.91 in. Full-page 300 DPI art for these boxes is 2175 x 2825, 2067 x 2717
+  and 2023 x 2673 px.
+- **Placement.** The whole drawing, uniformly scaled to fit the box and centred. It
+  is never cropped, clipped, stretched or resampled by PuzzlePress. Effective DPI is
+  prepared pixels per printed inch; under 300 is a preflight finding, not a build
+  failure.
+- **Pixels.** Each drawing is prepared from its verified original with its saved
+  settings (the Studio preview pipeline, without measuring) and embedded exactly:
+  FlateDecode DeviceGray at 1 bit per pixel when the prepared pixels are only black
+  and white, else 8 bits. No JPEG, no smoothing, no `/Interpolate`. A drawing used on
+  several pages is embedded once. Originals are never written.
+- **Verification.** The PDF is reopened with pypdf: boxes, fonts, blanks, folios,
+  then every embedded image is decoded from the file's own streams and must equal its
+  prepared pixel digest, at the prepared size and bit depth.
+- **Determinism.** Rebuilds are byte-identical in one environment. Deflate output
+  depends on the zlib implementation (Python 3.14 on Windows links zlib-ng), so the
+  identity records it.
+
+Measured here (Windows, Python 3.13, synthetic full-size line art, one process):
+60 drawings (122 pages) build in 8.4 s and preflight in 37.7 s, a 1.79 MB PDF; 150
+drawings (302 pages) build in 19.7 s with a 96 MB peak and preflight in 92.8 s with
+a 132 MB peak, a 4.28 MB PDF. Two-level art is packed at 1 bit, so line-art PDFs
+are small; gray art at 8 bits is larger. The 300-entry caps were not raised and
+were not measured at their limit (time scaled linearly from 60 to 150).
+
+The manifest (`interior.json`) adds, for coloring books only: `engine`; a `coloring`
+identity input `{renderer_version, preparation_version, image_library, zlib}`
+(`zlib`, or `zlib-ng <version>`); `artwork` (each page's drawing, source and prepared
+digests, pixels, bits, DPI and printed size); `composition` counts; and
+`environment` (Python, Pillow, ReportLab, pypdf and the zlib runtime, recorded for
+traceability only). The interior identity covers the build identity (artwork digests,
+settings, page order, composition, layout), the plan digest (prepared pixels), the
+print profile, the shared toolchain and the coloring input. Word-search manifests
+and identities gain nothing.
+
+Four SYNTHETIC sample books (`python tests/coloring_samples.py DIR` writes them),
+every page, odd pages right-hand:
+
+![Sections: front matter, three dividers, nine drawings, double border](images/coloring/interior-sections.png)
+![Detailed: seven fine or difficult drawings with their settings, thin border](images/coloring/interior-detailed.png)
+![Simple: six bold drawings printed on both sides](images/coloring/interior-simple.png)
+![Single-sided: every drawing recto with a blank back, numbers hidden on art](images/coloring/interior-single-sided.png)
+
+## Preflight
+
+`book preflight` runs the separate ruleset `puzzlepress-kdp-coloring` v1, so
+word-search reports keep their ruleset and bytes. Shared rules keep their codes and
+evaluators: `interior_artifacts`, `manifest_format`, `manifest_book`,
+`manifest_pdf_digest`, `interior_identity`, `source_current`,
+`print_profile_current`, `source_buildable`, `pdf_readable`, `page_count`,
+`page_boxes`, `page_rotation`, `pdf_interactive_features`, `fonts_bundled`,
+`blank_pages`, `folios_printed`, `content_in_live_area`, `kdp_minimum_page_count`,
+`kdp_maximum_page_count`, `kdp_trim_size`, `kdp_page_size`, `kdp_no_bleed`,
+`kdp_gutter`, `kdp_outside_margins`, `kdp_minimum_font_size`,
+`kdp_minimum_line_weight`, `kdp_fonts_embedded`, `kdp_full_font_embedding`,
+`kdp_no_annotations`, `kdp_not_encrypted`, `kdp_flattened`, `kdp_no_printer_marks`,
+`kdp_blank_page_runs`, `kdp_page_number_parity` and `kdp_no_metadata` (see
+[preflight.md](preflight.md)). Coloring versions or additions:
+
+| Rule | Scope | Severity | Checks |
+| --- | --- | --- | --- |
+| `toolchain_current` | structural | blocking | shared toolchain plus coloring renderer and preparation versions |
+| `coloring_rendering_environment` | structural | blocking | the recorded zlib implementation and Pillow equal this environment's |
+| `plan_current` | structural | blocking | the plan digest (prepared pixels, order, composition) is current |
+| `pdf_matches_layout` | structural | blocking | byte-identical to a fresh render; not evaluated (never passing) under another zlib or Pillow |
+| `raster_images` | structural | blocking | one image per coloring page, none elsewhere |
+| `coloring_image_integrity` | structural | blocking | each embedded image decodes to its prepared digest, lossless DeviceGray, prepared size and bits |
+| `coloring_artwork_sources` | structural | blocking | each used original is present and matches its pinned SHA-256 |
+| `coloring_page_parity` | structural | blocking | order, recto coloring pages and dividers, blank reverses |
+| `coloring_art_placement` | structural | blocking | whole, unclipped, uniformly scaled, inside the art box, clear of the border |
+| `kdp_image_resolution` | KDP | blocking | each drawing prints at 300 DPI or more; the finding names the pixels needed |
+| `coloring_blank_artwork` | KDP | blocking | `prepared_blank` |
+| `coloring_excessive_ink` | KDP | blocking | `excessive_ink` |
+| `coloring_thin_lines` | KDP | blocking | `thin_lines_destroyed` |
+| `coloring_heavy_ink` | KDP | warning | `heavy_ink` |
+| `coloring_gray_background` | KDP | warning | `background_tint` |
+| `coloring_faint_lines` | KDP | warning | `large_change` | warning | mean change over 40 levels: a prompt to compare, not a defect |
+| `faint_lines` | warning | the darkest tenth of the line work (gray 200 or darker) is lighter than gray 64 (75 % ink) | |
+| `coloring_line_quality` | KDP | warning | `thin_lines_lost`, `detail_lost`, `strokes_broken`, `specks_remaining`, `prepared_touches_edge` |
+| `coloring_duplicate_artwork` | KDP | warning | the same file under two entries, or a drawing on several pages |
+| `coloring_similar_artwork` | KDP | info (manual review) | two files look alike (the duplicate heuristic) |
+| `coloring_visual_review` | KDP | info (manual review) | `large_change` |
+
+Line-quality rules re-prepare every used drawing with its measures (the
+Line-art preparation table); a drawing that cannot be read makes them not
+evaluated. Their basis is a PuzzlePress convention, not a KDP requirement: "KDP
+readiness" means ready as PuzzlePress models it. `info` findings are prompts for a
+person's judgement (Studio and the CLI say "Manual review") and never block; the
+shared severity scale is unchanged, so cover, publishing and word-search reports
+keep their bytes. Measured problems (ink, lines, paper, DPI) are separate from
+those prompts. No result guarantees acceptance by Amazon KDP.
+
 ## CLI
 
 ```text
+puzzlepress book plan BOOK [--json]
+puzzlepress book build BOOK [--output DIR] [--profile ID] [--json]
+puzzlepress book preflight BOOK [--output DIR] [--json] [--no-write]
 puzzlepress coloring import BOOK FILE... [--no-page] [--json]
 puzzlepress coloring list BOOK [--json]
 puzzlepress coloring inspect BOOK [ID...] [--file FILE...] [--json]
@@ -219,7 +376,13 @@ puzzlepress coloring prepare BOOK ID [--set KEY=VALUE...] [--reset] [--output DI
 puzzlepress coloring adjust BOOK ID (--set KEY=VALUE... | --reset) [--json]
 ```
 
-Exit codes: 0 done; 1 refused, blocking findings among those inspected or
+`book plan`, `book build` and `book preflight` are the word-search commands, with
+coloring plans, interiors and the coloring ruleset; `book plan --json` has no puzzle
+or solution fields. `book plan` exits 1 for an incomplete plan; `book build` 1
+when nothing was written; `book preflight` 0 only when structurally valid and KDP
+ready. Studio's interior sample (`sample_interior`) draws the title page, the first
+drawing and its blank back, and the first divider. For the `coloring` commands:
+exit codes 0 done; 1 refused, blocking findings among those inspected or
 prepared, or duplicates found or not all compared; 2 usage. `inspect --file` checks
 files without importing them. `prepare` previews the saved settings, or those with
 `--set` overrides, and saves nothing. With `--output` it writes
@@ -229,8 +392,8 @@ restores the defaults.
 
 ## Studio
 
-A coloring book opens with Overview and Artwork only; no word-search section is
-shown. Artwork imports several files at once (one upload each, sent as raw bytes
+A coloring book opens with Overview, Artwork and Print proof; no word-search
+section is shown. Artwork imports several files at once (one upload each, sent as raw bytes
 with the saved revision), shows a Python thumbnail, the facts and findings above,
 the pages using each drawing, duplicates, and files no artwork uses. Removing asks
 whether to remove the drawing's pages too. API:
@@ -250,17 +413,40 @@ and difference previews (before/after or one at a time), the findings and
 measurements, and Save, Reset to defaults and Revert to saved. Previews are
 debounced and numbered; only the latest answer is shown, so the preview always
 matches the settings on screen. One preparation runs at a time; others wait up to
-30 s.
+30 s. Saving says to rebuild the interior, and the next print proof shows the
+interior as out of date (`source_current`, `plan_current`).
+
+Print proof builds the saved source, runs the coloring preflight and shows every
+physical page as a thumbnail and a page view (PDFium rasters of `interior.pdf`):
+blank backs included, with recto/verso, printed numbers and Python's description
+of each page ("Blank: back of the coloring page", "Section divider: Woodland").
+Overlays draw the live area, KDP margins and every element's bounds, so the art
+box, border and placement are visible over the real raster. Findings are grouped
+as blocking, warnings and manual review. `Download interior.pdf` returns exactly
+the inspected file (`GET /api/projects/{key}/interior/pdf?pdf=<sha256>`; 409
+`preview_stale` once it changed). Saving preparation settings or the source marks
+the proof out of date with the reasons and a Rebuild button; the word-search
+production rebuild panel is not offered.
 
 ## Limitations
 
-No pages are laid out, so the DPI is measured against the profile's live area,
-not a page design, and no build reads the prepared pixels yet. 8.5 x 11 in only.
-The similarity heuristic and every preparation threshold were measured on synthetic
-drawings only; real scans need review. The difference preview colors changes of
+8.5 x 11 in, no bleed only: art always prints inside the margins. No auto-crop, no
+captions, no per-page placement or scale: every drawing is fitted whole into the
+same art box. Covers, publishing metadata, production and packages are not
+available for coloring books. Studio has no page-order or composition editor; the
+composition is edited in `book.yaml`. The similarity heuristic and every preparation
+threshold were measured on synthetic drawings only; real scans need review, and no
+real artwork was available to this engine (real books live outside it). Line work
+lighter than gray 128 in the original is not counted by the fine-line and detail
+measures, so contrast that pushes faint pencil lines to white is not reported (seen
+on the synthetic pencil page at contrast 2.5, whose 1-px gray lines vanished). A
+coloring interior is byte-reproducible only with the zlib implementation and Pillow
+it was rendered with; elsewhere preflight reports the difference and does not claim
+a match. Preflight re-prepares every drawing with its measures (about 0.6 s for each
+synthetic full-size drawing), so it is the slow step: about 1.5 minutes at 150
+drawings, and Studio's first proof of a long book waits that long. The difference preview colors changes of
 ink (level 128 or darker) only, so a faint gray stroke that fades further is not
-shown. Prepared images exist only in memory (Studio cache) or where `prepare
---output` writes them; nothing is cached on disk. Studio has no editing of titles
-or page order yet, and no artwork trash controls (the CLI's `remove --trash` and
-the asset library API do this). Inspection costs about 0.1 s and preparation 0.6-3 s
-per full-size drawing.
+shown. Prepared images exist only in memory (Studio cache), in a built PDF, or
+where `prepare --output` writes them; nothing is cached on disk. Studio has no
+artwork trash controls (the CLI's `remove --trash` and the asset library API do
+this). Inspection costs about 0.1 s and preparation 0.6-3 s per full-size drawing.

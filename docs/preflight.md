@@ -29,6 +29,11 @@ a warning; the plan owns page count and the renderer never pads.
 Preflight verifies modeled constraints only. Amazon remains the final authority;
 passing preflight is not a guarantee of acceptance.
 
+Coloring books are preflighted with their own ruleset, `puzzlepress-kdp-coloring`,
+which reuses the rules below under the same codes and adds artwork, image-integrity,
+parity, rendering-environment and line-quality rules
+([coloring.md](coloring.md#preflight)). This catalogue and its reports are unchanged.
+
 ## How it works
 
 ```text

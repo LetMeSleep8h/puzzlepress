@@ -2,9 +2,13 @@
 
 Status: branch `feat/multi-engine-coloring`, cut from main `693aa00`. The author
 approved D1-D6 as recommended. Interval 1 (foundation, merged as PR #15),
-Interval 2 (coloring schema, artwork import and library, merged as PR #16) and
-Interval 3 (line-art preparation; guide [coloring.md](coloring.md)) are
-implemented; Intervals 4-7 are not.
+Interval 2 (coloring schema, artwork import and library, merged as PR #16),
+Interval 3 (line-art preparation) and Interval 4 (composition, lossless interior
+and coloring preflight; guide [coloring.md](coloring.md)) are implemented;
+Intervals 5-7 are not. Interval 4 differs from section 3 in three places: dividers
+and reverse blanks live in `coloring.pages` and `coloring.layout` (composition has
+only `artwork.start`); manual-review prompts use the existing `info` severity; and
+no auto-crop or per-page placement was built.
 
 ## 1. What the repository is today
 
