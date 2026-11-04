@@ -192,9 +192,13 @@ def test_despeckle_keeps_faint_line_fragments_and_cleans_scans():
     assert pencil.measures.detail_retention == 1.0
     noisy = encode(noisy_scan(2))
     assert "specks_remaining" in codes(prepare_artwork(noisy, Adjustments()))
-    fixed = prepare_artwork(noisy, Adjustments(background_cleanup=0.6, despeckle=3, threshold=0.5))
-    assert codes(fixed) == []
-    assert fixed.measures.specks_removed > 100
+    # Despeckle 3 (marks up to 16 px) leaves the scan's 13-21 px dots: still flagged.
+    partly = prepare_artwork(noisy, Adjustments(background_cleanup=0.6, despeckle=3, threshold=0.5))
+    assert partly.measures.specks_per_megapixel_after > 5
+    assert codes(partly) == ["specks_remaining"]
+    fixed = prepare_artwork(noisy, Adjustments(background_cleanup=0.6, despeckle=4, threshold=0.5))
+    assert codes(fixed) == [] and fixed.measures.specks_per_megapixel_after == 0
+    assert fixed.measures.specks_removed > 200
 
 
 def test_transparency_is_composited_onto_white():

@@ -61,7 +61,9 @@ HEAVY_INK_WARNING = 0.35
 HEAVY_INK_BLOCKING = 0.60
 STROKES_BROKEN = 1.25  # Stroke count growth (with an allowance of 3) that means breaks.
 PAPER_WARNING = 240  # Median non-ink level below this prints as a tint.
-SPECKS_PER_MP_WARNING = 20.0
+# Clean fixtures measured 0-1.3 isolated marks per megapixel; a scan that looked
+# visibly dusty in review measured 14.8 (despeckle 3 left its 13-21 px dots).
+SPECKS_PER_MP_WARNING = 5.0
 CHANGE_REVIEW = 40.0  # Mean absolute change (levels) worth a visual review.
 
 
