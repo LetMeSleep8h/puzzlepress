@@ -2,8 +2,8 @@
 
 The baseline (`tests/fixtures/golden/baseline.json`) was recorded by
 `tests/golden_baseline.py` from the engine at main `693aa00` (branch commit `270d3dd`
-adds only documentation) before any engine change. Never
-rewrite it to make this test pass: a difference is a behavior change to explain.
+adds only documentation) before any engine change. Never rewrite it to make this
+test pass: a difference is a behavior change to explain.
 """
 
 import json
@@ -39,9 +39,7 @@ def _differences(expected: object, actual: object, path: str = "") -> list[str]:
 
 def test_baseline_file_is_canonical(pinned):
     # A Windows checkout may turn the line endings into CRLF; the content is what counts.
-    assert BASELINE.read_bytes().replace(b"
-", b"
-") == encode(pinned)
+    assert BASELINE.read_bytes().replace(b"\r\n", b"\n") == encode(pinned)
 
 
 def test_source_only_outputs_match(pinned, current):
