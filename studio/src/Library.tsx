@@ -60,13 +60,16 @@ export function Library() {
           {visible.map((project) => {
             const source = project.source;
             const content = source?.word_search;
+            const coloring = source?.coloring;
             return (
               <article className="book-row" key={project.key}>
                 <div className="book-specimen" aria-hidden="true">
                   <div className="specimen-spine" />
                   <span>PuzzlePress</span>
                   <strong>{source?.book.title ?? project.key}</strong>
-                  <small>{content ? 'Word search' : 'Source fixture'}</small>
+                  <small>
+                    {coloring ? project.engine?.label : content ? 'Word search' : 'Source fixture'}
+                  </small>
                 </div>
                 <div className="book-description">
                   <Status tone={project.validation.valid ? 'pass' : 'fail'}>
@@ -79,7 +82,26 @@ export function Library() {
                   </h2>
                   {source?.book.subtitle && <p>{source.book.subtitle}</p>}
                   <p className="muted">{source?.book.id ?? project.key}</p>
-                  {source ? (
+                  {source && coloring ? (
+                    <dl className="inline-facts">
+                      <div>
+                        <dt>Type</dt>
+                        <dd>{project.engine?.label}</dd>
+                      </div>
+                      <div>
+                        <dt>Artwork</dt>
+                        <dd>{coloring.artwork.length}</dd>
+                      </div>
+                      <div>
+                        <dt>Pages</dt>
+                        <dd>{coloring.pages.length}</dd>
+                      </div>
+                      <div>
+                        <dt>Language</dt>
+                        <dd>{source.book.language}</dd>
+                      </div>
+                    </dl>
+                  ) : source ? (
                     <dl className="inline-facts">
                       <div>
                         <dt>Type</dt>
@@ -103,7 +125,7 @@ export function Library() {
                   ) : (
                     <Issues issues={project.validation.issues} />
                   )}
-                  {!content && source && (
+                  {!content && !coloring && source && (
                     <p className="muted">Authored content fixture. No word-search definitions.</p>
                   )}
                 </div>

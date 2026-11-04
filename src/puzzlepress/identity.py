@@ -4,6 +4,7 @@ import hashlib
 import json
 
 from . import __version__
+from .coloring_config import COLORING_VERSION
 from .composition import COMPOSITION_VERSION
 from .content import PIPELINE_VERSION
 from .models import Project
@@ -35,6 +36,9 @@ def canonical_build_inputs(project: Project) -> bytes:
         envelope["word_search_pipeline_version"] = PIPELINE_VERSION
     if project.composition is not None:
         envelope["composition_version"] = COMPOSITION_VERSION
+    if project.coloring is not None:
+        # Artwork enters by its pinned SHA-256, never by reading the file here.
+        envelope["coloring_version"] = COLORING_VERSION
     return json.dumps(
         envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     ).encode("utf-8")

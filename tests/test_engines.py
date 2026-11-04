@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from puzzlepress import build_identity, canonical_build_inputs, load_project, validate_project
-from puzzlepress.engines import SECTIONS, EngineKind, detect_engine, registry
+from puzzlepress.engines import LABELS, SECTIONS, EngineKind, detect_engine, registry
 from puzzlepress.engines.registry import WordSearchEngine, engine_for
 from puzzlepress.errors import ProjectError
 from puzzlepress.publication import build_publication
@@ -56,31 +56,42 @@ def test_unregistered_engine_is_an_expected_error(monkeypatch):
     with pytest.raises(ProjectError) as raised:
         engine_for(project)
     (issue,) = raised.value.issues
-    assert (issue.path, issue.code) == ("word_search", "engine_unavailable")
+    assert (issue.path, issue.code) == ("word_search", "engine_not_buildable")
 
 
 def test_detection_rules():
     assert detect_engine({}) == (EngineKind.WORD_SEARCH, ())
     assert detect_engine({"content": {"items": ["A"]}}) == (EngineKind.WORD_SEARCH, ())
     assert detect_engine({"word_search": {}}) == (EngineKind.WORD_SEARCH, ())
+    assert detect_engine({"coloring": {}}) == (EngineKind.COLORING, ())
     assert detect_engine(["not", "a", "mapping"]) == (None, ())
-    kind, (issue,) = detect_engine({"coloring": {}})
-    assert kind is None
-    assert (issue.path, issue.code) == ("coloring", "engine_unavailable")
-    assert "Remove the coloring section" in issue.message
     kind, (issue,) = detect_engine({"word_search": {}, "coloring": {}})
     assert kind is None
     assert (issue.path, issue.code) == ("coloring", "engine_conflict")
     assert "word_search and coloring" in issue.message
-    assert set(SECTIONS) == set(EngineKind)
+    assert set(SECTIONS) == set(EngineKind) == set(LABELS)
 
 
-def test_a_coloring_section_is_reported_not_read_as_word_search():
+def test_an_engine_this_version_cannot_load_is_reported(monkeypatch):
+    """Interval 1 behavior for coloring, kept for any future recognised-but-absent engine."""
+    from puzzlepress.engines import kind as kinds
+
+    monkeypatch.setattr(kinds, "AVAILABLE", frozenset({EngineKind.WORD_SEARCH}))
+    kind, (issue,) = kinds.detect_engine({"coloring": {}})
+    assert kind is None
+    assert (issue.path, issue.code) == ("coloring", "engine_unavailable")
+    assert "Remove the coloring section" in issue.message
+
+
+def test_a_coloring_section_is_read_with_coloring_rules_not_word_search():
     source = _source(ROOT / "books" / "garden-demo")
     del source["word_search"]
     source["coloring"] = {"version": 1}
+    project = validate_project(source).require_project()
+    assert project.engine is EngineKind.COLORING
+    source["coloring"] = {"version": 1, "banks": []}
     issues = validate_project(source).issues
-    assert [(i.path, i.code) for i in issues] == [("coloring", "engine_unavailable")]
+    assert [(i.path, i.code) for i in issues] == [("coloring.banks", "unknown_field")]
 
 
 def test_two_engine_sections_conflict():
@@ -112,7 +123,7 @@ def test_cli_reports_the_engine(capsys):
     assert build_identity(project) in out
 
 
-def test_cli_rejects_an_unavailable_engine(tmp_path, capsys):
+def test_cli_reads_word_search_content_under_coloring_with_coloring_rules(tmp_path, capsys):
     from puzzlepress.cli import main
     from puzzlepress.yaml_io import dump_project
 
@@ -121,8 +132,31 @@ def test_cli_rejects_an_unavailable_engine(tmp_path, capsys):
     (tmp_path / "book.yaml").write_text(text, encoding="utf-8")
     assert main(["validate", str(tmp_path)]) == 1
     err = capsys.readouterr().err
-    assert "coloring [engine_unavailable]" in err
+    assert "coloring.banks [unknown_field]" in err
     assert "Traceback" not in err
+
+
+def test_cli_inspect_names_a_coloring_book_without_puzzle_terms(tmp_path, capsys):
+    from puzzlepress.cli import main
+    from tests.coloring_helpers import write_coloring_book
+
+    folder = write_coloring_book(tmp_path / "book")
+    assert main(["inspect", str(folder)]) == 0
+    out = capsys.readouterr().out
+    assert "Engine: coloring (Coloring book)" in out
+    assert "Artwork: 0" in out and "Coloring pages: 0" in out
+    assert "Puzzle" not in out
+
+
+def test_book_commands_refuse_a_coloring_book(tmp_path, capsys):
+    from puzzlepress.cli import main
+    from tests.coloring_helpers import write_coloring_book
+
+    folder = write_coloring_book(tmp_path / "book")
+    for command in (["book", "plan"], ["book", "build"], ["book", "preflight"]):
+        assert main([*command, str(folder)]) == 1, command
+        err = capsys.readouterr().err
+        assert "Traceback" not in err
 
 
 def test_engine_summary_is_json_safe():

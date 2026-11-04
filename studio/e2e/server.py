@@ -116,4 +116,8 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
 
     import_photo(books / "design-demo", photo_bytes(900, 600), "spare-photo.jpg")
     import_photo(books / "template-demo", photo_bytes(900, 600), "spare-photo.jpg")
+    # Coloring artwork: an empty SYNTHETIC coloring book; the spec imports its drawings.
+    from coloring_helpers import write_coloring_book  # noqa: E402
+
+    write_coloring_book(books / "coloring-demo")
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)

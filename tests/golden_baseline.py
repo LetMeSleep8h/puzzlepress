@@ -7,9 +7,12 @@ standalone generator. It records each command's exit code, the SHA-256 of its
 stdout and stderr, and the SHA-256 of every file it wrote.
 
 One normalization only: the human-readable commands print the absolute paths they
-read and wrote, so in stdout/stderr the scratch root becomes `<scratch>` and path
-separators become `/`. Written files and JSON stdout are hashed as produced, so an
-absolute path or time in them shows up as instability between two runs.
+read and wrote, so in stdout/stderr each path under the scratch root becomes
+`<scratch>/...` with `/` separators. Nothing else is touched: baseline version 1
+also turned every backslash into `/` on Windows, which corrupted JSON escapes such
+as `\n` and made those digests platform-dependent (found by Linux CI). Written
+files are hashed as produced, so an absolute path or time in them, or in JSON
+stdout, shows up as instability between two runs.
 
 Write the baseline (only from an unchanged engine):
     python tests/golden_baseline.py --write
@@ -24,7 +27,7 @@ import contextlib
 import hashlib
 import io
 import json
-import os
+import re
 import shutil
 import sys
 import tempfile
@@ -33,7 +36,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "tests" / "fixtures" / "golden" / "baseline.json"
-BASELINE_VERSION = 1
+BASELINE_VERSION = 2
 
 # (name, source folder; None writes the synthetic production book)
 BOOKS = (
@@ -47,8 +50,12 @@ BOOKS = (
 
 # Values that depend only on the engine and the authored source. Everything else
 # (PDF bytes, interior/cover identities, reports that embed them) also depends on
-# the ReportLab, Pillow and pypdf versions recorded under `toolchain`.
+# the library versions recorded under `toolchain`.
 SOURCE_ONLY = ("build_identity", "validate", "plan", "batch", "generate")
+# What writes the PDF files: ReportLab draws them, Pillow encodes their images and
+# PyYAML reads the source. pypdf only reads them back (for reports), so a pypdf
+# release cannot change PDF bytes but may change report bytes.
+PDF_WRITERS = ("reportlab", "pillow", "PyYAML")
 
 
 def toolchain() -> dict[str, str]:
@@ -64,9 +71,11 @@ _SCRATCH: list[str] = []
 
 def _text(value: str) -> bytes:
     for root in _SCRATCH:
-        value = value.replace(root, "<scratch>")
-    if os.sep != "/":
-        value = value.replace(os.sep, "/")
+        value = re.sub(
+            re.escape(root) + r"[^\s\"'()<>|]*",
+            lambda match, root=root: "<scratch>" + match[0][len(root) :].replace("\\", "/"),
+            value,
+        )
     return value.encode("utf-8")
 
 

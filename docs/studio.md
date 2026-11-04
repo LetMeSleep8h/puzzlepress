@@ -451,6 +451,7 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | --- | --- |
 | `GET /api/projects` | Sorted library, including invalid projects |
 | `GET /api/projects/{key}` | Normalized source, validation, identity, engine version, derived `engine` {kind, label}, byte revision |
+| `GET /api/projects/{key}/coloring` | Coloring books: saved revision and artwork library report (see [coloring books](coloring.md), which also lists the artwork import, removal and thumbnail endpoints) |
 | `POST /api/projects/{key}/generation` | `{identity}`; saved-source batch report |
 | `POST /api/projects/{key}/draft/validate` | `{source}`; normalized valid project and semantic identity |
 | `POST /api/projects/{key}/draft/preview` | `{source}`; core batch, verification and authoritative solution cells |

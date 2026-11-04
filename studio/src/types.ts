@@ -80,6 +80,61 @@ export interface Project {
     cover?: CoverConfig;
     publishing?: PublishingConfig;
     interior?: InteriorStyle;
+    coloring?: ColoringSource;
+  };
+}
+/** The authored coloring section, as Python normalized it. */
+export interface ColoringSource {
+  version: number;
+  artwork: { id: string; path: string; sha256: string; title: string | null }[];
+  pages: { artwork: string }[];
+  layout: { blank_reverse: boolean; border: string };
+}
+export interface ArtworkFinding {
+  code: string;
+  severity: 'blocking' | 'warning';
+  message: string;
+  actual: string | null;
+  required: string | null;
+}
+export interface ArtworkEntry {
+  id: string;
+  title: string | null;
+  path: string;
+  sha256: string;
+  pages: number[];
+  adjustments_applied: boolean;
+  inspection: {
+    info: {
+      format: string;
+      bytes: number;
+      mode: string;
+      pixels: [number, number];
+      effective_dpi: number;
+      transparent_pixels: boolean;
+    };
+    findings: ArtworkFinding[];
+    blocking: boolean;
+  } | null;
+  error: { code: string; message: string } | null;
+}
+export interface ColoringListing {
+  revision: string;
+  report: {
+    book_id: string;
+    artwork: ArtworkEntry[];
+    pages: number;
+    unreferenced_files: string[];
+    blocking: number;
+    duplicates: {
+      confirmed: {
+        same_file: { sha256: string; artwork: string[]; pages: number[] }[];
+        repeated_pages: { artwork: string; pages: number[] }[];
+      };
+      possible: { similar: { artwork: [string, string]; pages: number[] }[] };
+      not_compared: string[];
+      complete: boolean;
+    };
   };
 }
 export interface Cell {

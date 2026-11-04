@@ -20,6 +20,7 @@ from puzzlepress.cover.font_assets import MAX_FONT_BYTES
 from puzzlepress.errors import ProjectError
 
 from .assets import AssetService
+from .coloring import ColoringService
 from .covering import CoverService
 from .designing import DesignService
 from .editing import DraftStore
@@ -121,6 +122,13 @@ class TrashedRequest(BaseModel):
     sha256: str | None = None
 
 
+class ArtworkRemoval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    artwork: str
+    revision: str
+    with_pages: bool = False
+
+
 class ReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_revision: str
@@ -151,16 +159,26 @@ class ProofRemoveRequest(BaseModel):
     id: str
 
 
-# The only non-JSON POSTs: photograph and font uploads. Their content types are not
-# CORS-safelisted, so another site cannot send one without a refused preflight.
-UPLOAD_PATH = re.compile(r"/api/projects/[^/]+/cover/(assets|fonts)")
-UPLOAD_TYPES = {"assets": ("image/jpeg", "image/png"), "fonts": ("font/ttf", "font/otf")}
+# The only non-JSON POSTs: photograph, font and artwork uploads. Their content types
+# are not CORS-safelisted, so another site cannot send one without a refused
+# preflight. Artwork also admits SVG and unlabeled files, so Python can explain why
+# it refuses them instead of the browser seeing a bare rejection.
+UPLOAD_PATH = re.compile(r"/api/projects/[^/]+/(cover/assets|cover/fonts|coloring/artwork)")
+UPLOAD_TYPES = {
+    "cover/assets": ("image/jpeg", "image/png"),
+    "cover/fonts": ("font/ttf", "font/otf"),
+    "coloring/artwork": ("image/png", "image/jpeg", "image/svg+xml", "application/octet-stream"),
+}
 
 
 def error_response(
-    status: int, code: str, message: str, uses: list[object] | None = None
+    status: int,
+    code: str,
+    message: str,
+    uses: list[object] | None = None,
+    issues: list[object] | None = None,
 ) -> JSONResponse:
-    error: dict[str, object] = {"code": code, "message": message, "issues": []}
+    error: dict[str, object] = {"code": code, "message": message, "issues": issues or []}
     if uses is not None:
         error["uses"] = uses  # Where an asset is used, so Studio can link to each use.
     return JSONResponse({"error": error}, status)
@@ -176,6 +194,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     publishing = PublishingService(service, drafts)
     planning = PlanningService(service)
     assets = AssetService(service, drafts)
+    coloring = ColoringService(service)
     reviews = ReviewService(service)
     production = ProductionService(service)
     app = FastAPI(title="PuzzlePress Studio", docs_url=None, redoc_url=None, openapi_url=None)
@@ -207,7 +226,13 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
 
     @app.exception_handler(StudioError)
     async def studio_error(request: Request, error: StudioError) -> JSONResponse:
-        return error_response(error.status, error.code, str(error), getattr(error, "uses", None))
+        return error_response(
+            error.status,
+            error.code,
+            str(error),
+            getattr(error, "uses", None),
+            getattr(error, "issues", None),
+        )
 
     @app.exception_handler(ProjectError)
     async def project_error(request: Request, error: ProjectError) -> JSONResponse:
@@ -507,6 +532,29 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
             headers={"Cache-Control": "private, max-age=31536000, immutable"},
         )
 
+    @app.get("/api/projects/{key}/coloring")
+    def coloring_library(key: str) -> dict[str, object]:
+        return coloring.listing(key)
+
+    @app.post("/api/projects/{key}/coloring/artwork")
+    async def import_artwork(
+        key: str, request: Request, revision: str, name: str = "artwork.png"
+    ) -> JSONResponse:
+        data = await read_upload(request, MAX_ASSET_BYTES, "file_too_large", "artwork")
+        return JSONResponse(coloring.import_artwork(key, data, name[:200], revision))
+
+    @app.post("/api/projects/{key}/coloring/remove")
+    def remove_artwork(key: str, body: ArtworkRemoval) -> dict[str, object]:
+        return coloring.remove(key, body.artwork, body.revision, body.with_pages)
+
+    @app.get("/api/projects/{key}/coloring/thumbnail")
+    def artwork_thumbnail(key: str, artwork: str) -> Response:
+        return Response(
+            coloring.thumbnail(key, artwork[:64]),
+            media_type="image/png",
+            headers={"Cache-Control": "private, no-cache"},
+        )
+
     @app.get("/api/projects/{key}/publishing")
     def publishing_status(key: str) -> dict[str, object]:
         return publishing.status(key)
@@ -557,6 +605,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     @app.get("/books/{key}/cover")
     @app.get("/books/{key}/publishing")
     @app.get("/books/{key}/planning")
+    @app.get("/books/{key}/artwork")
     @app.get("/books/{key}/puzzles/{puzzle_id}")
     def shell() -> FileResponse:
         index = frontend / "index.html"

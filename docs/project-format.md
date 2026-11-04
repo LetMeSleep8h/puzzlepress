@@ -35,7 +35,7 @@ output:
 | `content.items` | Ordered nonempty strings; omitted content/items defaults to an empty list. Duplicates and order are preserved. No puzzle-specific rules apply. |
 | `output.directory` | Relative path from the resolved YAML file's directory; defaults to `../build/<book.id>`. |
 | `word_search` | Optional banks, explicit difficulty profiles, themed puzzle definitions, and quality settings. See [batch schema](batch-quality.md). Omit for legacy projects; null is rejected. |
-| `coloring` | Recognised, not yet available: a source with it fails `engine_unavailable`; with `word_search` too, `engine_conflict`. Never read with word-search rules. |
+| `coloring` | Optional coloring book (version 1): artwork library pinned by SHA-256, page order, adjustment settings, layout. Not with `word_search` (`engine_conflict`) or `composition` yet. Part of build identity. See [coloring books](coloring.md). |
 | `composition` | Optional book composition: front/back matter, solution and page-number policy. Requires `word_search`. See [book composition](book-composition.md). |
 | `cover` | Optional versioned paperback cover: photograph, crop, type and fill. Requires `composition`. Excluded from build identity. See [cover](cover.md). |
 | `publishing` | Optional versioned KDP paperback metadata, AI disclosure and author confirmations. Requires `composition`. Excluded from build identity. See [publishing](publishing.md). |

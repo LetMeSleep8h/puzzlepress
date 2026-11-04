@@ -2,14 +2,48 @@
 
 ## Completed scope
 
-Multi-engine Interval 1 (foundation) on branch `feat/multi-engine-coloring`;
-committed locally, not pushed. Plan and decisions D1-D6: docs/multi-engine-plan.md.
+Multi-engine Interval 2 (coloring schema, artwork import and library) on branch
+`feat/multi-engine-coloring`; committed locally, not pushed. Guide: docs/coloring.md.
+
+- `coloring_config`/`coloring_validation`: optional `coloring` (version 1) with
+  artwork (id, `coloring-assets/<stem>-<sha12>.png|jpg`, full SHA-256, title,
+  adjustments recorded but not applied), ordered pages and layout (`blank_reverse`
+  true, `border` none|thin|double). Defaults normalized; part of build identity with
+  envelope `coloring_version: 1`. Not with `word_search` (`engine_conflict`) or
+  `composition` (`not_available_for_engine`), so no cover/interior/publishing.
+  Caps 300 artwork / 300 pages are provisional (nothing built yet).
+- Coloring is loadable: `engine_for` refuses it (`engine_not_buildable`), so `book
+  plan|build|preflight|produce` exit 1 without a traceback; `inspect` shows artwork
+  and page counts. `LABELS` names book types apart from the build registry.
+- `coloring/`: `inspection` (PNG/JPEG by content; SVG refused `svg_not_supported`;
+  empty, corrupt, other formats, >64 MB, >80 MP, 16-bit refused; facts and findings,
+  effective DPI fitted to the 7.25 x 9.75 in live area; blocking <150 DPI and
+  blank; warnings <300 DPI, gray paper, color, transparency, CMYK, shape, edge
+  contact), `assets` (content-addressed, staged, fsynced, linked, never overwritten,
+  digest-checked reads inside the resolved project), `duplicates` (confirmed
+  same-file and repeated pages apart from a dHash + gray-map heuristic), `library`
+  (all-or-nothing batch import, reimport adds nothing, removal keeps the file).
+  `source_store.replace_source`: the CLI's revision-checked book.yaml writer (the
+  same contract as Studio's save). The asset library lists artwork with its uses and
+  trashes only unreferenced files to `coloring-assets/.trash/`.
+- CLI `coloring import|list|inspect|duplicates|remove`. Studio: a coloring book has
+  Overview and Artwork only (no word-search terms); API GET `/coloring`, POST
+  `/coloring/artwork` (raw body; SVG and unlabeled bodies pass the upload guard so
+  Python explains them), POST `/coloring/remove`, GET `/coloring/thumbnail`.
+- Golden baseline v2 (fix): version 1's Windows normalization also rewrote JSON
+  escapes in `book plan --json` and `puzzle batch --json`, so main's Linux CI failed
+  after PR #15 (run 41772806080). Re-recorded from the pre-refactor engine with the
+  corrected harness: exactly those five digests changed and equal Linux CI's values.
+  PDF files are now compared when ReportLab, Pillow and PyYAML match (pypdf only
+  reads PDFs), so Linux CI compares PDF bytes too.
+
+Earlier: multi-engine Interval 1 (foundation), merged to main as PR #15.
 
 - `engines/kind.py`: `EngineKind` (word_search, coloring), derived from the content
   section and never stored. Every existing project, legacy ones included, is
-  word_search. `detect_engine` on raw source: `engine_conflict` (both sections) and
-  `engine_unavailable` (coloring: recognised, not buildable in 0.1.0), each at path
-  `coloring`. Word-search validation issues and their order are unchanged.
+  word_search. `detect_engine` on raw source: `engine_conflict` (both sections);
+  `engine_unavailable` remains for a recognised engine a version cannot load.
+  Word-search validation issues and their order are unchanged.
 - `Project.engine` is a property, so `to_dict`, YAML and build identity are untouched.
 - `engines/registry.py`: `ContentEngine` protocol (kind, label, build_publication,
   verify_publication) and `WordSearchEngine`, which delegates to the existing
@@ -512,6 +546,25 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Coloring schema and artwork library, 2026-11-04 (Windows, Python 3.13):
+
+- Python: **1918 passed, 9 skipped** (symlink permission, Windows drive paths),
+  scratch `--basetemp`, `-p no:cacheprovider`; then the corrected golden test 4/4
+  (source-only, PDF files, every output) against baseline v2. Ruff lint and format,
+  strict mypy (144 files), pip check, `git diff --check`. AGENTS CLI commands exit
+  as on main (scratch output directory).
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build. Vitest **95/96**:
+  the Composer "edits matter…" test times out at 5 s while another project's
+  CPU-heavy jobs run on this machine; main's frontend code fails the same test under
+  the same load, and Composer + Cover pass 21/21 alone. Playwright **34/35**: new
+  `coloring.spec.ts` passes (import, SVG refusal, reimport, look-alike, reload, axe,
+  removal, 1440/1024/768/390 without overflow); `templates.spec.ts` rich text fails
+  at line 320 as before. Rewritten `docs/images/studio` captures were restored.
+- Measured: full inspection about 0.12 s per 2175 x 2925 drawing; similarity
+  thresholds from 60 synthetic drawings (1,770 pairs, none matched).
+- Linux: PR #15's CI showed baseline v1's five platform-dependent digests (fixed in
+  v2). The v2 PDF comparison on Linux awaits the next CI run.
+
 Multi-engine foundation, 2026-11-03 (Windows, Python 3.13):
 
 - Python: **1823 passed, 8 skipped** (symlink permission, Windows drive paths);
@@ -528,8 +581,8 @@ Multi-engine foundation, 2026-11-03 (Windows, Python 3.13):
   rich text fails at line 320 (`runs[0]` not bold `Twenty`) identically on main
   `693aa00` code and this branch, twice each. The browser specs rewrite
   `docs/images/studio/*.png`; those captures were restored, not committed.
-- Not verified: the golden PDF digests on Linux/macOS (pinned on Windows; same
-  library versions are expected to give the same bytes, as CI's `cmp` shows per OS).
+- Not verified then: the golden PDF digests on Linux/macOS. Linux CI after the merge
+  found baseline v1's normalization bug instead (see Interval 2).
 
 Interior design studio, 2026-10-18 (Windows, Python 3.13):
 
@@ -656,6 +709,14 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
   status and 15 recorded file digests were identical before and after.
 
 ## Limits and decisions for review
+
+Coloring books (Interval 2): adjustments are stored, not applied; no page layout,
+interior, cover, preflight or package exists for them; DPI is measured against the
+profile's live area; caps are provisional; the similarity heuristic is measured on
+synthetic drawings only; Studio cannot edit titles, adjustments or page order or
+trash artwork (CLI `remove --trash` and the asset library API can); the CLI's
+`import`/`remove` rewrite book.yaml canonically (comments lost), through a writer
+that follows Studio's save contract but is a second implementation of it.
 
 Interior design: the omitted `per_page` default changed from 1 to 4, which
 repaginates any book that omitted it (all demos and the automotive book state 2,

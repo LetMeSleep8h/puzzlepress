@@ -1,5 +1,5 @@
 {
-  "baseline_version": 1,
+  "baseline_version": 2,
   "books": {
     "composition-demo": {
       "batch": {
@@ -25,7 +25,7 @@
       "plan": {
         "exit": 0,
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "stdout_sha256": "5f53f344bce2d6a5430efffce66c82b5f556c3450d9a6349cf9aaad90a090beb"
+        "stdout_sha256": "a8238c49e8997b1beab966cb655e16336c2f02a6781be3d18be9e3febf3729ab"
       },
       "produce": {
         "exit": 1,
@@ -82,7 +82,7 @@
       "plan": {
         "exit": 0,
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "stdout_sha256": "a5259f9f38882acb6d8b52eaeedec587df9435d484c96662b5a5b51d35926c25"
+        "stdout_sha256": "85e1e05a182ea1a3565b13161574b6fc23f78193703fb4bc2599ffdb06f06378"
       },
       "produce": {
         "exit": 0,
@@ -163,7 +163,7 @@
       "plan": {
         "exit": 0,
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "stdout_sha256": "725b7934b2e33fb88fb19f94d5fcc0f9ec9107530fd79e4671bce192585ac7d2"
+        "stdout_sha256": "0c876b1bc99ef745d670888ef07d7d2b8e71610e942790aced22fc869878cde0"
       },
       "produce": {
         "exit": 0,
@@ -201,7 +201,7 @@
       "batch": {
         "exit": 0,
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "stdout_sha256": "aded2ce2784abab1d0c9cc64f92d08d72202523214498079f7ed0192caab57f2"
+        "stdout_sha256": "67c0d1c9878dfdca47d33c0cc797087ae585dc854375d63e9df9f2882727ead1"
       },
       "build_identity": "pp1-sha256-99d2f4c359f218c14c4586cb67d7adb757a69922ffbbac19c921d286ba0857d9",
       "interior_build": {
@@ -221,7 +221,7 @@
       "plan": {
         "exit": 0,
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "stdout_sha256": "ddb96b77f13e51adc39a94f51a4a6961efdb95ba9575d1abbb2cc75ea0788ee5"
+        "stdout_sha256": "034976795fa3cffd9ef14aef3557ee585b816d6e249b8c62f91416493597cbc4"
       },
       "produce": {
         "exit": 1,
