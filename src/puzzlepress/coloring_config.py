@@ -3,7 +3,8 @@
 Artwork files live in the project's `coloring-assets/` folder under content-addressed
 names (`<stem>-<first 12 hex of SHA-256>.png|jpg`) and are never rewritten. The
 source pins each file's full SHA-256. Adjustments are non-destructive settings over
-the original bytes; nothing in this version applies them to pixels.
+the original bytes, applied in memory by `coloring.prepare` when a build or preview
+needs pixels; the originals are never rewritten.
 
 Normalized values always carry every default, so an omitted setting and the same
 setting written out explicitly serialize, and therefore hash, identically.
@@ -14,11 +15,12 @@ from enum import StrEnum
 
 COLORING_VERSION = 1
 ARTWORK_DIRECTORY = "coloring-assets"
-# Provisional caps: no coloring interior is built yet, so these are not measured
-# generation budgets. Interval 4 measures layout and rendering before raising them.
+# Provisional caps until layout and rendering are measured at these sizes (see
+# docs/coloring.md); never raised without measuring a build at the new size.
 MAX_ARTWORK = 300
 MAX_PAGES = 300
 MAX_TITLE = 200
+MAX_DIVIDER_TEXT = 600
 
 
 class Border(StrEnum):
@@ -29,21 +31,22 @@ class Border(StrEnum):
 
 @dataclass(frozen=True)
 class Adjustments:
-    """Line-art preparation settings, stored with the artwork and applied by Python.
-
-    Recorded in this version only: no build reads them yet.
+    """Line-art preparation settings over the original, applied in Python by
+    `coloring.prepare` (order and meaning are documented there). No build reads
+    them yet; the defaults reproduce the original's gray levels.
     """
 
-    grayscale: bool = True
+    grayscale: bool = True  # Luma; false takes each pixel's darkest channel.
     threshold: float | None = None  # None keeps gray levels; else 0.05..0.95 black point.
     brightness: float = 0.0  # -1..1
     contrast: float = 1.0  # 0.25..4
-    background_cleanup: float = 0.0  # 0..1: how much near-white is lifted to white.
-    despeckle: int = 0  # 0..5: specks up to this many pixels removed.
+    background_cleanup: float = 0.0  # 0..1: paper stretched to white, then near-white lifted.
+    despeckle: int = 0  # 0..5: isolated marks up to 0/4/9/16/36/64 pixels removed.
     line_weight: int = 0  # -2..2: thin (negative) or thicken (positive) lines.
+    invert: bool = False  # For white-on-black artwork.
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        data: dict[str, object] = {
             "grayscale": self.grayscale,
             "threshold": self.threshold,
             "brightness": self.brightness,
@@ -52,6 +55,10 @@ class Adjustments:
             "despeckle": self.despeckle,
             "line_weight": self.line_weight,
         }
+        if self.invert:
+            # Only when set, so books saved before `invert` existed keep their bytes.
+            data["invert"] = True
+        return data
 
 
 @dataclass(frozen=True)
@@ -73,10 +80,29 @@ class Artwork:
 
 
 @dataclass(frozen=True)
-class ColoringPage:
-    artwork: str  # An artwork id.
+class ColoringDivider:
+    """A section divider page: the author's title and optional text, never generated."""
+
+    title: str
+    text: str | None = None
 
     def to_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {"title": self.title}
+        if self.text is not None:
+            data["text"] = self.text
+        return data
+
+
+@dataclass(frozen=True)
+class ColoringPage:
+    """One entry in publication order: an artwork page, or a section divider."""
+
+    artwork: str | None = None  # An artwork id.
+    divider: ColoringDivider | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        if self.divider is not None:
+            return {"divider": self.divider.to_dict()}
         return {"artwork": self.artwork}
 
 
@@ -98,6 +124,15 @@ class ColoringBook:
 
     def artwork_by_id(self, artwork_id: str) -> Artwork | None:
         return next((item for item in self.artwork if item.id == artwork_id), None)
+
+    @property
+    def artwork_pages(self) -> tuple[tuple[int, str], ...]:
+        """(position in `pages`, 1-based; artwork id) for every artwork entry."""
+        return tuple(
+            (number, page.artwork)
+            for number, page in enumerate(self.pages, start=1)
+            if page.artwork is not None
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {

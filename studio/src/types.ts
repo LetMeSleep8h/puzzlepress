@@ -87,8 +87,31 @@ export interface Project {
 export interface ColoringSource {
   version: number;
   artwork: { id: string; path: string; sha256: string; title: string | null }[];
-  pages: { artwork: string }[];
+  /** Publication order: a drawing, or a section divider. */
+  pages: ({ artwork: string } | { divider: { title: string; text?: string } })[];
   layout: { blank_reverse: boolean; border: string };
+}
+/** Line-art preparation settings, as Python normalizes them (invert only when set). */
+export interface Adjustments {
+  grayscale: boolean;
+  threshold: number | null;
+  brightness: number;
+  contrast: number;
+  background_cleanup: number;
+  despeckle: number;
+  line_weight: number;
+  invert?: boolean;
+}
+export interface Preparation {
+  artwork: string;
+  key: string;
+  preparation_version: number;
+  adjustments: Adjustments;
+  saved_adjustments: Adjustments;
+  measures: Record<string, number | number[] | string[] | null>;
+  findings: ArtworkFinding[];
+  blocking: boolean;
+  images: { original: string; prepared: string; difference: string };
 }
 export interface ArtworkFinding {
   code: string;
@@ -103,6 +126,7 @@ export interface ArtworkEntry {
   path: string;
   sha256: string;
   pages: number[];
+  adjustments: Adjustments;
   adjustments_applied: boolean;
   inspection: {
     info: {
@@ -260,9 +284,11 @@ export interface Measure {
   unit: string | null;
   comparison: string | null;
 }
+/** `info` never blocks; the coloring ruleset uses it for manual-review prompts. */
+export type PreflightSeverity = 'error' | 'warning' | 'info';
 export interface PreflightFinding {
   rule: string;
-  severity: 'error' | 'warning' | 'info';
+  severity: PreflightSeverity;
   scope: 'structural' | 'kdp';
   category: string;
   message: string;
@@ -280,7 +306,7 @@ export interface PreflightRule {
   code: string;
   scope: 'structural' | 'kdp';
   category: string;
-  severity: 'error' | 'warning' | 'info';
+  severity: PreflightSeverity;
   title: string;
   description: string;
   basis: string;

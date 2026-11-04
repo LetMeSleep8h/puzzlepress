@@ -62,7 +62,8 @@ def test_upload_lists_inspects_and_thumbnails_artwork(client, library):
     assert imported["id"] == "fox-in-the-ferns" and imported["page"] == 1
     (entry,) = data["report"]["artwork"]
     assert entry["inspection"]["info"]["effective_dpi"] == 300.0
-    assert entry["adjustments_applied"] is False and entry["pages"] == [1]
+    # Interval 4: interior builds print the saved settings.
+    assert entry["adjustments_applied"] is True and entry["pages"] == [1]
     assert data["revision"] != empty["revision"]
     stored = library / "colors" / imported["path"]
     assert stored.read_bytes() == png(1)
@@ -171,3 +172,100 @@ def test_word_search_books_have_no_artwork(client):
 
 def test_artwork_shell_route_serves_the_app(client):
     assert client.get("/books/colors/artwork").status_code == 200
+
+
+# ---------------------------------------------------------------- line-art preparation
+
+
+def _imported(client) -> dict:
+    revision = listing(client)["revision"]
+    return upload(client, png(1), "a.png", revision).json()
+
+
+def test_prepare_previews_with_findings_and_images(client, library):
+    _imported(client)
+    original = (library / "colors" / "coloring-assets").iterdir().__next__().read_bytes()
+    response = client.post(
+        "/api/projects/colors/coloring/prepare",
+        json={"artwork": "a", "adjustments": {"line_weight": -2}},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["artwork"] == "a" and data["key"].startswith("pp1-prepared-sha256-")
+    assert data["adjustments"]["line_weight"] == -2
+    assert data["saved_adjustments"]["line_weight"] == 0
+    assert "detail_lost" in [f["code"] for f in data["findings"]]
+    for kind, url in data["images"].items():
+        image = client.get(url)
+        assert image.status_code == 200 and image.content.startswith(b"\x89PNG"), kind
+    folder = library / "colors" / "coloring-assets"
+    assert [p.read_bytes() for p in folder.iterdir()] == [original]
+    assert (library / "colors" / "book.yaml").read_text(encoding="utf-8").count(
+        "line_weight: 0"
+    ) == 1
+
+
+def test_preview_images_belong_to_their_project(client, library):
+    _imported(client)
+    data = client.post("/api/projects/colors/coloring/prepare", json={"artwork": "a"}).json()
+    prepared = data["key"]
+    other = client.get(f"/api/projects/garden/coloring/prepared/{prepared}/prepared")
+    assert other.status_code == 404 and other.json()["error"]["code"] == "preview_expired"
+    assert client.get(f"/api/projects/colors/coloring/prepared/{prepared}/nope").status_code == 404
+
+
+def test_invalid_adjustments_are_explained(client):
+    _imported(client)
+    response = client.post(
+        "/api/projects/colors/coloring/prepare",
+        json={"artwork": "a", "adjustments": {"contrast": 9, "sharpen": 1}},
+    )
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "invalid_adjustments"
+    assert {issue["code"] for issue in error["issues"]} == {"range", "unknown_field"}
+    unknown = client.post("/api/projects/colors/coloring/prepare", json={"artwork": "zz"})
+    assert unknown.status_code == 404
+
+
+def test_adjustments_save_reset_and_refuse_stale_revisions(client, library):
+    revision = _imported(client)["revision"]
+    saved = client.post(
+        "/api/projects/colors/coloring/adjustments",
+        json={"artwork": "a", "revision": revision, "adjustments": {"threshold": 0.5}},
+    )
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert body["adjustments"]["threshold"] == 0.5 and body["revision"] != revision
+    assert body["report"]["artwork"][0]["adjustments"]["threshold"] == 0.5
+    stale = client.post(
+        "/api/projects/colors/coloring/adjustments",
+        json={"artwork": "a", "revision": revision, "adjustments": {"threshold": 0.6}},
+    )
+    assert stale.status_code == 409 and stale.json()["error"]["code"] == "source_changed"
+    preview = client.post("/api/projects/colors/coloring/prepare", json={"artwork": "a"}).json()
+    assert preview["adjustments"]["threshold"] == 0.5  # Saved settings preview by default.
+    reset = client.post(
+        "/api/projects/colors/coloring/adjustments",
+        json={"artwork": "a", "revision": body["revision"], "adjustments": None},
+    ).json()
+    assert reset["adjustments"]["threshold"] is None
+    assert "threshold: null" in (library / "colors" / "book.yaml").read_text(encoding="utf-8")
+
+
+def test_concurrent_saves_with_one_revision_let_exactly_one_win(client):
+    from concurrent.futures import ThreadPoolExecutor
+
+    revision = _imported(client)["revision"]
+
+    def save(weight: int) -> int:
+        return client.post(
+            "/api/projects/colors/coloring/adjustments",
+            json={"artwork": "a", "revision": revision, "adjustments": {"line_weight": weight}},
+        ).status_code
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        statuses = sorted(pool.map(save, [1, 2, -1, -2]))
+    assert statuses == [200, 409, 409, 409]
+    weight = listing(client)["report"]["artwork"][0]["adjustments"]["line_weight"]
+    assert weight in (1, 2, -1, -2)

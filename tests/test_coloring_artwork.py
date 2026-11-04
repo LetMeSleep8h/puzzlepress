@@ -563,6 +563,6 @@ def test_publishing_and_production_refuse_coloring_books(book, capsys, tmp_path)
     code, _, err = run(capsys, "publish", "inspect", str(book))
     assert code == 1 and "Traceback" not in err
     code, _, err = run(capsys, "book", "produce", str(book), "--output", str(tmp_path / "out"))
-    assert code == 1 and "engine_not_buildable" in err and "Traceback" not in err
+    assert code == 1 and "not_available_for_engine" in err and "Traceback" not in err
     code, _, err = run(capsys, "puzzle", "batch", str(book))
     assert code == 1 and "Traceback" not in err

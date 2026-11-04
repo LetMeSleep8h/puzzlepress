@@ -1,0 +1,1457 @@
+{
+  "key": "coloring-print",
+  "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
+  "ruleset": 1,
+  "profiles": [
+    {
+      "id": "paperback-8.5x11",
+      "description": "8.5 x 11 in paperback interior, black ink on white paper, no bleed",
+      "paper": "white"
+    },
+    {
+      "id": "paperback-8.5x11-cream",
+      "description": "8.5 x 11 in paperback interior, black ink on cream paper, no bleed",
+      "paper": "cream"
+    }
+  ],
+  "profile": "paperback-8.5x11",
+  "state": "current",
+  "report": {
+    "report_version": 1,
+    "ruleset": {
+      "id": "puzzlepress-kdp-coloring",
+      "version": 1,
+      "kdp_rules_checked": "2026-10-07"
+    },
+    "book_id": "synthetic-coloring-book",
+    "source_identity": "pp1-sha256-f229dfb2559e19d094664cc576abe5d646d9b1b4f108cefbc9af764777fdf032",
+    "profile": {
+      "id": "paperback-8.5x11",
+      "version": 2,
+      "description": "8.5 x 11 in paperback interior, black ink on white paper, no bleed",
+      "trim": {
+        "name": "8.5x11",
+        "width_in": 8.5,
+        "height_in": 11.0
+      },
+      "bleed": false
+    },
+    "artifacts": {
+      "pdf": {
+        "sha256": "b2a6a9dc78cbb0a6b223294f91c5ba5a4faa14d82ccbbf0e31f6d8e6c461048a",
+        "bytes": 71469
+      },
+      "manifest": {
+        "sha256": "324ae556c2de1a464db727c1e53340ceabc6876c1cdf73d5f9e6eb833264c704",
+        "bytes": 3912
+      },
+      "interior_identity": "pp1-interior-sha256-d90d16c322fc389be16fbc7eead756623f84383ff5166173c5d072b4ccd04e08",
+      "expected_interior_identity": "pp1-interior-sha256-d90d16c322fc389be16fbc7eead756623f84383ff5166173c5d072b4ccd04e08",
+      "matches_layout": true
+    },
+    "page_count": 6,
+    "structural": {
+      "status": "valid"
+    },
+    "kdp": {
+      "status": "not_ready"
+    },
+    "counts": {
+      "severity": {
+        "error": 3,
+        "warning": 1,
+        "info": 1
+      },
+      "scope": {
+        "structural": 0,
+        "kdp": 5
+      },
+      "category": {
+        "artifact": 0,
+        "integrity": 0,
+        "page": 1,
+        "geometry": 0,
+        "typography": 0,
+        "font": 1,
+        "content": 3
+      },
+      "outcome": {
+        "passed": 51,
+        "failed": 4,
+        "not_applicable": 0,
+        "not_evaluated": 0
+      }
+    },
+    "findings": [
+      {
+        "rule": "kdp_minimum_page_count",
+        "severity": "error",
+        "scope": "kdp",
+        "category": "page",
+        "message": "6 pages. The supported KDP paperback minimum is 24 pages.",
+        "physical_page": null,
+        "logical_page": null,
+        "page_kind": null,
+        "side": null,
+        "folio": null,
+        "subject": null,
+        "region": null,
+        "bounds": null,
+        "measure": {
+          "actual": 6,
+          "required": 24,
+          "unit": "pages",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "rule": "kdp_image_resolution",
+        "severity": "error",
+        "scope": "kdp",
+        "category": "content",
+        "message": "The drawing prints at 162 DPI. Supply at least 2020 x 2717 pixels for this placement.",
+        "physical_page": 3,
+        "logical_page": 3,
+        "page_kind": "coloring",
+        "side": "recto",
+        "folio": "3",
+        "subject": null,
+        "region": "coloring_art",
+        "bounds": {
+          "x": 72.561,
+          "y": 82.0,
+          "width": 484.878,
+          "height": 652.0
+        },
+        "measure": {
+          "actual": 161.6,
+          "required": 300.0,
+          "unit": "dpi",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "rule": "kdp_image_resolution",
+        "severity": "error",
+        "scope": "kdp",
+        "category": "content",
+        "message": "The drawing prints at 162 DPI. Supply at least 2020 x 2717 pixels for this placement.",
+        "physical_page": 5,
+        "logical_page": 5,
+        "page_kind": "coloring",
+        "side": "recto",
+        "folio": "5",
+        "subject": null,
+        "region": "coloring_art",
+        "bounds": {
+          "x": 72.561,
+          "y": 82.0,
+          "width": 484.878,
+          "height": 652.0
+        },
+        "measure": {
+          "actual": 161.6,
+          "required": 300.0,
+          "unit": "dpi",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "rule": "kdp_full_font_embedding",
+        "severity": "warning",
+        "scope": "kdp",
+        "category": "font",
+        "message": "2 font(s) are subset-embedded. Review against KDP's wording; subsets contain every glyph the interior uses.",
+        "physical_page": null,
+        "logical_page": null,
+        "page_kind": null,
+        "side": null,
+        "folio": null,
+        "subject": null,
+        "region": "fonts",
+        "bounds": null,
+        "measure": {
+          "actual": "subset",
+          "required": "fully embedded",
+          "unit": null,
+          "comparison": "equal"
+        }
+      },
+      {
+        "rule": "coloring_similar_artwork",
+        "severity": "info",
+        "scope": "kdp",
+        "category": "content",
+        "message": "'drawing-1' and 'drawing-2' look alike (hash distance 0, ink map difference 0.01). Compare them.",
+        "physical_page": null,
+        "logical_page": null,
+        "page_kind": null,
+        "side": null,
+        "folio": null,
+        "subject": "drawing-1",
+        "region": "similar",
+        "bounds": null,
+        "measure": {
+          "actual": 0,
+          "required": null,
+          "unit": "bits",
+          "comparison": null
+        }
+      }
+    ],
+    "rules": [
+      {
+        "code": "interior_artifacts",
+        "scope": "structural",
+        "category": "artifact",
+        "severity": "error",
+        "title": "Interior files present",
+        "description": "interior.pdf and interior.json exist as regular files in the output directory.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Both build artifacts are present.",
+        "measure": null
+      },
+      {
+        "code": "manifest_format",
+        "scope": "structural",
+        "category": "artifact",
+        "severity": "error",
+        "title": "Manifest readable",
+        "description": "interior.json is a supported manifest version with every required field.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Manifest version 1 with all required fields.",
+        "measure": null
+      },
+      {
+        "code": "manifest_book",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Manifest names this book",
+        "description": "The manifest's book ID equals the project's book ID.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Book synthetic-coloring-book.",
+        "measure": null
+      },
+      {
+        "code": "manifest_pdf_digest",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "PDF matches its manifest",
+        "description": "The PDF's SHA-256 and byte size equal the values recorded in interior.json.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "SHA-256 and size match the manifest.",
+        "measure": null
+      },
+      {
+        "code": "interior_identity",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Interior identity consistent",
+        "description": "The manifest's interior identity recomputes from the inputs it records.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Identity recomputes from source, plan, profile and toolchain.",
+        "measure": null
+      },
+      {
+        "code": "source_current",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Built from current source",
+        "description": "The interior was built from the project source as it is now (build identity).",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Manifest identity and style equal the current source.",
+        "measure": null
+      },
+      {
+        "code": "print_profile_current",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Print profile current",
+        "description": "The recorded print profile is a built-in profile with an unchanged definition.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "paperback-8.5x11 v2.",
+        "measure": null
+      },
+      {
+        "code": "toolchain_current",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Renderer and fonts current",
+        "description": "Renderer, engine, PDF library, pinned fonts, coloring renderer and preparation versions equal the running toolchain.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Renderer, preparation, ReportLab and fonts unchanged.",
+        "measure": null
+      },
+      {
+        "code": "coloring_rendering_environment",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Rendering environment compatible",
+        "description": "The interior was rendered with this environment's deflate implementation (zlib or zlib-ng) and image library. Deflate output differs between implementations, so a PDF made under another one cannot be reproduced and compared byte for byte here.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress coloring interior contract (docs/coloring.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Rendered with this environment's zlib and Pillow.",
+        "measure": null
+      },
+      {
+        "code": "source_buildable",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Current source builds",
+        "description": "The current source prepares every drawing and lays out without diagnostics.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Plan verified, digests bound, layout validated.",
+        "measure": null
+      },
+      {
+        "code": "plan_current",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Plan current",
+        "description": "The manifest's plan digest equals the digest of the current verified plan, which names every page's prepared pixels.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Plan digest unchanged.",
+        "measure": null
+      },
+      {
+        "code": "pdf_matches_layout",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "PDF equals deterministic render",
+        "description": "The PDF's bytes equal a fresh render of the current verified layout. Geometry rules apply to the PDF only when this holds. Not evaluated, and therefore never passing, when the rendering environment differs.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Byte-identical to the deterministic render.",
+        "measure": null
+      },
+      {
+        "code": "pdf_readable",
+        "scope": "structural",
+        "category": "artifact",
+        "severity": "error",
+        "title": "PDF parses",
+        "description": "An independent parser (pypdf, strict) reads the PDF; it is not encrypted.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Parsed strictly by pypdf.",
+        "measure": null
+      },
+      {
+        "code": "page_count",
+        "scope": "structural",
+        "category": "page",
+        "severity": "error",
+        "title": "Page count matches",
+        "description": "PDF pages equal the manifest's page count and the plan's logical pages.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "6 pages.",
+        "measure": {
+          "actual": 6,
+          "required": null,
+          "unit": "pages",
+          "comparison": null
+        }
+      },
+      {
+        "code": "page_boxes",
+        "scope": "structural",
+        "category": "page",
+        "severity": "error",
+        "title": "Page boxes match profile",
+        "description": "Every page's MediaBox and TrimBox equal the profile's trim; no larger BleedBox.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every page is exactly the trim size.",
+        "measure": null
+      },
+      {
+        "code": "page_rotation",
+        "scope": "structural",
+        "category": "page",
+        "severity": "error",
+        "title": "Pages unrotated",
+        "description": "No page carries a /Rotate entry.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No rotated pages.",
+        "measure": null
+      },
+      {
+        "code": "pdf_interactive_features",
+        "scope": "structural",
+        "category": "content",
+        "severity": "error",
+        "title": "No interactive features",
+        "description": "No annotations, links, forms, open actions, name trees or bookmarks.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No annotations, forms, actions or bookmarks.",
+        "measure": null
+      },
+      {
+        "code": "fonts_bundled",
+        "scope": "structural",
+        "category": "font",
+        "severity": "error",
+        "title": "Bundled fonts only",
+        "description": "Every font is an embedded subset of the bundled, digest-pinned Vera Sans faces.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Only embedded bundled Vera Sans subsets.",
+        "measure": null
+      },
+      {
+        "code": "raster_images",
+        "scope": "structural",
+        "category": "content",
+        "severity": "error",
+        "title": "Raster images are the layout's",
+        "description": "Raster images appear only where the verified layout places a drawing (one per coloring page); any other image is foreign.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "2 drawing(s), as the layout places them.",
+        "measure": null
+      },
+      {
+        "code": "coloring_image_integrity",
+        "scope": "structural",
+        "category": "content",
+        "severity": "error",
+        "title": "Drawings embedded losslessly",
+        "description": "Each coloring page embeds exactly its prepared pixels: Flate-compressed DeviceGray at the prepared size and bit depth, decoding to the prepared pixel digest. No JPEG, resampling or other image. Checked by decoding the PDF's own image streams.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress coloring interior contract (docs/coloring.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "2 drawing(s) embedded losslessly and pixel-identical to their prepared pixels.",
+        "measure": null
+      },
+      {
+        "code": "coloring_artwork_sources",
+        "scope": "structural",
+        "category": "integrity",
+        "severity": "error",
+        "title": "Artwork present and unaltered",
+        "description": "Every drawing a page uses is in coloring-assets and still matches the SHA-256 the source pins for it.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress coloring interior contract (docs/coloring.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "2 drawing(s) present and unchanged.",
+        "measure": null
+      },
+      {
+        "code": "coloring_page_parity",
+        "scope": "structural",
+        "category": "page",
+        "severity": "error",
+        "title": "Page order and parity",
+        "description": "Coloring pages follow coloring.pages; the artwork section starts on a right-hand page when asked; with blank reverses every coloring page is a right-hand page whose back is blank; section dividers start on a right-hand page.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress coloring interior contract (docs/coloring.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "2 of 2 coloring page(s) on right-hand pages; 2 blank reverse(s).",
+        "measure": {
+          "actual": 2,
+          "required": 2,
+          "unit": "pages",
+          "comparison": "equal"
+        }
+      },
+      {
+        "code": "coloring_art_placement",
+        "scope": "structural",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Artwork placement",
+        "description": "Each drawing prints whole: uniformly scaled, unclipped, inside its art box (the live area above the page number, inside any border), with the border clear of it.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress coloring interior contract (docs/coloring.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every drawing whole, uniformly scaled and inside its art box.",
+        "measure": null
+      },
+      {
+        "code": "blank_pages",
+        "scope": "structural",
+        "category": "content",
+        "severity": "error",
+        "title": "Intentional blanks are blank",
+        "description": "Plan blank pages carry no text or painting operators in the PDF.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "2 intentional blank page(s) are empty.",
+        "measure": null
+      },
+      {
+        "code": "folios_printed",
+        "scope": "structural",
+        "category": "content",
+        "severity": "error",
+        "title": "Page numbers printed",
+        "description": "Every page number the plan displays appears in the page's PDF text.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every displayed page number is present.",
+        "measure": null
+      },
+      {
+        "code": "content_in_live_area",
+        "scope": "structural",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Content inside the live area",
+        "description": "Every element's painted extent (text ink box, rule and frame strokes) lies inside the print profile's live area. KDP's own margins are separate rules.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress interior contract (docs/print-interior.md)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every element's painted extent is inside the live area.",
+        "measure": null
+      },
+      {
+        "code": "kdp_minimum_page_count",
+        "scope": "kdp",
+        "category": "page",
+        "severity": "error",
+        "title": "Minimum page count",
+        "description": "A KDP paperback has at least 24 pages. PuzzlePress never pads.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "failed",
+        "findings": 1,
+        "note": null,
+        "measure": null
+      },
+      {
+        "code": "kdp_maximum_page_count",
+        "scope": "kdp",
+        "category": "page",
+        "severity": "error",
+        "title": "Maximum page count",
+        "description": "Page count is within KDP's black-ink maximum for the trim. KDP's current table omits the 8.5 x 11 in row; the lower indexed value (550, cream) is used.",
+        "basis": "kdp_ambiguous",
+        "source": "KDP help: Print Options",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "6 of at most 550 pages.",
+        "measure": {
+          "actual": 6,
+          "required": 550,
+          "unit": "pages",
+          "comparison": "at_most"
+        }
+      },
+      {
+        "code": "kdp_trim_size",
+        "scope": "kdp",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Supported trim size",
+        "description": "The trim is within KDP's paperback trim range (4-8.5 in wide, 6-11.69 in tall).",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Print Options",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "8.5 x 11 in.",
+        "measure": {
+          "actual": "8.5 x 11",
+          "required": "4-8.5 x 6-11.69",
+          "unit": "in",
+          "comparison": "within"
+        }
+      },
+      {
+        "code": "kdp_page_size",
+        "scope": "kdp",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Single trim-size pages",
+        "description": "Each PDF page is one page at the trim size: no spreads or 2-up pages.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every page is a single trim-size page.",
+        "measure": null
+      },
+      {
+        "code": "kdp_no_bleed",
+        "scope": "kdp",
+        "category": "geometry",
+        "severity": "error",
+        "title": "No-bleed setup",
+        "description": "The profile is no-bleed, so pages must not be enlarged for bleed (no BleedBox beyond the trim) and outside margins of at least 0.25 in apply.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Set Trim Size, Bleed, and Margins",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No-bleed interior; page size equals trim size.",
+        "measure": null
+      },
+      {
+        "code": "kdp_gutter",
+        "scope": "kdp",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Inside margin (gutter)",
+        "description": "Content clears the binding edge by KDP's gutter for the page count: 24-150 0.375 in, 151-300 0.5, 301-500 0.625, 501-700 0.75, 701-828 0.875.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Set Trim Size, Bleed, and Margins",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Smallest inside clearance 0.75 in on page 3.",
+        "measure": {
+          "actual": 0.75,
+          "required": 0.375,
+          "unit": "in",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "code": "kdp_outside_margins",
+        "scope": "kdp",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Outside, top and bottom margins",
+        "description": "Content clears the outside, top and bottom trim edges by at least 0.25 in (no bleed).",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Set Trim Size, Bleed, and Margins",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Smallest outside clearance 0.5 in on page 3.",
+        "measure": {
+          "actual": 0.5,
+          "required": 0.25,
+          "unit": "in",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "code": "kdp_minimum_font_size",
+        "scope": "kdp",
+        "category": "typography",
+        "severity": "error",
+        "title": "Minimum font size",
+        "description": "All text (titles, matter and page numbers) is at least 7 pt.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Smallest text size 9.5 pt.",
+        "measure": {
+          "actual": 9.5,
+          "required": 7.0,
+          "unit": "pt",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "code": "kdp_minimum_line_weight",
+        "scope": "kdp",
+        "category": "geometry",
+        "severity": "error",
+        "title": "Minimum line weight",
+        "description": "Rules and page borders are at least 0.75 pt (KDP also states 0.01 in, which is 0.72 pt; the stricter value applies). Line weights inside a drawing are measured by the line-quality rules, not here.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Smallest line weight 0.75 pt.",
+        "measure": {
+          "actual": 0.75,
+          "required": 0.75,
+          "unit": "pt",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "code": "kdp_fonts_embedded",
+        "scope": "kdp",
+        "category": "font",
+        "severity": "error",
+        "title": "Fonts embedded",
+        "description": "Every font used by a page has an embedded font program.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every font program is embedded.",
+        "measure": null
+      },
+      {
+        "code": "kdp_full_font_embedding",
+        "scope": "kdp",
+        "category": "font",
+        "severity": "warning",
+        "title": "Full font embedding",
+        "description": "KDP's formatting help says fonts should be 'fully embedded'; its submission guidelines say 'embedded'. PuzzlePress embeds subsets, which carry every glyph used.",
+        "basis": "kdp_ambiguous",
+        "source": "KDP help: Fix Paperback and Hardcover Formatting Issues",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "failed",
+        "findings": 1,
+        "note": null,
+        "measure": null
+      },
+      {
+        "code": "kdp_no_annotations",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "No comments, annotations or bookmarks",
+        "description": "The file contains no annotations, comments, form fields or bookmarks.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "None present.",
+        "measure": null
+      },
+      {
+        "code": "kdp_not_encrypted",
+        "scope": "kdp",
+        "category": "artifact",
+        "severity": "error",
+        "title": "Not locked or encrypted",
+        "description": "The file is not locked or encrypted.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Not encrypted.",
+        "measure": null
+      },
+      {
+        "code": "kdp_flattened",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "Flattened transparency and layers",
+        "description": "No transparency groups, soft masks, blend modes, partial opacity or layers.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No transparency or layers.",
+        "measure": null
+      },
+      {
+        "code": "kdp_no_printer_marks",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "No crop or trim marks",
+        "description": "Pages have no area beyond the trim where crop, registration or other printer's marks could print. Content placement is judged by the margin rules.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No slug area beyond the trim.",
+        "measure": null
+      },
+      {
+        "code": "kdp_image_resolution",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "Image resolution",
+        "description": "Each drawing prints at 300 DPI or more: its prepared pixels per printed inch at its placement.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "failed",
+        "findings": 2,
+        "note": null,
+        "measure": {
+          "actual": 161.6,
+          "required": 300.0,
+          "unit": "dpi",
+          "comparison": "at_least"
+        }
+      },
+      {
+        "code": "kdp_blank_page_runs",
+        "scope": "kdp",
+        "category": "page",
+        "severity": "error",
+        "title": "Consecutive blank pages",
+        "description": "At most 4 consecutive blank pages at the beginning or middle, and at most 10 at the end.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Fix Paperback and Hardcover Formatting Issues",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Longest blank run: 1 page(s).",
+        "measure": null
+      },
+      {
+        "code": "kdp_page_number_parity",
+        "scope": "kdp",
+        "category": "page",
+        "severity": "error",
+        "title": "Even numbers on left pages",
+        "description": "Printed page numbers are even on left (verso) pages and odd on right (recto) pages.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "2 printed page numbers match their sides.",
+        "measure": null
+      },
+      {
+        "code": "kdp_no_metadata",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "No descriptive metadata",
+        "description": "KDP asks for files without metadata. Descriptive fields (title, author, subject, keywords) are checked; producer tool names are not interpreted as metadata.",
+        "basis": "kdp_ambiguous",
+        "source": "KDP help: Paperback Submission Guidelines",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Title, author, subject and keywords are empty.",
+        "measure": null
+      },
+      {
+        "code": "coloring_blank_artwork",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "No blank coloring pages",
+        "description": "A coloring page's prepared drawing has at least 0.1% ink; an intentional blank is a plan blank page, never an empty drawing.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every drawing has line work.",
+        "measure": null
+      },
+      {
+        "code": "coloring_excessive_ink",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "Ink coverage",
+        "description": "A prepared drawing is at most 60% ink: more prints as a dark page with little to color (often white-on-black art that needs Invert).",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No drawing is mostly ink.",
+        "measure": null
+      },
+      {
+        "code": "coloring_thin_lines",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "error",
+        "title": "Fine lines kept",
+        "description": "Preparation keeps at least 60% of the original one- and two-pixel line work.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Fine line work survives preparation.",
+        "measure": null
+      },
+      {
+        "code": "coloring_heavy_ink",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "Heavy ink",
+        "description": "A prepared drawing over 35% ink prints heavy and leaves little to color.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No drawing is heavily inked.",
+        "measure": null
+      },
+      {
+        "code": "coloring_gray_background",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "White paper",
+        "description": "The paper around the line work prints white (median 240 or lighter), not as a gray tint; use background cleanup to lift a scanned page.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every drawing's paper prints white.",
+        "measure": null
+      },
+      {
+        "code": "coloring_faint_lines",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "Lines print dark",
+        "description": "The darkest tenth of a drawing's line work (gray 200 or darker) reaches gray 64 (75% ink) or darker; paler lines print as light gray that is hard to color inside.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every drawing's lines print dark.",
+        "measure": null
+      },
+      {
+        "code": "coloring_line_quality",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "Line quality",
+        "description": "Measured damage from preparation: fine lines thinned (under 90% kept), detail lost (under 60%), strokes broken apart, isolated specks left (over 5 per megapixel) or ink pushed to an image edge.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No measured line damage.",
+        "measure": null
+      },
+      {
+        "code": "coloring_duplicate_artwork",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "Duplicate artwork",
+        "description": "The same drawing (byte-identical file) appears under two artwork entries or on more than one page.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No drawing is used twice.",
+        "measure": null
+      },
+      {
+        "code": "coloring_similar_artwork",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "info",
+        "title": "Possibly duplicate artwork",
+        "description": "Two different files look alike (difference hash and reduced ink map). A prompt to compare them, not a verdict.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "failed",
+        "findings": 1,
+        "note": null,
+        "measure": null
+      },
+      {
+        "code": "coloring_visual_review",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "info",
+        "title": "Visual review of large changes",
+        "description": "Preparation changed a drawing a lot (mean change over 40 gray levels). Compare the original and prepared drawing; this is a prompt, not a defect. Artwork quality is always a person's judgement.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "No drawing changed enough to prompt a comparison.",
+        "measure": null
+      }
+    ],
+    "pages": [
+      {
+        "physical_page": 1,
+        "logical_page": 1,
+        "kind": "title_page",
+        "side": "recto",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      {
+        "physical_page": 2,
+        "logical_page": 2,
+        "kind": "copyright_page",
+        "side": "verso",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      {
+        "physical_page": 3,
+        "logical_page": 3,
+        "kind": "coloring",
+        "side": "recto",
+        "folio": "3",
+        "findings": {
+          "error": 1,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      {
+        "physical_page": 4,
+        "logical_page": 4,
+        "kind": "blank",
+        "side": "verso",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      {
+        "physical_page": 5,
+        "logical_page": 5,
+        "kind": "coloring",
+        "side": "recto",
+        "folio": "5",
+        "findings": {
+          "error": 1,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      {
+        "physical_page": 6,
+        "logical_page": 6,
+        "kind": "blank",
+        "side": "verso",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      }
+    ]
+  },
+  "preview": {
+    "pdf_sha256": "b2a6a9dc78cbb0a6b223294f91c5ba5a4faa14d82ccbbf0e31f6d8e6c461048a",
+    "page_count": 6,
+    "scales": {
+      "thumb": 0.5,
+      "page": 2.0,
+      "detail": 4.0
+    },
+    "pages": [
+      {
+        "physical_page": 1,
+        "logical_page": 1,
+        "kind": "title_page",
+        "side": "recto",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "description": "Title page: Synthetic Coloring Book"
+      },
+      {
+        "physical_page": 2,
+        "logical_page": 2,
+        "kind": "copyright_page",
+        "side": "verso",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "description": "Copyright page"
+      },
+      {
+        "physical_page": 3,
+        "logical_page": 3,
+        "kind": "coloring",
+        "side": "recto",
+        "folio": "3",
+        "findings": {
+          "error": 1,
+          "warning": 0,
+          "info": 0
+        },
+        "description": "Coloring page 1: drawing 1 [drawing-1]"
+      },
+      {
+        "physical_page": 4,
+        "logical_page": 4,
+        "kind": "blank",
+        "side": "verso",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "description": "Blank: back of the coloring page"
+      },
+      {
+        "physical_page": 5,
+        "logical_page": 5,
+        "kind": "coloring",
+        "side": "recto",
+        "folio": "5",
+        "findings": {
+          "error": 1,
+          "warning": 0,
+          "info": 0
+        },
+        "description": "Coloring page 2: drawing 2 [drawing-2]"
+      },
+      {
+        "physical_page": 6,
+        "logical_page": 6,
+        "kind": "blank",
+        "side": "verso",
+        "folio": null,
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "description": "Blank: back of the coloring page"
+      }
+    ],
+    "geometry": [
+      {
+        "physical_page": 1,
+        "trim": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 612.0,
+          "height": 792
+        },
+        "live": {
+          "x": 54.0,
+          "y": 45.0,
+          "width": 522.0,
+          "height": 702.0
+        },
+        "kdp_safe": {
+          "x": 27.0,
+          "y": 18.0,
+          "width": 567.0,
+          "height": 756.0
+        },
+        "elements": [
+          {
+            "role": "title",
+            "box": {
+              "x": 111.335,
+              "y": 562.918,
+              "width": 407.329,
+              "height": 34.922
+            }
+          },
+          {
+            "role": "title_rule",
+            "box": {
+              "x": 279.0,
+              "y": 544.543,
+              "width": 72,
+              "height": 0.75
+            }
+          }
+        ]
+      },
+      {
+        "physical_page": 2,
+        "trim": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 612.0,
+          "height": 792
+        },
+        "live": {
+          "x": 36.0,
+          "y": 45.0,
+          "width": 522.0,
+          "height": 702.0
+        },
+        "kdp_safe": {
+          "x": 18.0,
+          "y": 18.0,
+          "width": 567.0,
+          "height": 756.0
+        },
+        "elements": [
+          {
+            "role": "copyright",
+            "box": {
+              "x": 99.0,
+              "y": 69.0,
+              "width": 252.585,
+              "height": 11.059
+            }
+          }
+        ]
+      },
+      {
+        "physical_page": 3,
+        "trim": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 612.0,
+          "height": 792
+        },
+        "live": {
+          "x": 54.0,
+          "y": 45.0,
+          "width": 522.0,
+          "height": 702.0
+        },
+        "kdp_safe": {
+          "x": 27.0,
+          "y": 18.0,
+          "width": 567.0,
+          "height": 756.0
+        },
+        "elements": [
+          {
+            "role": "coloring_border_1",
+            "box": {
+              "x": 54.0,
+              "y": 69.0,
+              "width": 522.0,
+              "height": 678.0
+            }
+          },
+          {
+            "role": "coloring_art",
+            "box": {
+              "x": 72.561,
+              "y": 82.0,
+              "width": 484.878,
+              "height": 652.0
+            }
+          },
+          {
+            "role": "folio",
+            "box": {
+              "x": 311.819,
+              "y": 45.0,
+              "width": 6.362,
+              "height": 11.641
+            }
+          }
+        ]
+      },
+      {
+        "physical_page": 4,
+        "trim": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 612.0,
+          "height": 792
+        },
+        "live": {
+          "x": 36.0,
+          "y": 45.0,
+          "width": 522.0,
+          "height": 702.0
+        },
+        "kdp_safe": {
+          "x": 18.0,
+          "y": 18.0,
+          "width": 567.0,
+          "height": 756.0
+        },
+        "elements": []
+      },
+      {
+        "physical_page": 5,
+        "trim": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 612.0,
+          "height": 792
+        },
+        "live": {
+          "x": 54.0,
+          "y": 45.0,
+          "width": 522.0,
+          "height": 702.0
+        },
+        "kdp_safe": {
+          "x": 27.0,
+          "y": 18.0,
+          "width": 567.0,
+          "height": 756.0
+        },
+        "elements": [
+          {
+            "role": "coloring_border_1",
+            "box": {
+              "x": 54.0,
+              "y": 69.0,
+              "width": 522.0,
+              "height": 678.0
+            }
+          },
+          {
+            "role": "coloring_art",
+            "box": {
+              "x": 72.561,
+              "y": 82.0,
+              "width": 484.878,
+              "height": 652.0
+            }
+          },
+          {
+            "role": "folio",
+            "box": {
+              "x": 311.819,
+              "y": 45.0,
+              "width": 6.362,
+              "height": 11.641
+            }
+          }
+        ]
+      },
+      {
+        "physical_page": 6,
+        "trim": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 612.0,
+          "height": 792
+        },
+        "live": {
+          "x": 36.0,
+          "y": 45.0,
+          "width": 522.0,
+          "height": 702.0
+        },
+        "kdp_safe": {
+          "x": 18.0,
+          "y": 18.0,
+          "width": 567.0,
+          "height": 756.0
+        },
+        "elements": []
+      }
+    ]
+  }
+}

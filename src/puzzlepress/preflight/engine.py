@@ -9,6 +9,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..engines.kind import EngineKind
 from ..identity import build_identity
 from ..interior.build import InteriorBuild, build_interior
 from ..interior.design import resolve_design
@@ -19,8 +20,9 @@ from ..interior.spec import PROFILES, PrintSpecification, to_inches
 from ..models import Project
 from ..publication import PublicationPlan
 from .context import Context, InteriorArtifacts, parse_manifest
-from .model import Finding, Outcome, PreflightReport, RuleResult
-from .rules import CATALOGUE
+from .model import KDP_PAPERBACK, Finding, Outcome, PreflightReport, RuleResult, Ruleset
+from .model import Rule as PreflightRule
+from .rules import CATALOGUE, Evaluator
 
 
 @dataclass(frozen=True)
@@ -75,21 +77,47 @@ def preflight_interior(
         same = expected is not None and expected.facts is not None and expected.pdf == artifacts.pdf
         facts_or_issue = expected.facts if same and expected else read_pdf_facts(artifacts.pdf)
     facts = None if isinstance(facts_or_issue, LayoutIssue) else facts_or_issue
-    ctx = Context(
-        project=project,
-        source_identity=source_identity,
-        artifacts=artifacts,
-        manifest=manifest,
-        manifest_problem=manifest_problem,
-        spec=spec,
-        facts=facts,
-        facts_problem=facts_or_issue if isinstance(facts_or_issue, LayoutIssue) else None,
-        expected=expected,
-        build_error=build_error,
-    )
+    fields = {
+        "project": project,
+        "source_identity": source_identity,
+        "artifacts": artifacts,
+        "manifest": manifest,
+        "manifest_problem": manifest_problem,
+        "spec": spec,
+        "facts": facts,
+        "facts_problem": facts_or_issue if isinstance(facts_or_issue, LayoutIssue) else None,
+        "expected": expected,
+        "build_error": build_error,
+    }
+    catalogue: list[tuple[PreflightRule, Evaluator]] = CATALOGUE
+    ruleset = KDP_PAPERBACK
+    ctx: Context
+    if project.engine is EngineKind.COLORING:
+        from . import coloring
+
+        checks = coloring.load_artwork(source_directory, project)
+        from ..interior.coloring import embedded_images
+
+        images = (
+            embedded_images(artifacts.pdf)
+            if artifacts.pdf is not None and facts is not None
+            else None
+        )
+        ctx = coloring.ColoringContext(
+            **fields,  # type: ignore[arg-type]
+            artwork=checks,
+            duplicates=coloring.duplicate_report(project, checks),
+            images=images,
+        )
+        catalogue = coloring.COLORING_CATALOGUE
+        ruleset = Ruleset(
+            coloring.RULESET_ID, coloring.RULESET_VERSION, KDP_PAPERBACK.kdp_rules_checked
+        )
+    else:
+        ctx = Context(**fields)  # type: ignore[arg-type]
     results: list[RuleResult] = []
     findings: list[Finding] = []
-    for definition, evaluate in CATALOGUE:
+    for definition, evaluate in catalogue:
         check = evaluate(definition, ctx)
         outcome = check.outcome or (Outcome.FAILED if check.findings else Outcome.PASSED)
         results.append(
@@ -111,8 +139,18 @@ def preflight_interior(
         pages=tuple(ctx.page(n) for n in range(1, facts.page_count + 1)) if facts else (),
         results=tuple(results),
         findings=tuple(sorted(findings, key=Finding.sort_key)),
+        ruleset=ruleset,
     )
     return PreflightResult(report, ctx.layout, ctx.plan)
+
+
+def ruleset_for(project: Project) -> tuple[str, int]:
+    """(id, version) of the rule set that preflights this project's interior."""
+    if project.engine is EngineKind.COLORING:
+        from .coloring import RULESET_ID, RULESET_VERSION
+
+        return RULESET_ID, RULESET_VERSION
+    return KDP_PAPERBACK.id, KDP_PAPERBACK.version
 
 
 def _profile(spec: PrintSpecification | None) -> dict[str, object] | None:

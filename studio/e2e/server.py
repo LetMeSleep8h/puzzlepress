@@ -117,7 +117,31 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
     import_photo(books / "design-demo", photo_bytes(900, 600), "spare-photo.jpg")
     import_photo(books / "template-demo", photo_bytes(900, 600), "spare-photo.jpg")
     # Coloring artwork: an empty SYNTHETIC coloring book; the spec imports its drawings.
-    from coloring_helpers import write_coloring_book  # noqa: E402
+    from coloring_helpers import (  # noqa: E402
+        coloring_source,
+        encode,
+        fine_detail,
+        write_coloring_book,
+    )
+
+    from puzzlepress.coloring.library import import_files  # noqa: E402
 
     write_coloring_book(books / "coloring-demo")
+    # Line-art preparation: a SYNTHETIC drawing with known 1, 2, 3 and 6 px lines.
+    source = coloring_source("preparation-acceptance")
+    source["book"]["title"] = "Preparation Acceptance Book"  # type: ignore[index]
+    write_coloring_book(books / "coloring-prepare", source)
+    import_files(books / "coloring-prepare", [("Fine detail.png", encode(fine_detail()))])
+    # Coloring print proofs: a SYNTHETIC composed book with two drawings and a divider.
+    from coloring_helpers import composed_coloring_book  # noqa: E402
+
+    composed_coloring_book(books / "coloring-print", 2, dividers={1: "Woodland"}, border="thin")
+    source = books / "coloring-print" / "book.yaml"
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        .replace("id: synthetic-coloring-book", "id: coloring-print-acceptance")
+        .replace("title: Synthetic Coloring Book", "title: Print Acceptance Coloring Book")
+        .replace("../build/synthetic-coloring-book", "../../build/coloring-print"),
+        encoding="utf-8",
+    )
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)

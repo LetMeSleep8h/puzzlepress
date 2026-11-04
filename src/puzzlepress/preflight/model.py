@@ -26,7 +26,22 @@ KDP_RULES_CHECKED = "2026-10-07"
 class Severity(StrEnum):
     ERROR = "error"  # Blocks the status of its scope.
     WARNING = "warning"
-    INFO = "info"
+    INFO = "info"  # Never blocks. The coloring ruleset uses it for manual-review prompts.
+
+
+@dataclass(frozen=True)
+class Ruleset:
+    """Which rule set a report's verdicts come from."""
+
+    id: str
+    version: int
+    kdp_rules_checked: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {"id": self.id, "version": self.version, "kdp_rules_checked": self.kdp_rules_checked}
+
+
+KDP_PAPERBACK = Ruleset(RULESET_ID, RULESET_VERSION, KDP_RULES_CHECKED)
 
 
 class Scope(StrEnum):
@@ -192,6 +207,7 @@ class PreflightReport:
     pages: tuple[PageContext, ...]
     results: tuple[RuleResult, ...]
     findings: tuple[Finding, ...]
+    ruleset: Ruleset = KDP_PAPERBACK
 
     def _blocking(self, scope: Scope) -> bool:
         # Unscreened error rules block as surely as failed ones; warnings never block.
@@ -232,11 +248,7 @@ class PreflightReport:
                 tally[key] = tally.get(key, 0) + 1
         return {
             "report_version": REPORT_VERSION,
-            "ruleset": {
-                "id": RULESET_ID,
-                "version": RULESET_VERSION,
-                "kdp_rules_checked": KDP_RULES_CHECKED,
-            },
+            "ruleset": self.ruleset.to_dict(),
             "book_id": self.book_id,
             "source_identity": self.source_identity,
             "profile": self.profile,

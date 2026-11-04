@@ -1,0 +1,57 @@
+{
+  "key": "pp1-prepared-sha256-4466dfdefa34dd3ebf15e4e44de52c1c4e573ff3cc826d3669336419d7c92d88",
+  "preparation_version": 1,
+  "adjustments": {
+    "grayscale": true,
+    "threshold": null,
+    "brightness": 0.0,
+    "contrast": 1.0,
+    "background_cleanup": 0.0,
+    "despeckle": 0,
+    "line_weight": -2
+  },
+  "measures": {
+    "not_measured": [],
+    "new_edges": [],
+    "pixels": [
+      2175,
+      2925
+    ],
+    "ink_before": 0.0381,
+    "ink_after": 0.0182,
+    "thin_line_pixels": 19,
+    "thin_line_retention": null,
+    "detail_retention": 0.4785,
+    "strokes_before": 1,
+    "strokes_after": 1,
+    "specks_removed": 0,
+    "specks_per_megapixel_after": 0.0,
+    "paper_level_after": 255,
+    "mean_change": 5.06
+  },
+  "findings": [
+    {
+      "code": "detail_lost",
+      "severity": "warning",
+      "message": "Part of the original line work is no longer printed as ink.",
+      "actual": "48% kept",
+      "required": "at least 60%"
+    }
+  ],
+  "blocking": false,
+  "images": {
+    "original": "/api/projects/coloring-demo/coloring/prepared/pp1-prepared-sha256-4466dfdefa34dd3ebf15e4e44de52c1c4e573ff3cc826d3669336419d7c92d88/original",
+    "prepared": "/api/projects/coloring-demo/coloring/prepared/pp1-prepared-sha256-4466dfdefa34dd3ebf15e4e44de52c1c4e573ff3cc826d3669336419d7c92d88/prepared",
+    "difference": "/api/projects/coloring-demo/coloring/prepared/pp1-prepared-sha256-4466dfdefa34dd3ebf15e4e44de52c1c4e573ff3cc826d3669336419d7c92d88/difference"
+  },
+  "artwork": "fox-in-the-ferns",
+  "saved_adjustments": {
+    "grayscale": true,
+    "threshold": null,
+    "brightness": 0.0,
+    "contrast": 1.0,
+    "background_cleanup": 0.0,
+    "despeckle": 0,
+    "line_weight": 0
+  }
+}

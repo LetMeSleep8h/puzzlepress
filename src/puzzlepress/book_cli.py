@@ -7,11 +7,18 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .batch import BatchReport
+from .engines.kind import EngineKind
 from .engines.registry import engine_for
 from .production_cli import add_book_actions, run_produce
 from .project import load_project
-from .publication import PageKind, PlanPage, PublicationPlan
-from .publication_verification import publication_payload
+from .publication import (
+    ARTWORK_BLANK_REASON,
+    REVERSE_BLANK_REASON,
+    PageKind,
+    PlanPage,
+    PublicationPlan,
+)
 
 if TYPE_CHECKING:
     from .interior import LayoutIssue
@@ -53,13 +60,23 @@ def describe(page: PlanPage, plan: PublicationPlan) -> str:
     def label(index: int | None) -> str:
         return plan.pages[index - 1].number.label if index else "?"
 
+    coloring = plan.engine is EngineKind.COLORING
     if page.kind is PageKind.BLANK:
+        if page.blank_reason == REVERSE_BLANK_REASON:
+            previous = plan.pages[page.index - 2] if page.index > 1 else None
+            back = "divider" if previous and previous.kind is PageKind.DIVIDER else "coloring page"
+            return f"Blank: back of the {back}"
+        if page.blank_reason == ARTWORK_BLANK_REASON:
+            return "Blank: coloring page starts on recto"
         if page.blank_reason == "divider_recto_start":
-            return "Blank: theme divider starts on recto"
+            return f"Blank: {'section' if coloring else 'theme'} divider starts on recto"
         before = page.blank_before.value.replace("_", " ") if page.blank_before else "?"
         return f"Blank: {before} start on recto"
+    if page.artwork is not None:
+        art = page.artwork
+        return f"Coloring page {art.ordinal}: {art.title or art.id} [{art.id}]"
     if page.divider is not None:
-        return f"Theme divider: {page.divider.title}"
+        return f"{'Section' if coloring else 'Theme'} divider: {page.divider.title}"
     if page.puzzle is not None:
         ref = page.puzzle
         where = f"; solution p. {label(page.solution_page)}" if page.solution_page else ""
@@ -82,23 +99,27 @@ def run_book_command(args: argparse.Namespace) -> int:
         return run_preflight_command(args)
     if args.book_command == "produce":
         return run_produce(args)
-    project = load_project(args.project).project
+    loaded = load_project(args.project)
+    project = loaded.project
     engine = engine_for(project)
-    report, plan = engine.build_publication(project)
-    verification = engine.verify_publication(plan, project, report)
+    content, plan = engine.build_publication(project, loaded.source_path.parent)
+    verification = engine.verify_publication(plan, project, content)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
     if args.json:
         print(
             json.dumps(
-                publication_payload(report, plan, verification),
+                engine.payload(content, plan, verification),
                 ensure_ascii=True,
                 sort_keys=True,
                 indent=2,
                 allow_nan=False,
             )
         )
+    elif not isinstance(content, BatchReport):
+        _print_coloring_plan(plan)
     else:
+        report = content
         stats = plan.statistics
         print(f"Build identity: {plan.identity}")
         print(
@@ -127,6 +148,32 @@ def run_book_command(args: argparse.Namespace) -> int:
     for issue in plan.diagnostics:
         print(f"{issue.path} [{issue.code}]: {issue.message}", file=sys.stderr)
     return 0 if plan.complete else 1
+
+
+def _print_coloring_plan(plan: PublicationPlan) -> None:
+    stats = plan.statistics
+    print(f"Build identity: {plan.identity}")
+    print(
+        f"Coloring plan v{plan.plan_version} for {plan.book_id}: "
+        f"{stats.logical_pages} pages, verified"
+    )
+    print(f"{'Page':>4}  {'Side':<5}  {'Folio':<7}  {'Section':<12}  Entry")
+    for page in plan.pages:
+        folio = page.number.label if page.number.displayed else f"({page.number.label})"
+        section = page.section.value.replace("_", " ")
+        print(
+            f"{page.index:>4}  {page.side.value:<5}  {folio:<7}  {section:<12}  "
+            f"{describe(page, plan)}"
+        )
+    print(
+        f"\nFront matter: {stats.front_matter_pages} | coloring pages: {stats.artwork_pages} | "
+        f"dividers: {stats.divider_pages} | blanks: {stats.blank_pages} "
+        f"({stats.reverse_blank_pages} reverse) | back matter: {stats.back_matter_pages}"
+    )
+    first = stats.first_artwork_page
+    print(f"First coloring page: {f'page {first}' if first else 'none'}")
+    print("Page numbers count every page; parenthesized numbers are not printed.")
+    print("Odd pages are right-hand (recto) pages; the plan is the PDF's page order.")
 
 
 def run_build_command(args: argparse.Namespace) -> int:
@@ -202,6 +249,7 @@ def run_preflight_command(args: argparse.Namespace) -> int:
     from .interior import InteriorError
     from .interior.build import check_output_directory, write_preflight_report
     from .preflight import Severity, preflight_interior, read_interior_artifacts, report_bytes
+    from .preflight.coloring import RULESET_ID as COLORING_RULESET
 
     loaded = load_project(args.project)
     source = loaded.source_path.parent
@@ -239,7 +287,9 @@ def run_preflight_command(args: argparse.Namespace) -> int:
             binary.flush()
     else:
         profile = report.profile or {}
-        print(f"Preflight: {report.book_id} (ruleset {_ruleset()})")
+        print(
+            f"Preflight: {report.book_id} (ruleset {report.ruleset.id} v{report.ruleset.version})"
+        )
         print(f"Interior: {directory}")
         if report.page_count is not None:
             print(f"Pages: {report.page_count} | profile {profile.get('id', 'unknown')}")
@@ -249,7 +299,10 @@ def run_preflight_command(args: argparse.Namespace) -> int:
             print(f"PDF SHA-256: {pdf['pdf']['sha256']}")
         print(f"Structural: {'VALID' if report.structurally_valid else 'INVALID'}")
         print(f"KDP readiness: {'READY' if report.kdp_ready else 'NOT READY'}")
-        for severity, heading in ((Severity.ERROR, "Blocking"), (Severity.WARNING, "Warnings")):
+        headings = [(Severity.ERROR, "Blocking"), (Severity.WARNING, "Warnings")]
+        if report.ruleset.id == COLORING_RULESET:  # Its info findings are review prompts.
+            headings.append((Severity.INFO, "Manual review"))
+        for severity, heading in headings:
             found = [f for f in report.findings if f.severity is severity]
             print(f"{heading}: {len(found) or 'none'}")
             for finding in found:
@@ -268,12 +321,6 @@ def run_preflight_command(args: argparse.Namespace) -> int:
             print(f"Report: {written}")
         print("Preflight checks the constraints PuzzlePress models; Amazon KDP decides acceptance.")
     return 0 if report.kdp_ready and not write_failed else 1
-
-
-def _ruleset() -> str:
-    from .preflight import RULESET_ID, RULESET_VERSION
-
-    return f"{RULESET_ID} v{RULESET_VERSION}"
 
 
 def _describe_issue(issue: "LayoutIssue") -> str:

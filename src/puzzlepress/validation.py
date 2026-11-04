@@ -177,24 +177,28 @@ def validate_project(data: object) -> ValidationResult:
         coloring, coloring_issues = validate_coloring(root["coloring"])
         issues.extend(coloring_issues)
     composition = None
-    if "composition" in root and engine is EngineKind.COLORING:
-        issue(
-            "composition",
-            "not_available_for_engine",
-            "Coloring books have no page composition in this version, so cover, interior "
-            "and publishing sections cannot be added yet. Remove the composition section.",
-        )
-    elif "composition" in root:
+    if "composition" in root:
         composition, composition_issues = validate_composition(
-            root["composition"], "word_search" in root
+            root["composition"], "word_search" in root, coloring=engine is EngineKind.COLORING
         )
         issues.extend(composition_issues)
+    if engine is EngineKind.COLORING:
+        # Covers, publishing metadata and interior styles read word-search content in
+        # this version; coloring books get them in a later version, never half-applied.
+        for section in ("cover", "publishing", "interior"):
+            if section in root:
+                issue(
+                    section,
+                    "not_available_for_engine",
+                    f"Coloring books cannot have a {section} section in this version. "
+                    "Remove it; the coloring interior builds without it.",
+                )
     cover = None
-    if "cover" in root:
+    if "cover" in root and engine is not EngineKind.COLORING:
         cover, cover_issues = validate_cover(root["cover"], "composition" in root)
         issues.extend(cover_issues)
     publishing = None
-    if "publishing" in root:
+    if "publishing" in root and engine is not EngineKind.COLORING:
         publishing, publishing_issues = validate_publishing(
             root["publishing"], "composition" in root
         )
@@ -202,7 +206,7 @@ def validate_project(data: object) -> ValidationResult:
     if composition is not None and composition.dividers is not None and word_search is not None:
         issues.extend(divider_issues(composition, word_search.puzzles))
     interior = None
-    if "interior" in root:
+    if "interior" in root and engine is not EngineKind.COLORING:
         from .interior_style_validation import validate_interior_style
 
         interior, interior_issues = validate_interior_style(root["interior"], "composition" in root)

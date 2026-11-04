@@ -9,7 +9,9 @@ from .composition import (
     MATTER_FIELDS,
     MAX_DIVIDER_QUOTE,
     MAX_DIVIDER_TEXT,
+    NO_SOLUTIONS,
     SOLUTIONS_PER_PAGE,
+    ArtworkPolicy,
     Composition,
     DividerPolicy,
     MatterItem,
@@ -31,9 +33,16 @@ Choice = TypeVar("Choice", SectionStart, SolutionPlacement, NumberingScheme, Puz
 
 
 def validate_composition(
-    value: object, has_puzzles: bool
+    value: object, has_puzzles: bool, coloring: bool = False
 ) -> tuple[Composition | None, tuple[ValidationIssue, ...]]:
-    """Validate composition; `has_puzzles` states whether word_search is declared."""
+    """Validate composition; `has_puzzles` states whether word_search is declared.
+
+    `coloring` selects a coloring book's composition: front matter, the artwork
+    section's start, back matter and page numbers. Puzzle and solution settings
+    do not apply to it and are reported, never ignored.
+    """
+    if coloring:
+        return _coloring_composition(value)
     reader = _Reader()
     path = "composition"
     root = reader.mapping(
@@ -277,3 +286,71 @@ def divider_issues(
                 )
             )
     return issues
+
+
+# Settings that belong to word-search books only, with the reason given to authors.
+_WORD_SEARCH_ONLY = {
+    "puzzles": "Coloring books have no puzzles; place the artwork section with artwork.start.",
+    "solutions": "Coloring books have no solutions to place.",
+}
+
+
+def _coloring_composition(value: object) -> tuple[Composition | None, tuple[ValidationIssue, ...]]:
+    """A coloring book's composition. Never repairs; collects independent issues."""
+    reader = _Reader()
+    path = "composition"
+    if not isinstance(value, dict):
+        reader.mapping(value, path, set())
+        return None, tuple(reader.issues)
+    for key, reason in _WORD_SEARCH_ONLY.items():
+        if key in value:
+            reader.issue(f"{path}.{key}", "not_applicable_for_engine", reason)
+    known = {"front_matter", "artwork", "back_matter", "page_numbers"}
+    reader.mapping({k: v for k, v in value.items() if k not in _WORD_SEARCH_ONLY}, path, known)
+    front = _matter(
+        reader, value.get("front_matter", []), f"{path}.front_matter", FRONT_MATTER_KINDS
+    )
+    back = _matter(reader, value.get("back_matter", []), f"{path}.back_matter", BACK_MATTER_KINDS)
+    artwork = reader.mapping(value.get("artwork", {}), f"{path}.artwork", {"start"})
+    start = _choice(reader, artwork.get("start", "recto"), f"{path}.artwork.start", SectionStart)
+    raw_numbers = value.get("page_numbers", {})
+    numbers_path = f"{path}.page_numbers"
+    if isinstance(raw_numbers, dict) and "show_solutions" in raw_numbers:
+        reader.issue(
+            f"{numbers_path}.show_solutions",
+            "not_applicable_for_engine",
+            "Coloring books have no solutions; use show_artwork for coloring pages.",
+        )
+        raw_numbers = {k: v for k, v in raw_numbers.items() if k != "show_solutions"}
+    data = reader.mapping(
+        raw_numbers,
+        numbers_path,
+        {"scheme", "show_front_matter", "show_artwork", "show_back_matter"},
+    )
+    numbers = PageNumberPolicy(
+        _choice(
+            reader, data.get("scheme", "continuous"), f"{numbers_path}.scheme", NumberingScheme
+        ),
+        _flag(reader, data.get("show_front_matter", False), f"{numbers_path}.show_front_matter"),
+        True,
+        _flag(reader, data.get("show_back_matter", True), f"{numbers_path}.show_back_matter"),
+        _flag(reader, data.get("show_artwork", True), f"{numbers_path}.show_artwork"),
+    )
+    if numbers.scheme is NumberingScheme.ROMAN_FRONT_MATTER and not front:
+        reader.issue(
+            f"{numbers_path}.scheme",
+            "requires_front_matter",
+            "Roman front-matter numbering requires at least one front-matter page.",
+        )
+    if reader.issues:
+        return None, tuple(reader.issues)
+    return (
+        Composition(
+            NO_SOLUTIONS,
+            tuple(front),
+            back_matter=tuple(back),
+            page_numbers=numbers,
+            artwork=ArtworkPolicy(start),
+        ),
+        (),
+    )

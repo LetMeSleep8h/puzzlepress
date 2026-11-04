@@ -152,22 +152,28 @@ def test_word_search_and_coloring_conflict(garden):
     assert not any(path.startswith("coloring.") for path, _ in found)
 
 
-def test_coloring_books_take_no_composition_cover_or_publishing_yet():
+def test_coloring_books_take_a_coloring_composition_but_no_cover_or_publishing_yet():
+    # Interval 4: a coloring composition is accepted; word-search settings are not.
     data = source()
     data["composition"] = {"solutions": {"placement": "omit"}}
-    assert codes(data) == [("composition", "not_available_for_engine")]
+    assert codes(data) == [("composition.solutions", "not_applicable_for_engine")]
+    data = source()
+    data["composition"] = {"artwork": {"start": "recto"}}
+    assert codes(data) == []
     data = source()
     data["publishing"] = {"version": 2}
-    assert ("publishing", "requires_composition") in codes(data)
+    assert codes(data) == [("publishing", "not_available_for_engine")]
 
 
-def test_valid_coloring_book_is_not_buildable():
+def test_valid_coloring_book_is_buildable_and_needs_a_composition(tmp_path):
+    # Interval 4: coloring books plan and build; a composition is still required.
     project = validate_project(source()).require_project()
+    engine = engine_for(project)
+    assert engine.kind.value == "coloring"
     with pytest.raises(ProjectError) as raised:
-        engine_for(project)
+        engine.build_publication(project, tmp_path)
     (issue,) = raised.value.issues
-    assert (issue.path, issue.code) == ("coloring", "engine_not_buildable")
-    assert "cannot plan, build or package" in issue.message
+    assert (issue.path, issue.code) == ("composition", "required")
 
 
 def test_word_search_projects_have_no_coloring_key(garden):

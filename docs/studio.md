@@ -451,7 +451,7 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | --- | --- |
 | `GET /api/projects` | Sorted library, including invalid projects |
 | `GET /api/projects/{key}` | Normalized source, validation, identity, engine version, derived `engine` {kind, label}, byte revision |
-| `GET /api/projects/{key}/coloring` | Coloring books: saved revision and artwork library report (see [coloring books](coloring.md), which also lists the artwork import, removal and thumbnail endpoints) |
+| `GET /api/projects/{key}/coloring` | Coloring books: saved revision and artwork library report (see [coloring books](coloring.md), which also lists the artwork import, removal, thumbnail and line-art preparation endpoints, and the coloring Print proof) |
 | `POST /api/projects/{key}/generation` | `{identity}`; saved-source batch report |
 | `POST /api/projects/{key}/draft/validate` | `{source}`; normalized valid project and semantic identity |
 | `POST /api/projects/{key}/draft/preview` | `{source}`; core batch, verification and authoritative solution cells |
@@ -460,6 +460,7 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | `GET /api/projects/{key}/interior` | Saved interior state (`missing`, `current`, `stale`, `invalid`), preflight report, preview pages and overlay geometry |
 | `POST /api/projects/{key}/interior/build` | `{revision}`; builds saved source, writes interior and `preflight.json`, returns state or `{build: {success: false, stage, diagnostics}}` |
 | `GET /api/projects/{key}/interior/pages/{n}` | `?size=thumb\|page\|detail&pdf=<sha256>`; PNG raster of page `n` of that exact PDF |
+| `GET /api/projects/{key}/interior/pdf` | `?pdf=<sha256>`; the built `interior.pdf` as an attachment while it is that exact file (409 `preview_stale`); Studio links it for coloring books |
 | `GET /api/projects/{key}/cover` | Saved cover state (`no_config`, `missing`, `current`, `stale`, `invalid`), cover preflight report, layout geometry |
 | `POST /api/projects/{key}/draft/cover` | `{source}`; renders the draft's cover in memory; layout geometry with each text line's layer and face, interior facts, checks (with their layer), `buildable`, `display` text, the photo and font `library` (per-photo DPI, per-font missing characters) and the preview digest |
 | `GET /api/projects/{key}/cover/preview` | `?size=preview\|detail&pdf=<sha256>`; PNG of a draft PDF or `cover.pdf` (409 when gone) |

@@ -20,7 +20,7 @@ from puzzlepress.cover.font_assets import MAX_FONT_BYTES
 from puzzlepress.errors import ProjectError
 
 from .assets import AssetService
-from .coloring import ColoringService
+from .coloring import ColoringService, PreparationService
 from .covering import CoverService
 from .designing import DesignService
 from .editing import DraftStore
@@ -129,6 +129,19 @@ class ArtworkRemoval(BaseModel):
     with_pages: bool = False
 
 
+class PreparationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    artwork: str
+    adjustments: dict[str, object] | None = None  # None previews the saved settings.
+
+
+class AdjustmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    artwork: str
+    revision: str
+    adjustments: dict[str, object] | None  # None restores the defaults.
+
+
 class ReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_revision: str
@@ -195,6 +208,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     planning = PlanningService(service)
     assets = AssetService(service, drafts)
     coloring = ColoringService(service)
+    preparation = PreparationService(service, coloring)
     reviews = ReviewService(service)
     production = ProductionService(service)
     app = FastAPI(title="PuzzlePress Studio", docs_url=None, redoc_url=None, openapi_url=None)
@@ -301,7 +315,9 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
 
     @app.post("/api/projects/{key}/draft/plan")
     def plan_draft(key: str, body: DraftRequest) -> dict[str, object]:
-        return service.plan_project(drafts.validate(key, body.source))
+        return service.plan_project(
+            drafts.validate(key, body.source), service.store.source(key).parent
+        )
 
     @app.post("/api/projects/{key}/draft/save")
     def save_draft(key: str, body: SaveRequest) -> dict[str, object]:
@@ -342,6 +358,14 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
             printing.draft_image(key, index, size, pdf),
             media_type="image/png",
             headers={"Cache-Control": "private, max-age=31536000, immutable"},
+        )
+
+    @app.get("/api/projects/{key}/interior/pdf")
+    def interior_pdf(key: str, pdf: str) -> Response:
+        return Response(
+            printing.pdf(key, pdf),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="interior.pdf"'},
         )
 
     @app.get("/api/projects/{key}/interior/pages/{page}")
@@ -546,6 +570,22 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     @app.post("/api/projects/{key}/coloring/remove")
     def remove_artwork(key: str, body: ArtworkRemoval) -> dict[str, object]:
         return coloring.remove(key, body.artwork, body.revision, body.with_pages)
+
+    @app.post("/api/projects/{key}/coloring/prepare")
+    def prepare_artwork(key: str, body: PreparationRequest) -> dict[str, object]:
+        return preparation.prepare(key, body.artwork, body.adjustments)
+
+    @app.get("/api/projects/{key}/coloring/prepared/{prepared}/{kind}")
+    def prepared_image(key: str, prepared: str, kind: str) -> Response:
+        return Response(
+            preparation.image(key, prepared[:128], kind),
+            media_type="image/png",
+            headers={"Cache-Control": "private, max-age=3600, immutable"},
+        )
+
+    @app.post("/api/projects/{key}/coloring/adjustments")
+    def adjust_artwork(key: str, body: AdjustmentRequest) -> dict[str, object]:
+        return preparation.adjust(key, body.artwork, body.adjustments, body.revision)
 
     @app.get("/api/projects/{key}/coloring/thumbnail")
     def artwork_thumbnail(key: str, artwork: str) -> Response:

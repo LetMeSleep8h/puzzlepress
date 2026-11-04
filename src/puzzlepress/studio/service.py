@@ -16,7 +16,6 @@ from puzzlepress.errors import ProjectError, ValidationIssue
 from puzzlepress.identity import build_identity
 from puzzlepress.models import Project
 from puzzlepress.project import resolve_output_directory
-from puzzlepress.publication_verification import publication_payload
 from puzzlepress.wordsearch import verify_word_search
 from puzzlepress.yaml_io import parse_project
 
@@ -160,17 +159,20 @@ class StudioService:
         finally:
             self._generation_lock.release()
 
-    def plan_project(self, project: Project) -> dict[str, object]:
-        """Generate and plan the given source; the verified plan is the only result."""
+    def plan_project(self, project: Project, source: Path | None = None) -> dict[str, object]:
+        """Generate (or prepare) and plan the given source; the verified plan is the result.
+
+        `source` is the project folder, where a coloring book's artwork lives.
+        """
         with self.exclusive():
             if project.composition is None:
                 raise StudioError(422, "no_composition", "This project has no book composition.")
             engine = engine_for(project)
-            report, plan = engine.build_publication(project)
-            verification = engine.verify_publication(plan, project, report)
+            content, plan = engine.build_publication(project, source)
+            verification = engine.verify_publication(plan, project, content)
             if not verification.valid:
                 raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
-            return publication_payload(report, plan, verification)
+            return engine.payload(content, plan, verification)
 
     def generate_project(self, project: Project) -> dict[str, object]:
         with self.exclusive():

@@ -20,7 +20,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from ..coloring_config import Artwork, ColoringBook, ColoringPage
+from ..coloring_config import Adjustments, Artwork, ColoringBook, ColoringPage
 from ..errors import ProjectError, ValidationIssue
 from ..models import Project
 from ..project import load_project
@@ -36,6 +36,7 @@ from .assets import (
 from .duplicates import DuplicateReport, find_duplicates
 from .inspection import FORMATS, Inspection, inspect_artwork
 from .issues import ArtworkError, ImportRejected
+from .prepare import Prepared, prepare_artwork
 
 
 def require_coloring(project: Project) -> ColoringBook:
@@ -184,7 +185,7 @@ class ArtworkEntryReport:
             "path": self.artwork.path,
             "sha256": self.artwork.sha256,
             "adjustments": self.artwork.adjustments.to_dict(),
-            "adjustments_applied": False,
+            "adjustments_applied": True,
             "pages": list(self.pages),
             "inspection": self.inspection.to_dict() if self.inspection else None,
             "error": self.error.to_dict() if self.error else None,
@@ -230,8 +231,8 @@ def library_report(
     """
     book = require_coloring(project)
     pages: dict[str, list[int]] = {}
-    for number, page in enumerate(book.pages, start=1):
-        pages.setdefault(page.artwork, []).append(number)
+    for number, artwork in book.artwork_pages:
+        pages.setdefault(artwork, []).append(number)
     entries: list[ArtworkEntryReport] = []
     inspections: dict[str, Inspection | None] = {}
     for item in book.artwork:
@@ -306,3 +307,60 @@ def remove_artwork(source: Path, artwork_id: str, with_pages: bool = False) -> R
     updated, removed = without_artwork(loaded.project, artwork_id, with_pages)
     replace_source(loaded.source_path, updated, revision)
     return removed
+
+
+def _artwork(project: Project, artwork_id: str) -> Artwork:
+    item = require_coloring(project).artwork_by_id(artwork_id)
+    if item is None:
+        raise ArtworkError("unknown_artwork", f"No artwork has the ID {artwork_id!r}.", artwork_id)
+    return item
+
+
+def prepare_entry(
+    project_directory: Path,
+    project: Project,
+    artwork_id: str,
+    adjustments: Adjustments | None = None,
+    prepare: Callable[[bytes, Adjustments, str], Prepared] = prepare_artwork,
+) -> Prepared:
+    """Prepare one artwork from its verified original, with its saved settings unless
+    `adjustments` previews others. Nothing is written."""
+    item = _artwork(project, artwork_id)
+    data = read_artwork(project_directory, item)
+    return prepare(data, adjustments or item.adjustments, item.path)
+
+
+def with_adjustments(
+    project: Project, artwork_id: str, adjustments: Adjustments
+) -> tuple[Project, Artwork]:
+    """The project with one artwork's settings replaced (defaults reset them)."""
+    book = require_coloring(project)
+    item = _artwork(project, artwork_id)
+    updated_item = replace(item, adjustments=adjustments)
+    artwork = tuple(updated_item if a.id == artwork_id else a for a in book.artwork)
+    return replace(project, coloring=replace(book, artwork=artwork)), updated_item
+
+
+def adjust_artwork(
+    source: Path, artwork_id: str, adjustments: Adjustments, revision: str | None = None
+) -> Artwork:
+    """Save one artwork's settings in the project at `source`; the original is untouched.
+
+    `revision` (when given) must be the saved byte revision the caller last saw.
+    """
+    loaded = load_project(source)
+    current = source_revision(loaded.source_path)
+    if revision is not None and revision != current:
+        raise ProjectError(
+            (
+                ValidationIssue(
+                    "book.yaml",
+                    "source_changed",
+                    "book.yaml changed since it was read; reload it, then save the settings.",
+                ),
+            )
+        )
+    updated, item = with_adjustments(loaded.project, artwork_id, adjustments)
+    if updated != loaded.project:
+        replace_source(loaded.source_path, updated, current)
+    return item

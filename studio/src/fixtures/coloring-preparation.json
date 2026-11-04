@@ -1,0 +1,49 @@
+{
+  "key": "pp1-prepared-sha256-c553b6e4faf7852f27f0bed3e505b1b5105ae48f16d8b1dc3416fc679596fe60",
+  "preparation_version": 1,
+  "adjustments": {
+    "grayscale": true,
+    "threshold": null,
+    "brightness": 0.0,
+    "contrast": 1.0,
+    "background_cleanup": 0.0,
+    "despeckle": 0,
+    "line_weight": 0
+  },
+  "measures": {
+    "not_measured": [],
+    "new_edges": [],
+    "pixels": [
+      2175,
+      2925
+    ],
+    "ink_before": 0.0381,
+    "ink_after": 0.0381,
+    "thin_line_pixels": 19,
+    "thin_line_retention": null,
+    "detail_retention": 1.0,
+    "strokes_before": 1,
+    "strokes_after": 1,
+    "specks_removed": 0,
+    "specks_per_megapixel_after": 0.0,
+    "paper_level_after": 255,
+    "mean_change": 0.0
+  },
+  "findings": [],
+  "blocking": false,
+  "images": {
+    "original": "/api/projects/coloring-demo/coloring/prepared/pp1-prepared-sha256-c553b6e4faf7852f27f0bed3e505b1b5105ae48f16d8b1dc3416fc679596fe60/original",
+    "prepared": "/api/projects/coloring-demo/coloring/prepared/pp1-prepared-sha256-c553b6e4faf7852f27f0bed3e505b1b5105ae48f16d8b1dc3416fc679596fe60/prepared",
+    "difference": "/api/projects/coloring-demo/coloring/prepared/pp1-prepared-sha256-c553b6e4faf7852f27f0bed3e505b1b5105ae48f16d8b1dc3416fc679596fe60/difference"
+  },
+  "artwork": "fox-in-the-ferns",
+  "saved_adjustments": {
+    "grayscale": true,
+    "threshold": null,
+    "brightness": 0.0,
+    "contrast": 1.0,
+    "background_cleanup": 0.0,
+    "despeckle": 0,
+    "line_weight": 0
+  }
+}

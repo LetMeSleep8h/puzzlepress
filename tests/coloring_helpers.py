@@ -8,7 +8,7 @@ import io
 import random
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 from puzzlepress import dump_project, validate_project
 
@@ -85,3 +85,156 @@ def write_artwork_files(directory: Path, seeds: list[int]) -> list[Path]:
         path.write_bytes(png(seed))
         paths.append(path)
     return paths
+
+
+# ---------------------------------------------------------------- calibration fixtures
+# Each is SYNTHETIC and drawn at full page size (2175 x 2925, 300 DPI over the live
+# area) so measured widths are the widths a printed page would have.
+
+
+def fine_detail(size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    """Known widths: horizontal rules of 1, 2, 3 and 6 px, one- and two-pixel circles,
+    glyph-like zigzags with 2 px strokes and a 1 px crosshatch."""
+    width, height = size
+    image = Image.new("L", size, 255)
+    draw = ImageDraw.Draw(image)
+    y = 120
+    for stroke in (1, 2, 3, 6):
+        for _ in range(6):
+            draw.line([(150, y), (width - 150, y)], fill=0, width=stroke)
+            y += 28
+        y += 40
+    for index, radius in enumerate(range(80, 400, 40)):
+        draw.ellipse(
+            (width // 2 - radius, 1500 - radius, width // 2 + radius, 1500 + radius),
+            outline=0,
+            width=1 + index % 2,
+        )
+    for row in range(4):
+        for column in range(24):
+            x0, y0 = 150 + column * 78, 2050 + row * 70
+            draw.line([(x0, y0 + 40), (x0 + 12, y0), (x0 + 24, y0 + 40), (x0 + 36, y0)], 0, 2)
+    for offset in range(0, 600, 6):
+        draw.line([(150 + offset, 2400), (150 + offset, 2800)], fill=0, width=1)
+        draw.line([(150, 2400 + offset * 400 // 600), (750, 2400 + offset * 400 // 600)], 0, 1)
+    return image
+
+
+def dense_pattern(size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    """A mandala-like page with a lot of ink: rings every 18 px and 72 spokes."""
+    import math
+
+    width, height = size
+    image = Image.new("L", size, 255)
+    draw = ImageDraw.Draw(image)
+    cx, cy = width // 2, height // 2
+    for radius in range(30, min(width, height) // 2 - 40, 18):
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=0, width=6)
+    for spoke in range(72):
+        angle = spoke * math.pi / 36
+        end = (cx + math.cos(angle) * 1050, cy + math.sin(angle) * 1050)
+        draw.line([(cx, cy), end], fill=0, width=5)
+    return image
+
+
+def noisy_scan(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    """Line art on gray, grainy paper (level 214-234) with scattered specks."""
+    rng = random.Random(seed)
+    width, height = size
+    noise = Image.frombytes("L", size, rng.randbytes(width * height)).point(lambda v: v * 20 // 255)
+    paper = ImageChops.add(Image.new("L", size, 214), noise)
+    image = ImageChops.darker(line_art(seed, size), paper)
+    draw = ImageDraw.Draw(image)
+    for _ in range(400):
+        x, y, r = rng.randrange(width), rng.randrange(height), rng.choice((0, 1, 1, 2))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=40)
+    return image
+
+
+def white_on_black(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    return ImageChops.invert(line_art(seed, size))
+
+
+def transparent_art(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    """Black outlines on a fully transparent background (RGBA)."""
+    lines = line_art(seed, size)
+    image = Image.new("RGBA", size, (0, 0, 0, 0))
+    image.putalpha(ImageChops.invert(lines))
+    return image
+
+
+def light_colored_lines(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    """Yellow outlines on white: nearly invisible in luma."""
+    lines = line_art(seed, size)
+    image = Image.new("RGB", size, (255, 255, 255))
+    image.paste((240, 220, 0), mask=ImageChops.invert(lines))
+    return image
+
+
+def pencil_sketch(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
+    """Soft, light line work: the fine-detail page drawn in gray (level 96) at twice the
+    size and reduced, so strokes have anti-aliased edges, on slightly warm paper (246)."""
+    width, height = size
+    big = fine_detail((width * 2, height * 2)).point(lambda v: 96 if v < 128 else 246)
+    del seed  # One layout; the parameter keeps the fixture signature uniform.
+    return big.resize(size, Image.Resampling.BOX)
+
+
+# ------------------------------------------------------------- composed coloring books
+
+SMALL_SIZE = (300, 400)  # Small SYNTHETIC drawings keep plan and layout tests quick.
+FRONT_MATTER = (
+    {"kind": "title_page"},
+    {"kind": "copyright_page", "text": "Copyright 2026 Synthetic Author. All rights reserved."},
+    {"kind": "instructions", "title": "How to use this book", "text": "Color one page a day."},
+)
+
+
+def composed_coloring_book(
+    directory: Path,
+    count: int,
+    *,
+    front: int = 2,
+    reverse: bool = True,
+    start: str = "recto",
+    dividers: dict[int, str] | None = None,
+    size: tuple[int, int] = SMALL_SIZE,
+    images: list[Image.Image] | None = None,
+    border: str = "none",
+    numbers: dict[str, object] | None = None,
+    back: list[dict[str, object]] | None = None,
+) -> Path:
+    """A SYNTHETIC coloring book with `count` drawings and a coloring composition.
+
+    `dividers` maps a 0-based drawing position to a divider title placed before it.
+    Drawings are imported through the library, so files are real, content-addressed
+    project assets.
+    """
+    from puzzlepress.coloring.library import import_files
+    from puzzlepress.project import load_project
+
+    write_coloring_book(directory)
+    drawings = images or [line_art(seed, size) for seed in range(count)]
+    if drawings:
+        import_files(
+            directory, [(f"drawing {i + 1}.png", encode(d)) for i, d in enumerate(drawings)]
+        )
+    data = load_project(directory).project.to_dict()
+    pages: list[object] = []
+    for position, page in enumerate(data["coloring"]["pages"]):  # type: ignore[index]
+        if dividers and position in dividers:
+            pages.append({"divider": {"title": dividers[position]}})
+        pages.append(page)
+    coloring = data["coloring"]
+    assert isinstance(coloring, dict)
+    coloring["pages"] = pages
+    coloring["layout"] = {"blank_reverse": reverse, "border": border}
+    data["composition"] = {
+        "front_matter": list(FRONT_MATTER[:front]),
+        "artwork": {"start": start},
+        "back_matter": back or [],
+        "page_numbers": numbers or {},
+    }
+    project = validate_project(data).require_project()
+    (directory / "book.yaml").write_text(dump_project(project), encoding="utf-8")
+    return directory
