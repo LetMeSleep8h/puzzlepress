@@ -7,10 +7,11 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .engines.registry import engine_for
 from .production_cli import add_book_actions, run_produce
 from .project import load_project
-from .publication import PageKind, PlanPage, PublicationPlan, build_publication
-from .publication_verification import publication_payload, verify_publication_plan
+from .publication import PageKind, PlanPage, PublicationPlan
+from .publication_verification import publication_payload
 
 if TYPE_CHECKING:
     from .interior import LayoutIssue
@@ -82,8 +83,9 @@ def run_book_command(args: argparse.Namespace) -> int:
     if args.book_command == "produce":
         return run_produce(args)
     project = load_project(args.project).project
-    report, plan = build_publication(project)
-    verification = verify_publication_plan(plan, project, report)
+    engine = engine_for(project)
+    report, plan = engine.build_publication(project)
+    verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
     if args.json:

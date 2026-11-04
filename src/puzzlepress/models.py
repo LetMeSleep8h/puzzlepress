@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from .composition import Composition
 from .content import WordSearchContent
 from .cover_config import CoverConfig
+from .engines.kind import EngineKind
 from .interior_style import InteriorStyle
 from .publishing_config import PublishingConfig
 
@@ -49,6 +50,12 @@ class Project:
     cover: CoverConfig | None = None
     publishing: PublishingConfig | None = None
     interior: InteriorStyle | None = None
+
+    @property
+    def engine(self) -> EngineKind:
+        """Derived from the content section, never stored: a schema-v1 project without
+        another engine's section is a word-search project (legacy ones included)."""
+        return EngineKind.WORD_SEARCH
 
     def to_dict(self) -> dict[str, object]:
         """Return an independent, JSON/YAML-compatible source representation."""

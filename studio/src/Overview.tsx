@@ -44,6 +44,10 @@ export function Overview({ project }: { project: Project }) {
               </dd>
             </div>
             <div>
+              <dt>Book type</dt>
+              <dd>{project.engine?.label ?? 'Unknown'}</dd>
+            </div>
+            <div>
               <dt>Schema / engine</dt>
               <dd>
                 {source.schema_version} / {project.engine_version}

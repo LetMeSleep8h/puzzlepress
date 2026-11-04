@@ -450,7 +450,7 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | Method and path | Request / result |
 | --- | --- |
 | `GET /api/projects` | Sorted library, including invalid projects |
-| `GET /api/projects/{key}` | Normalized source, validation, identity, engine version, byte revision |
+| `GET /api/projects/{key}` | Normalized source, validation, identity, engine version, derived `engine` {kind, label}, byte revision |
 | `POST /api/projects/{key}/generation` | `{identity}`; saved-source batch report |
 | `POST /api/projects/{key}/draft/validate` | `{source}`; normalized valid project and semantic identity |
 | `POST /api/projects/{key}/draft/preview` | `{source}`; core batch, verification and authoritative solution cells |

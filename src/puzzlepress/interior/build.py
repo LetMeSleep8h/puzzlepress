@@ -16,10 +16,10 @@ from reportlab import Version as REPORTLAB_VERSION
 
 from .. import __version__
 from ..batch import BatchReport
+from ..engines.registry import engine_for
 from ..identity import IDENTITY_VERSION
 from ..models import Project
-from ..publication import PublicationPlan, build_publication
-from ..publication_verification import verify_publication_plan
+from ..publication import PublicationPlan
 from .design import resolve_design, style_images, style_inputs
 from .engine import RENDERER_VERSION, AnswerFit, answer_fits, layout_interior
 from .fonts import font_manifest
@@ -70,8 +70,9 @@ def build_interior(
     """
     from .images import InteriorPhotos, encode_gray, load_photos
 
-    report, plan = build_publication(project)
-    verification = verify_publication_plan(plan, project, report)
+    engine = engine_for(project)
+    report, plan = engine.build_publication(project)
+    verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
     style = project.interior
@@ -394,8 +395,9 @@ def sample_interior(
 
     from .images import InteriorPhotos, encode_gray, load_photos
 
-    report, plan = publication or build_publication(project)
-    verification = verify_publication_plan(plan, project, report)
+    engine = engine_for(project)
+    report, plan = publication or engine.build_publication(project)
+    verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
     style = project.interior

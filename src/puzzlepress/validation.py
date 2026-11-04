@@ -8,6 +8,7 @@ from typing import cast
 from .composition_validation import divider_issues, validate_composition
 from .content_validation import validate_word_search_content
 from .cover_validation import validate_cover
+from .engines.kind import detect_engine
 from .errors import MAX_SEED
 from .errors import ProjectError as ProjectError
 from .errors import ValidationIssue as ValidationIssue
@@ -82,6 +83,7 @@ def validate_project(data: object) -> ValidationResult:
             "content",
             "output",
             "word_search",
+            "coloring",
             "composition",
             "cover",
             "publishing",
@@ -161,6 +163,9 @@ def validate_project(data: object) -> ValidationResult:
         ):
             issue("output.directory", "path", "Use a relative path with forward slashes.")
 
+    # The engine is derived from the content section; a second engine's section, or one
+    # this version cannot build, is reported rather than read with word-search rules.
+    issues.extend(detect_engine(root)[1])
     word_search = None
     if "word_search" in root:
         word_search, content_issues = validate_word_search_content(root["word_search"])

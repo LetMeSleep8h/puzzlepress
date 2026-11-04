@@ -82,6 +82,10 @@ export function Library() {
                   {source ? (
                     <dl className="inline-facts">
                       <div>
+                        <dt>Type</dt>
+                        <dd>{project.engine?.label ?? 'Unknown'}</dd>
+                      </div>
+                      <div>
                         <dt>Puzzles</dt>
                         <dd>{content?.puzzles.length ?? 0} definitions</dd>
                       </div>

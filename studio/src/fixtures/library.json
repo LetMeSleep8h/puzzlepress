@@ -30,6 +30,7 @@
       },
       "identity": "pp1-sha256-7c31474f1712b985957d7edaa7ecff27f702060320eadbee7343819e13507bf2",
       "engine_version": "0.1.0",
+      "engine": { "kind": "word_search", "label": "Word search" },
       "validation": {
         "valid": true,
         "issues": []
@@ -156,6 +157,7 @@
       },
       "identity": "pp1-sha256-85966304262a0b3af4ffee5c742099e5635e1c4d52c817fa20334681101a6f84",
       "engine_version": "0.1.0",
+      "engine": { "kind": "word_search", "label": "Word search" },
       "validation": {
         "valid": true,
         "issues": []

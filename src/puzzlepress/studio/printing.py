@@ -15,6 +15,7 @@ from pathlib import Path
 from puzzlepress.batch import BatchReport
 from puzzlepress.book_cli import describe
 from puzzlepress.composition import SolutionPlacement
+from puzzlepress.engines.registry import engine_for
 from puzzlepress.identity import build_identity
 from puzzlepress.interior import DEFAULT_PROFILE, InteriorError, build_interior, write_interior
 from puzzlepress.interior.build import (
@@ -39,7 +40,7 @@ from puzzlepress.preflight import (
 from puzzlepress.preflight.context import parse_manifest
 from puzzlepress.preflight.rules import ink_bounds, kdp_safe_area
 from puzzlepress.project import resolve_output_directory
-from puzzlepress.publication import PageKind, PublicationPlan, build_publication
+from puzzlepress.publication import PageKind, PublicationPlan
 
 from .editing import DraftStore
 from .preview import SCALES, PageOutOfRange, PageRasterizer, PreviewUnavailable
@@ -231,7 +232,7 @@ class PrintService:
             answers: dict[str, object] | None = None
             try:
                 if publication is None:
-                    publication = build_publication(project)
+                    publication = engine_for(project).build_publication(project)
                     self._publications[identity] = publication
                     while len(self._publications) > 2:
                         self._publications.popitem(last=False)

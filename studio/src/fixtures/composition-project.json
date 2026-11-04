@@ -204,6 +204,7 @@
   },
   "identity": "pp1-sha256-4bd3089c4209be27a02cf588c9955e750058e1da449d8de2b20e107a1ac1b980",
   "engine_version": "0.1.0",
+  "engine": { "kind": "word_search", "label": "Word search" },
   "validation": {
     "valid": true,
     "issues": []
