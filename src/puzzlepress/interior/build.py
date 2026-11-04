@@ -368,7 +368,13 @@ def write_interior(build: InteriorBuild, output: Path, source_directory: Path) -
     finally:
         for path in staged:
             path.unlink(missing_ok=True)
-    if hashlib.sha256(pdf.read_bytes()).hexdigest() != hashlib.sha256(build.pdf).hexdigest():
+    try:
+        # A concurrent writer may hold or replace the file meanwhile (Windows denies the
+        # read): that is a failed write to report, never a raw OSError.
+        written = pdf.read_bytes()
+    except OSError as error:
+        raise _output_issue("write_failed", f"Cannot verify the written PDF: {error}") from error
+    if hashlib.sha256(written).hexdigest() != hashlib.sha256(build.pdf).hexdigest():
         raise _output_issue("write_failed", "Written PDF does not match the verified bytes.")
     return InteriorOutput(pdf, manifest)
 

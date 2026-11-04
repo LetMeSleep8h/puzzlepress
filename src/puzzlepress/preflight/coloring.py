@@ -24,8 +24,8 @@ from pathlib import Path
 from ..coloring.content import ColoringContent
 from ..coloring.duplicates import DuplicateReport, find_duplicates
 from ..coloring.inspection import Inspection, inspect_artwork
-from ..coloring.issues import ArtworkError
-from ..coloring.prepare import Prepared, prepare_artwork
+from ..coloring.issues import ArtworkError, ArtworkFinding
+from ..coloring.prepare import PreparationMeasures, prepare_artwork
 from ..coloring_config import Border
 from ..interior.build import toolchain
 from ..interior.coloring import (
@@ -38,6 +38,7 @@ from ..interior.coloring import (
 from ..interior.issues import LayoutIssue
 from ..interior.model import ImageBlock
 from ..interior.spec import KDP
+from ..models import Project
 from ..publication import REVERSE_BLANK_REASON, PageKind
 from .context import Context
 from .model import Basis, Category, Measure, Outcome, Scope, Severity
@@ -63,9 +64,12 @@ QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"
 
 @dataclass(frozen=True)
 class ArtworkCheck:
-    """One drawing as preflight read it: verified bytes, preparation and inspection."""
+    """One drawing as preflight read it: its preparation's measures and findings, and
+    its inspection. No pixels are kept, so memory stays flat however long the book.
+    """
 
-    prepared: Prepared | None = None
+    measures: PreparationMeasures | None = None  # None: the drawing could not be read.
+    findings: tuple[ArtworkFinding, ...] = ()
     inspection: Inspection | None = None
     error: ArtworkError | None = None
 
@@ -109,13 +113,11 @@ class ColoringContext(Context):
         ]
 
 
-def load_artwork(project_directory: Path | None, ctx_project: object) -> dict[str, ArtworkCheck]:
+def load_artwork(project_directory: Path | None, project: Project) -> dict[str, ArtworkCheck]:
     """Read, verify, prepare (with measures) and inspect every drawing a page uses."""
     from ..coloring.assets import read_artwork
-    from ..models import Project
 
-    assert isinstance(ctx_project, Project)
-    book = ctx_project.coloring
+    book = project.coloring
     if book is None:
         return {}
     checks: dict[str, ArtworkCheck] = {}
@@ -130,19 +132,16 @@ def load_artwork(project_directory: Path | None, ctx_project: object) -> dict[st
             continue
         try:
             data = read_artwork(project_directory, artwork)
+            prepared = prepare_artwork(data, artwork.adjustments, artwork.path)
             checks[artwork_id] = ArtworkCheck(
-                prepare_artwork(data, artwork.adjustments, artwork.path),
-                inspect_artwork(data, artwork.path),
+                prepared.measures, prepared.findings, inspect_artwork(data, artwork.path)
             )
         except ArtworkError as error:
             checks[artwork_id] = ArtworkCheck(error=error.about(artwork.path))
     return checks
 
 
-def duplicate_report(project: object, checks: dict[str, ArtworkCheck]) -> DuplicateReport | None:
-    from ..models import Project
-
-    assert isinstance(project, Project)
+def duplicate_report(project: Project, checks: dict[str, ArtworkCheck]) -> DuplicateReport | None:
     if project.coloring is None:
         return None
     inspections = {key: check.inspection for key, check in checks.items()}
@@ -334,9 +333,7 @@ def _plan_current(r: PreflightRule, ctx: Context) -> Check:
 def _coloring_matches(r: PreflightRule, ctx: Context) -> Check:
     changes = _coloring(ctx).environment_change()
     if changes and ctx.expected is not None and not ctx.matches_layout:
-        names = ", ".join(
-            f"{key} {recorded} (here {running})" for key, recorded, running in changes
-        )
+        names = ", ".join(f"{recorded} (here {running})" for _, recorded, running in changes)
         return _skip(
             f"Not comparable: rendered with {names}. Rebuild in this environment, or "
             "preflight where it was built."
@@ -603,15 +600,14 @@ def _quality(r: PreflightRule, ctx: Context, codes: tuple[str, ...], passed: str
     c = _coloring(ctx)
     if not c.artwork:
         return Check(note="No drawings are used.")
-    unreadable = sorted(k for k, check in c.artwork.items() if check.prepared is None)
+    unreadable = sorted(k for k, check in c.artwork.items() if check.measures is None)
     findings = []
     unmeasured: set[str] = set()
     for key, check in sorted(c.artwork.items()):
-        prepared = check.prepared
-        if prepared is None:
+        if check.measures is None:
             continue
-        unmeasured.update(prepared.measures.not_measured)
-        for item in prepared.findings:
+        unmeasured.update(check.measures.not_measured)
+        for item in check.findings:
             if item.code not in codes:
                 continue
             pages: list[int | None] = [*c.pages_of(key)] or [None]

@@ -385,3 +385,24 @@ def test_preflight_never_writes_beside_the_artwork(ready):
     content = build_interior(project, SPEC, directory).report
     assert isinstance(content, ColoringContent)
     assert sorted(p.relative_to(directory) for p in directory.rglob("*")) == before
+
+
+def test_every_coloring_rule_is_documented():
+    docs = (ROOT / "docs" / "coloring.md").read_text(encoding="utf-8")
+    for rule in COLORING_RULES:
+        assert f"`{rule.code}`" in docs, rule.code
+
+
+def test_preflight_keeps_measures_not_pixels(tmp_path):
+    """Memory stays flat with book length: 150 drawings peaked at 132 MB (docs)."""
+    from dataclasses import fields
+
+    from puzzlepress.preflight.coloring import load_artwork
+
+    directory = composed_coloring_book(tmp_path / "book", 2, size=MEDIUM)
+    checks = load_artwork(directory, load_project(directory).project)
+    assert sorted(checks) == ["drawing-1", "drawing-2"]
+    for check in checks.values():
+        assert check.measures is not None and check.inspection is not None
+        values = [getattr(check, f.name) for f in fields(check)]
+        assert not any(isinstance(v, Image.Image) for v in values)
