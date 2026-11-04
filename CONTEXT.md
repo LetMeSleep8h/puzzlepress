@@ -2,8 +2,38 @@
 
 ## Completed scope
 
-Multi-engine Interval 2 (coloring schema, artwork import and library) on branch
-`feat/multi-engine-coloring`; committed locally, not pushed. Guide: docs/coloring.md.
+Multi-engine Interval 3 (line-art preparation) on branch `feat/multi-engine-coloring`;
+committed locally, not pushed. Guide: docs/coloring.md (Line-art preparation).
+
+- `coloring/prepare.py`: in-memory pipeline over the verified original (luma or
+  darkest-channel gray, invert, brightness/contrast, background cleanup, despeckle
+  of isolated marks only, threshold, line weight). Defaults return the original's
+  gray levels exactly. `PREPARATION_VERSION` 1; content address
+  `pp1-prepared-sha256-` over source digest, settings, version and Pillow version.
+  Bounds: 40 MP, 3 M ink pixels per scan (`not_measured` or an explicit error).
+- Measures against the unadjusted original: fine-line (opening-based) and line-work
+  retention, strokes on shared ink, isolated specks, paper level, ink, new edge
+  contact, mean change; findings with blocking and warning severities, thresholds
+  calibrated on synthetic fixtures (table in the guide; speck warning lowered to
+  5/MP after visual review of `docs/images/coloring/preparation-samples.png`).
+- `coloring/components.py`: run-length 8-connected labeling with union-find and
+  isolation within 6 px (checked against a flood fill).
+- `invert` adjustment, serialized only when true (Interval 2 books keep their
+  bytes). `validate_adjustments`, `prepare_entry`, `with_adjustments`,
+  `adjust_artwork` (revision-checked through `replace_source`).
+- CLI `coloring prepare` (preview, `--set`, `--reset`, `--output` outside the book)
+  and `coloring adjust`. Studio: Prepare line art panel (debounced, numbered
+  previews; original/prepared/difference; findings; Save, Reset, Revert); API
+  POST `/coloring/prepare`, GET `/coloring/prepared/{key}/{kind}` (in-memory cache
+  per project), POST `/coloring/adjustments`.
+- Main CI repair (`883c64c` on local `fix/artwork-stem-python-314`, cherry-picked
+  here as `47c54d3`): artwork stems split without `pathlib` (Python 3.14 changed
+  `stem` for dot-heavy names), and the golden PDF gate also needs the same zlib
+  family (Python 3.14 on Windows links zlib-ng, which compresses streams to other
+  bytes). Baseline version 3 records classic zlib; pinned values unchanged.
+
+Earlier: multi-engine Interval 2 (coloring schema, artwork import and library),
+merged to main as PR #16. Guide: docs/coloring.md.
 
 - `coloring_config`/`coloring_validation`: optional `coloring` (version 1) with
   artwork (id, `coloring-assets/<stem>-<sha12>.png|jpg`, full SHA-256, title,
@@ -546,6 +576,28 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Line-art preparation and the Python 3.14 CI repair, 2026-11-04 (Windows):
+
+- Python 3.13: **1971 passed, 9 skipped** (symlink permission, Windows drive
+  paths); golden test 4/4 (source-only, PDF files, every output) against baseline
+  v3, whose pinned values are those recorded from the pre-refactor engine. Ruff lint
+  and format, strict mypy (146 files), pip check, `git diff --check`. AGENTS CLI
+  commands exit as on main (scratch output directory).
+- Python 3.14.6 (fresh venv on the repair branch): **1922 passed, 10 skipped**
+  before the zlib gate; the only failure was the golden PDF comparison under
+  zlib-ng, now skipped with that reason (golden on 3.14: 2 passed, 2 skipped). Main's
+  CI run 41779596662 showed the golden PDF comparison passing on Linux 3.14.
+- Frontend (idle machine): tsc, ESLint, Prettier (`--end-of-line auto`), build.
+  Vitest **100/100** twice. Playwright **35/36**: `coloring.spec.ts` (import and
+  preparation: findings, difference view, keyboard on a real slider, save, reload,
+  reset, axe, 1440/1024/768/390 without overflow) passes; `templates.spec.ts` rich
+  text fails at line 320 as before. Rewritten `docs/images/studio` captures restored.
+- Visual review: `docs/images/coloring/preparation-samples.png` (seven cases) and
+  Studio panel captures at 1440 and 390 px. They found a dusty result that passed
+  the checks (speck warning recalibrated) and oversized checkboxes and radios in the
+  panel (fixed). The previews are synthetic; real drawings still need a person's
+  review.
+
 Coloring schema and artwork library, 2026-11-04 (Windows, Python 3.13):
 
 - Python: **1918 passed, 9 skipped** (symlink permission, Windows drive paths),
@@ -709,6 +761,16 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
   status and 15 recorded file digests were identical before and after.
 
 ## Limits and decisions for review
+
+Line-art preparation (Interval 3): thresholds are conventions measured on
+synthetic drawings only (fine-line retention never fell between 0.05 and 0.99
+there, so the 0.60/0.90 limits are unexercised); despeckle also removes deliberate
+stippling further than 6 px apart; the difference preview shows ink changes only;
+no build reads prepared pixels yet; preparation takes 0.6-3 s per full page in
+Studio. Interior PDF bytes depend on Python's zlib (Python 3.14 on Windows links
+zlib-ng), which the interior identity does not record, so a book built under one
+zlib and preflighted under the other fails `pdf_matches_layout`: a follow-up, not
+fixed here.
 
 Coloring books (Interval 2): adjustments are stored, not applied; no page layout,
 interior, cover, preflight or package exists for them; DPI is measured against the
