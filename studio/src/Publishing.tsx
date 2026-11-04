@@ -8,6 +8,7 @@ import type {
   Confirmation,
   ContentOrigin,
   Issue,
+  RightsBasis,
   MetadataReport,
   PublishingConfig,
   PublishingDraftCheck,
@@ -21,8 +22,8 @@ import { ErrorState, Loading, Status } from './ui';
 // edits the draft's publishing section and presents findings; it never decides
 // readiness, never uploads anything and never claims a KDP outcome.
 
-export function starterPublishing(): PublishingConfig {
-  return {
+export function starterPublishing(coloring = false): PublishingConfig {
+  const starter: PublishingConfig = {
     version: 2,
     description: null,
     keywords: [],
@@ -37,7 +38,32 @@ export function starterPublishing(): PublishingConfig {
     attestations: { rights: null, ai_disclosure: null, metadata: null, isbn: null },
     notes: null,
   };
+  // Coloring books also declare who made the artwork and on what basis it is published.
+  // Nothing is preselected: undecided values block until the author chooses.
+  if (coloring) {
+    starter.ai_disclosure = {
+      ...starter.ai_disclosure,
+      interior_artwork: 'unknown',
+      cover_artwork: 'unknown',
+    };
+    starter.content_rights = {
+      interior_artwork: 'undecided',
+      cover_artwork: 'undecided',
+      text: 'undecided',
+      notes: null,
+    };
+  }
+  return starter;
 }
+
+const RIGHTS: [RightsBasis, string, string][] = [
+  ['own_work', 'My own work', 'Created by me or the contributors listed above'],
+  ['commissioned', 'Commissioned', 'Made for me under an agreement that grants the rights'],
+  ['licensed', 'Licensed', 'Used under a licence that allows commercial print sale'],
+  ['public_domain', 'Public domain', 'No longer under copyright; KDP may ask for proof'],
+  ['ai_tool_terms', 'AI tool terms', "Generated with an AI tool, used under the tool's terms"],
+  ['undecided', 'Not decided', 'Blocks the package until you decide'],
+];
 
 const ROLES: [string, string][] = [
   ['author', 'Author'],
@@ -75,6 +101,15 @@ const AREAS: Record<PublishingFinding['area'], string> = {
   print: 'Print',
   cover: 'Cover',
 };
+
+// Coloring books edit book details and composition in Pages; there is no Puzzles or
+// Book page for them.
+function areaRoute(area: PublishingFinding['area'], coloring: boolean): string {
+  return coloring && (area === 'edit' || area === 'book') ? 'pages' : area;
+}
+function areaLabel(area: PublishingFinding['area'], coloring: boolean): string {
+  return coloring && (area === 'edit' || area === 'book') ? 'Pages' : AREAS[area];
+}
 
 // A whole number, null when empty, or the text itself so Python reports it.
 function whole(value: string): number | null {
@@ -260,6 +295,7 @@ function Metadata({
   replaceSection: (next: PublishingConfig) => void;
 }) {
   const book = d.draft.book;
+  const coloring = !!d.draft.coloring;
   const base = `/books/${encodeURIComponent(d.key)}`;
   const description = pub.description ?? '';
   const age = pub.audience.reading_age;
@@ -334,9 +370,17 @@ function Metadata({
         </dl>
         <FieldFindings id="book" findings={findings} />
         <p className="small muted">
-          These come from the book and print on the cover, so KDP sees the same values. Edit the
-          title and language at the top of <a href={`${base}/edit`}>Puzzles</a>; subtitle, author
-          and imprint on the title page in <a href={`${base}/book`}>Book</a>.
+          These come from the book and print on the cover, so KDP sees the same values.{' '}
+          {coloring ? (
+            <>
+              Edit them under Book details in <a href={`${base}/pages`}>Pages</a>.
+            </>
+          ) : (
+            <>
+              Edit the title and language at the top of <a href={`${base}/edit`}>Puzzles</a>;
+              subtitle, author and imprint on the title page in <a href={`${base}/book`}>Book</a>.
+            </>
+          )}
         </p>
         <div className="field-pair">
           {text(
@@ -465,7 +509,11 @@ function Metadata({
           path="publishing.categories"
           items={pub.categories}
           limit={3}
-          hint="Saved preferences, written as a path such as Humor & Entertainment > Puzzles & Games > Word Search. KDP's list changes by marketplace and over time: confirm each one in KDP's selector."
+          hint={
+            coloring
+              ? "Saved preferences, written as a path with ' > ' between levels. KDP's list changes by marketplace and over time: confirm each one in KDP's selector."
+              : "Saved preferences, written as a path such as Humor & Entertainment > Puzzles & Games > Word Search. KDP's list changes by marketplace and over time: confirm each one in KDP's selector."
+          }
           addLabel="Add category"
           onChange={(categories) => update({ categories })}
           issues={issues}
@@ -529,7 +577,13 @@ function Metadata({
           path="publishing.low_content"
           value={String(pub.low_content) as 'true' | 'false' | 'null'}
           options={[
-            ['false', 'Not low-content', 'KDP lists puzzle books as not generally low-content'],
+            [
+              'false',
+              'Not low-content',
+              coloring
+                ? 'KDP lists coloring books as not generally low-content'
+                : 'KDP lists puzzle books as not generally low-content',
+            ],
             ['true', 'Low-content', 'Repetitive pages to fill in, such as journals or log books'],
             ['null', 'Not decided', 'Blocks the package; PuzzlePress does not choose for you'],
           ]}
@@ -570,20 +624,59 @@ function Metadata({
 
       <section aria-labelledby="pub-ai">
         <h3 id="pub-ai">AI content disclosure</h3>
-        <p className="small muted">
-          KDP asks you to disclose AI-generated text, images and translations. Content you created
-          and only edited with AI tools is AI-assisted and needs no disclosure. PuzzlePress&apos;s
-          puzzle grids are placed by a deterministic program, not an AI model, but you decide how
-          the book&apos;s words, text and photograph were made. Nothing is preselected.
-        </p>
+        {coloring ? (
+          <p className="small muted">
+            KDP asks you to disclose AI-generated text, images and translations, and counts cover
+            and interior images and artwork as images: a drawing made with an AI tool is
+            AI-generated even if you edited it substantially afterwards. Your own drawing refined
+            with AI tools is AI-assisted and needs no disclosure. PuzzlePress prepares your files
+            with fixed image adjustments; it does not generate or trace artwork. Nothing is
+            preselected.
+          </p>
+        ) : (
+          <p className="small muted">
+            KDP asks you to disclose AI-generated text, images and translations. Content you created
+            and only edited with AI tools is AI-assisted and needs no disclosure. PuzzlePress&apos;s
+            puzzle grids are placed by a deterministic program, not an AI model, but you decide how
+            the book&apos;s words, text and photograph were made. Nothing is preselected.
+          </p>
+        )}
+        {coloring &&
+          (['interior_artwork', 'cover_artwork'] as const).map((kind) => (
+            <Radios
+              key={kind}
+              legend={
+                kind === 'interior_artwork'
+                  ? 'Interior drawings (the coloring pages)'
+                  : 'Cover artwork or photograph'
+              }
+              name={`pub-ai-${kind}`}
+              path={`publishing.ai_disclosure.${kind}`}
+              value={pub.ai_disclosure[kind] ?? 'unknown'}
+              options={
+                kind === 'cover_artwork'
+                  ? [...ORIGINS.slice(0, 3), ['none', 'No artwork on the cover'], ORIGINS[3]]
+                  : ORIGINS
+              }
+              onChange={(origin) =>
+                update({ ai_disclosure: { ...pub.ai_disclosure, [kind]: origin } })
+              }
+              issues={issues}
+              findings={findings}
+            />
+          ))}
         {(['text', 'images', 'translations'] as const).map((kind) => (
           <Radios
             key={kind}
             legend={
               kind === 'text'
-                ? 'Text (word lists, instructions, description)'
+                ? coloring
+                  ? 'Text (captions, dividers, instructions, description)'
+                  : 'Text (word lists, instructions, description)'
                 : kind === 'images'
-                  ? 'Images (cover photograph)'
+                  ? coloring
+                    ? "Images: KDP's one answer for cover and interior artwork"
+                    : 'Images (cover photograph)'
                   : 'Translations'
             }
             name={`pub-ai-${kind}`}
@@ -602,6 +695,68 @@ function Metadata({
           />
         ))}
       </section>
+
+      {coloring && (
+        <section aria-labelledby="pub-rights">
+          <h3 id="pub-rights">Artwork rights</h3>
+          <p className="small muted">
+            Having an image file is not a right to publish it. Declare the basis on which you may
+            publish each kind of content. PuzzlePress records what you choose and cannot verify it;
+            KDP holds you responsible for rights and may ask for proof.
+          </p>
+          {(
+            [
+              ['interior_artwork', 'Interior drawings'],
+              ['cover_artwork', 'Cover artwork or photograph'],
+              ['text', 'Text (captions, dividers, instructions, description)'],
+            ] as const
+          ).map(([kind, legend]) => (
+            <Radios
+              key={kind}
+              legend={legend}
+              name={`pub-rights-${kind}`}
+              path={`publishing.content_rights.${kind}`}
+              value={pub.content_rights?.[kind] ?? 'undecided'}
+              options={
+                kind === 'cover_artwork'
+                  ? [...RIGHTS.slice(0, 5), ['none', 'No artwork on the cover', ''], RIGHTS[5]]
+                  : RIGHTS
+              }
+              onChange={(basis) =>
+                update({
+                  content_rights: {
+                    interior_artwork: 'undecided',
+                    cover_artwork: 'undecided',
+                    text: 'undecided',
+                    notes: null,
+                    ...pub.content_rights,
+                    [kind]: basis,
+                  },
+                })
+              }
+              issues={issues}
+              findings={findings}
+            />
+          ))}
+          {text(
+            'publishing.content_rights.notes',
+            'Rights notes (optional)',
+            pub.content_rights?.notes ?? '',
+            (value) =>
+              update({
+                content_rights: {
+                  interior_artwork: 'undecided',
+                  cover_artwork: 'undecided',
+                  text: 'undecided',
+                  ...pub.content_rights,
+                  notes: value.trim() ? value : null,
+                },
+              }),
+            'Licence names, sources and agreements, for your records.',
+            true,
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="pub-confirm">
         <h3 id="pub-confirm">Your confirmations</h3>
@@ -820,9 +975,11 @@ function stateLines(status: PublishingStatus, key: string) {
 function FindingGroups({
   findings,
   projectKey,
+  coloring = false,
 }: {
   findings: PublishingFinding[];
   projectKey: string;
+  coloring?: boolean;
 }) {
   const base = `/books/${encodeURIComponent(projectKey)}`;
   const groups: [string, PublishingFinding['severity']][] = [
@@ -845,7 +1002,7 @@ function FindingGroups({
                 <li key={i}>
                   <div className="finding-head">
                     <Status tone={SEVERITY[severity][0]}>{SEVERITY[severity][1]}</Status>
-                    <span className="finding-scope">{AREAS[f.area]}</span>
+                    <span className="finding-scope">{areaLabel(f.area, coloring)}</span>
                   </div>
                   <p>{f.message}</p>
                   {f.action && <p className="small">{f.action}</p>}
@@ -853,7 +1010,9 @@ function FindingGroups({
                     {f.area === 'publishing' && f.field ? (
                       <a href={`#${f.field}`}>Go to field</a>
                     ) : (
-                      <a href={`${base}/${f.area}`}>Open {AREAS[f.area]}</a>
+                      <a href={`${base}/${areaRoute(f.area, coloring)}`}>
+                        Open {areaLabel(f.area, coloring)}
+                      </a>
                     )}{' '}
                     · <code>{f.code}</code>
                     {f.related && (
@@ -1106,7 +1265,7 @@ function Readiness({
           {r.findings.length === 0 ? (
             <p>No findings.</p>
           ) : (
-            <FindingGroups findings={r.findings} projectKey={d.key} />
+            <FindingGroups findings={r.findings} projectKey={d.key} coloring={!!d.draft.coloring} />
           )}
         </details>
         <details className="details rule-list">
@@ -1245,12 +1404,20 @@ export function Publishing({ d }: { d: Draft }) {
       ) : (
         !statusError && <Loading>Checking metadata, interior and cover…</Loading>
       )}
-      <ProductionOverview
-        projectKey={d.key}
-        revision={d.saved.revision}
-        dirty={d.dirty}
-        onRebuilt={() => setAttempt((n) => n + 1)}
-      />
+      {d.draft.coloring ? (
+        <p className="small muted">
+          To build the interior, cover, artwork reports and this package in one verified run, use{' '}
+          <code>puzzlepress book produce</code>. It writes nothing until every file is checked and
+          never submits anything to Amazon.
+        </p>
+      ) : (
+        <ProductionOverview
+          projectKey={d.key}
+          revision={d.saved.revision}
+          dirty={d.dirty}
+          onRebuilt={() => setAttempt((n) => n + 1)}
+        />
+      )}
       <div className="publishing-workspace">
         <div className="publishing-main">
           {pub ? (
@@ -1285,7 +1452,12 @@ export function Publishing({ d }: { d: Draft }) {
               <button
                 type="button"
                 className="primary"
-                onClick={() => d.change({ ...d.draft, publishing: starterPublishing() } as Source)}
+                onClick={() =>
+                  d.change({
+                    ...d.draft,
+                    publishing: starterPublishing(!!d.draft.coloring),
+                  } as Source)
+                }
               >
                 Start publishing metadata
               </button>

@@ -195,7 +195,12 @@ function ProjectWorkspace({
       <>
         {heading}
         <ColoringNav base={base} section={section} />
-        <ColoringWorkspace project={project} section={section} />
+        <ColoringWorkspace
+          project={project}
+          section={section}
+          onDirty={trackDirty}
+          onSaved={(next) => setProject(next)}
+        />
       </>
     );
   return (
@@ -365,7 +370,7 @@ export function App() {
     first.current = false;
   }, [path]);
   const match = path.match(
-    /^\/books\/([^/]+)(?:\/(puzzles|quality|edit|book|interior|print|cover|publishing|planning|artwork)(?:\/([^/]+))?)?\/?$/,
+    /^\/books\/([^/]+)(?:\/(puzzles|quality|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
   );
   const isLibrary = path === '/' || path === '/books' || path === '/books/';
   return (
@@ -402,6 +407,7 @@ export function App() {
                   'publishing',
                   'planning',
                   'artwork',
+                  'pages',
                 ].includes(match[2]) && match[3]
               ) ? (
               <ProjectWorkspace

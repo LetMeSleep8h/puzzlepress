@@ -170,6 +170,11 @@ class StudioService:
             engine = engine_for(project)
             content, plan = engine.build_publication(project, source)
             verification = engine.verify_publication(plan, project, content)
+            if project.coloring is not None:
+                # An incomplete coloring plan (no pages yet, a drawing that cannot be
+                # read) is reported with its issues, so the composer can show them.
+                payload = engine.payload(content, plan, verification)
+                return {**payload, "geometry": coloring_page_geometry(project)}
             if not verification.valid:
                 raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
             return engine.payload(content, plan, verification)
@@ -199,3 +204,36 @@ class StudioService:
                     if result.puzzle
                 },
             }
+
+
+def coloring_page_geometry(project: Project) -> dict[str, object]:
+    """Trim, live area and art box (PDF points, origin bottom-left) of a recto and a verso
+    coloring page under the default print profile: what the composer outlines on its
+    page previews. Python's layout geometry; the browser only draws it."""
+    from puzzlepress.coloring_config import Border
+    from puzzlepress.interior import DEFAULT_PROFILE, print_profile
+    from puzzlepress.interior.coloring import art_box
+    from puzzlepress.interior.engine import FOLIO_BAND
+    from puzzlepress.interior.geometry import page_frame
+    from puzzlepress.interior.model import Box
+    from puzzlepress.interior.spec import PrintSpecification
+
+    spec = print_profile(DEFAULT_PROFILE)
+    assert isinstance(spec, PrintSpecification)
+    border = project.coloring.layout.border if project.coloring else Border.NONE
+
+    def box(value: Box) -> dict[str, float]:
+        return {k: round(getattr(value, k), 3) for k in ("x", "y", "width", "height")}
+
+    sides: dict[str, object] = {}
+    for side, number in (("recto", 1), ("verso", 2)):
+        frame = page_frame(spec, number)
+        content = frame.content
+        body = Box(content.x, content.y + FOLIO_BAND, content.width, content.height - FOLIO_BAND)
+        sides[side] = {"live": box(content), "art": box(art_box(body, border))}
+    return {
+        "profile": spec.profile_id,
+        "trim": {"width": spec.trim.width, "height": spec.trim.height},
+        "border": border.value,
+        "sides": sides,
+    }

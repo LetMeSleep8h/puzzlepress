@@ -47,7 +47,7 @@ test('the coloring proof shows physical pages, blank backs and manual-review pro
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['Overview', 'Artwork', 'Print proof']);
+  ).toEqual(['Overview', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
   // Every physical page, including each drawing's blank back, is a thumbnail.
   const pages = screen.getByRole('navigation', { name: 'Pages' });
   const thumbs = within(pages).getAllByRole('button');

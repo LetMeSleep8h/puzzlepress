@@ -683,6 +683,15 @@ export interface CoverStatus {
 }
 // Publishing. Metadata rules, readiness verdicts and the package come from Python.
 export type ContentOrigin = 'unknown' | 'human' | 'ai_assisted' | 'ai_generated' | 'none';
+/** Coloring books: the author's declared basis for publishing a kind of content. */
+export type RightsBasis =
+  | 'undecided'
+  | 'own_work'
+  | 'commissioned'
+  | 'licensed'
+  | 'public_domain'
+  | 'ai_tool_terms'
+  | 'none';
 export type ConfirmationName = 'rights' | 'ai_disclosure' | 'metadata' | 'isbn';
 // Version 2 stores the review identity Python reported for the confirmed content, or
 // null; version 1 stored booleans, which Python never treats as current confirmations.
@@ -701,9 +710,23 @@ export interface PublishingConfig {
   isbn: { mode: 'undecided' | 'kdp_free' | 'own' | 'none'; value: string | null };
   edition: number | null;
   series: { title: string; number: number | null } | null;
-  ai_disclosure: { text: ContentOrigin; images: ContentOrigin; translations: ContentOrigin };
+  ai_disclosure: {
+    text: ContentOrigin;
+    images: ContentOrigin;
+    translations: ContentOrigin;
+    /** Coloring books only. */
+    interior_artwork?: ContentOrigin;
+    cover_artwork?: ContentOrigin;
+  };
   attestations: Record<ConfirmationName, StoredConfirmation>;
   notes: string | null;
+  /** Coloring books only: rights declarations, recorded as written. */
+  content_rights?: {
+    interior_artwork: RightsBasis;
+    cover_artwork: RightsBasis;
+    text: RightsBasis;
+    notes: string | null;
+  };
 }
 export interface Confirmation {
   name: ConfirmationName;
@@ -1401,4 +1424,39 @@ export interface TemplatePreview {
   checks?: CoverCheck[];
   buildable?: boolean;
   preview?: { pdf_sha256: string; scales: Record<string, number> };
+}
+// Coloring plans: Python's verified page sequence of a coloring draft, with the page
+// geometry (PDF points, origin bottom-left) the composer outlines.
+export interface ColoringPlanPage {
+  index: number;
+  side: 'recto' | 'verso';
+  section: 'front_matter' | 'artwork' | 'back_matter';
+  kind: string;
+  number: { value: number; style: string; label: string; displayed: boolean };
+  matter: { title: string | null; text: string | null } | null;
+  blank: { reason: string; before_section: string | null } | null;
+  artwork?: { entry: number; id: string; ordinal: number; title: string | null; prepared: string };
+  divider?: { title: string; text: string | null };
+}
+interface PtRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface ColoringPlanResult {
+  plan: {
+    complete: boolean;
+    pages: ColoringPlanPage[];
+    statistics: Record<string, number | null>;
+    diagnostics: Issue[];
+  };
+  verification: { valid: boolean; issues: Issue[] };
+  artwork: { failures: { id: string; code: string; message: string }[] };
+  geometry: {
+    profile: string;
+    trim: { width: number; height: number };
+    border: string;
+    sides: Record<'recto' | 'verso', { live: PtRect; art: PtRect }>;
+  };
 }

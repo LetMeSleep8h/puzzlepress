@@ -25,7 +25,7 @@ const STARTS: [string, string][] = [
   ['recto', 'Right-hand (recto) page'],
 ];
 
-function newItem(kind: string): MatterItem {
+export function newItem(kind: string): MatterItem {
   if (kind === 'copyright_page') return { kind, text: '' };
   if (kind === 'instructions')
     return {
@@ -144,7 +144,7 @@ function OutlineSection({
   );
 }
 
-function MatterList({
+export function MatterList({
   items,
   kinds,
   path,
@@ -152,6 +152,8 @@ function MatterList({
   draft,
   onChange,
   onBook,
+  make = newItem,
+  titleNote = 'edit it at the top of Puzzles',
 }: {
   items: MatterItem[];
   kinds: string[];
@@ -160,6 +162,9 @@ function MatterList({
   draft: Source;
   onChange: (items: MatterItem[]) => void;
   onBook: (book: Source['book']) => void;
+  /** A new page of this kind; coloring books start with their own instructions. */
+  make?: (kind: string) => MatterItem;
+  titleNote?: string;
 }) {
   const missing = kinds.filter((kind) => !items.some((item) => item.kind === kind));
   return (
@@ -217,7 +222,7 @@ function MatterList({
                 <>
                   <p className="small">
                     Uses the book’s metadata. Title: <strong>{draft.book.title}</strong>{' '}
-                    <span className="muted">(edit it at the top of Puzzles)</span>
+                    <span className="muted">({titleNote})</span>
                   </p>
                   <div className="field-pair">
                     {book('subtitle', 'Subtitle (optional)')}
@@ -261,9 +266,7 @@ function MatterList({
               type="button"
               key={kind}
               onClick={() =>
-                onChange(
-                  kind === 'title_page' ? [newItem(kind), ...items] : [...items, newItem(kind)],
-                )
+                onChange(kind === 'title_page' ? [make(kind), ...items] : [...items, make(kind)])
               }
             >
               Add {KIND_NAMES[kind].toLowerCase()}

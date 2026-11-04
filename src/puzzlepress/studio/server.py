@@ -646,6 +646,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     @app.get("/books/{key}/publishing")
     @app.get("/books/{key}/planning")
     @app.get("/books/{key}/artwork")
+    @app.get("/books/{key}/pages")
     @app.get("/books/{key}/puzzles/{puzzle_id}")
     def shell() -> FileResponse:
         index = frontend / "index.html"

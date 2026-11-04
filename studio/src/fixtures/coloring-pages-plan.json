@@ -1,0 +1,752 @@
+{
+  "artwork": {
+    "failures": [],
+    "preparation_version": 1,
+    "prepared": [
+      {
+        "bits": 1,
+        "id": "shape-01",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-aaa2f07f1c9bb9fc0b5e7eb9236f5b039bcd45511a070f83e8af87064c249a06"
+      },
+      {
+        "bits": 1,
+        "id": "shape-02",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-a9bd7e611c38189a8755a28beca22022a7e24f4b0ef88ab0f9a2991692cb3a22"
+      },
+      {
+        "bits": 1,
+        "id": "shape-03",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-f1da69e85b14f343db0d8089ee13ee17c53898109da02b119899fc3a221088b4"
+      },
+      {
+        "bits": 1,
+        "id": "shape-04",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-af93ffeba085eea141a3f0d93699bee485ace1d1b05e7c98e7833302003f00bf"
+      },
+      {
+        "bits": 1,
+        "id": "shape-05",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-8fe581129c41ed76a335ffe93fc62431719d826b8258fe64e5931b018a639104"
+      },
+      {
+        "bits": 1,
+        "id": "shape-06",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-678bc765c533e36835832069179a89c71e0e328288d3312bb8e18fd011e31bfa"
+      },
+      {
+        "bits": 1,
+        "id": "shape-07",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-aeca3b55caad190753e856ddc21f4fea0d76ad59c14077ce86e6599229cdc544"
+      },
+      {
+        "bits": 1,
+        "id": "shape-08",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-065e1a1994ada11be63cc1595e279a9532c3a0994e42bb46c329a8d4a89bc9ce"
+      },
+      {
+        "bits": 1,
+        "id": "shape-09",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-784832bed07dfc1a365e2c3ef849547183ef337c9e4945e1a2dccd422eb0ac5b"
+      },
+      {
+        "bits": 1,
+        "id": "shape-10",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-9b716b15a63f81919f78de3913f748ee9a5d2a5e4fe2369be16bef26b70cd3bf"
+      },
+      {
+        "bits": 1,
+        "id": "shape-11",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-60bc4343b4f20e9fbd614b71b91f20a853e11b2164fd21f0c49ce99b0358b029"
+      },
+      {
+        "bits": 1,
+        "id": "shape-12",
+        "pixels": [
+          2175,
+          2925
+        ],
+        "prepared": "sha256-84e7c9043d1fab594b3b3e96fab524a6b9aef76a1ea920095bdb185b5e14f5e0"
+      }
+    ]
+  },
+  "geometry": {
+    "border": "thin",
+    "profile": "paperback-8.5x11",
+    "sides": {
+      "recto": {
+        "art": {
+          "height": 652.0,
+          "width": 496.0,
+          "x": 67.0,
+          "y": 82.0
+        },
+        "live": {
+          "height": 702.0,
+          "width": 522.0,
+          "x": 54.0,
+          "y": 45.0
+        }
+      },
+      "verso": {
+        "art": {
+          "height": 652.0,
+          "width": 496.0,
+          "x": 49.0,
+          "y": 82.0
+        },
+        "live": {
+          "height": 702.0,
+          "width": 522.0,
+          "x": 36.0,
+          "y": 45.0
+        }
+      }
+    },
+    "trim": {
+      "height": 792,
+      "width": 612.0
+    }
+  },
+  "plan": {
+    "book_id": "synthetic-coloring-production",
+    "complete": true,
+    "diagnostics": [],
+    "engine": "coloring",
+    "identity": "pp1-sha256-1f3916f8e5fb370077b68eae8d2d00dd6241618c8ca756f2a1bbcbe202a32853",
+    "language": "en",
+    "pages": [
+      {
+        "blank": null,
+        "heading": null,
+        "index": 1,
+        "kind": "title_page",
+        "matter": {
+          "author": "Sample Author",
+          "imprint": null,
+          "subtitle": "A Test Book",
+          "text": null,
+          "title": "Synthetic Shapes to Color"
+        },
+        "number": {
+          "displayed": false,
+          "label": "1",
+          "style": "arabic",
+          "value": 1
+        },
+        "section": "front_matter",
+        "side": "recto"
+      },
+      {
+        "blank": null,
+        "heading": null,
+        "index": 2,
+        "kind": "copyright_page",
+        "matter": {
+          "author": null,
+          "imprint": null,
+          "subtitle": null,
+          "text": "Copyright 2026 Sample Author. Synthetic test book; not for sale.",
+          "title": null
+        },
+        "number": {
+          "displayed": false,
+          "label": "2",
+          "style": "arabic",
+          "value": 2
+        },
+        "section": "front_matter",
+        "side": "verso"
+      },
+      {
+        "blank": null,
+        "heading": null,
+        "index": 3,
+        "kind": "instructions",
+        "matter": {
+          "author": null,
+          "imprint": null,
+          "subtitle": null,
+          "text": "Color each drawing however you like.",
+          "title": "How to Use This Book"
+        },
+        "number": {
+          "displayed": false,
+          "label": "3",
+          "style": "arabic",
+          "value": 3
+        },
+        "section": "front_matter",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": "artwork",
+          "reason": "section_recto_start"
+        },
+        "heading": null,
+        "index": 4,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "4",
+          "style": "arabic",
+          "value": 4
+        },
+        "section": "front_matter",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 1,
+          "id": "shape-01",
+          "ordinal": 1,
+          "prepared": "sha256-aaa2f07f1c9bb9fc0b5e7eb9236f5b039bcd45511a070f83e8af87064c249a06",
+          "source_sha256": "0dfcb86a26ece8601d11ec6894c84b3f3edcacdd74ad04011dafa092eacbe51e",
+          "title": "shape-01"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 5,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "5",
+          "style": "arabic",
+          "value": 5
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 6,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "6",
+          "style": "arabic",
+          "value": 6
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 2,
+          "id": "shape-02",
+          "ordinal": 2,
+          "prepared": "sha256-a9bd7e611c38189a8755a28beca22022a7e24f4b0ef88ab0f9a2991692cb3a22",
+          "source_sha256": "c01a10c0f872fcb7803f239feeda3ff23f010adaaee447ce996f72f9afc3e311",
+          "title": "shape-02"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 7,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "7",
+          "style": "arabic",
+          "value": 7
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 8,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "8",
+          "style": "arabic",
+          "value": 8
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 3,
+          "id": "shape-03",
+          "ordinal": 3,
+          "prepared": "sha256-f1da69e85b14f343db0d8089ee13ee17c53898109da02b119899fc3a221088b4",
+          "source_sha256": "cc68f5522599011475702ba7ebcde2bbcee14182cd0d87c381672e1f40cf739b",
+          "title": "shape-03"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 9,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "9",
+          "style": "arabic",
+          "value": 9
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 10,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "10",
+          "style": "arabic",
+          "value": 10
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 4,
+          "id": "shape-04",
+          "ordinal": 4,
+          "prepared": "sha256-af93ffeba085eea141a3f0d93699bee485ace1d1b05e7c98e7833302003f00bf",
+          "source_sha256": "e50ec2941181e3b50b1f30b1b06d008359698b958bc1beb54a497dd84cfde523",
+          "title": "shape-04"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 11,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "11",
+          "style": "arabic",
+          "value": 11
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 12,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "12",
+          "style": "arabic",
+          "value": 12
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 5,
+          "id": "shape-05",
+          "ordinal": 5,
+          "prepared": "sha256-8fe581129c41ed76a335ffe93fc62431719d826b8258fe64e5931b018a639104",
+          "source_sha256": "f03fdb559c91e96a9e5ffa33f418304300dd9237cb693b7e26fca1ef54811d1d",
+          "title": "shape-05"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 13,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "13",
+          "style": "arabic",
+          "value": 13
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 14,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "14",
+          "style": "arabic",
+          "value": 14
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 6,
+          "id": "shape-06",
+          "ordinal": 6,
+          "prepared": "sha256-678bc765c533e36835832069179a89c71e0e328288d3312bb8e18fd011e31bfa",
+          "source_sha256": "b15e9f31f7d404797a00c921fba7e7dd69959d8e30d1e5cbf48f7ff4211c5211",
+          "title": "shape-06"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 15,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "15",
+          "style": "arabic",
+          "value": 15
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 16,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "16",
+          "style": "arabic",
+          "value": 16
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 7,
+          "id": "shape-07",
+          "ordinal": 7,
+          "prepared": "sha256-aeca3b55caad190753e856ddc21f4fea0d76ad59c14077ce86e6599229cdc544",
+          "source_sha256": "2ca3d2dfd33ead25b504cdd1e741e356dacf0f13328c606a8519f9fbd2720aec",
+          "title": "shape-07"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 17,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "17",
+          "style": "arabic",
+          "value": 17
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 18,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "18",
+          "style": "arabic",
+          "value": 18
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 8,
+          "id": "shape-08",
+          "ordinal": 8,
+          "prepared": "sha256-065e1a1994ada11be63cc1595e279a9532c3a0994e42bb46c329a8d4a89bc9ce",
+          "source_sha256": "8a2bf6539c0066e2920cc354cb18d907c77ffbbb43dd332e3d5f164ef4a70716",
+          "title": "shape-08"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 19,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "19",
+          "style": "arabic",
+          "value": 19
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 20,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "20",
+          "style": "arabic",
+          "value": 20
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 9,
+          "id": "shape-09",
+          "ordinal": 9,
+          "prepared": "sha256-784832bed07dfc1a365e2c3ef849547183ef337c9e4945e1a2dccd422eb0ac5b",
+          "source_sha256": "f758f9a5c4a755cbb61f7919de84f47ee1906fbf87bba72a45c90d8ea42854bb",
+          "title": "shape-09"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 21,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "21",
+          "style": "arabic",
+          "value": 21
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 22,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "22",
+          "style": "arabic",
+          "value": 22
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 10,
+          "id": "shape-10",
+          "ordinal": 10,
+          "prepared": "sha256-9b716b15a63f81919f78de3913f748ee9a5d2a5e4fe2369be16bef26b70cd3bf",
+          "source_sha256": "34ddae535e12fbb8e43a4bebb32f398e3bdff9585eadff50ed16b78d04613e40",
+          "title": "shape-10"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 23,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "23",
+          "style": "arabic",
+          "value": 23
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 24,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "24",
+          "style": "arabic",
+          "value": 24
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 11,
+          "id": "shape-11",
+          "ordinal": 11,
+          "prepared": "sha256-60bc4343b4f20e9fbd614b71b91f20a853e11b2164fd21f0c49ce99b0358b029",
+          "source_sha256": "7cdc672caa42149b76f3b14a177e57be1d99d5dad4843e751d9d839a40e71a34",
+          "title": "shape-11"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 25,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "25",
+          "style": "arabic",
+          "value": 25
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 26,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "26",
+          "style": "arabic",
+          "value": 26
+        },
+        "section": "artwork",
+        "side": "verso"
+      },
+      {
+        "artwork": {
+          "entry": 12,
+          "id": "shape-12",
+          "ordinal": 12,
+          "prepared": "sha256-84e7c9043d1fab594b3b3e96fab524a6b9aef76a1ea920095bdb185b5e14f5e0",
+          "source_sha256": "1920d5e97e7043282f638659cdf9ed3e6b62576da3b8493fa6df0fd7a53a1254",
+          "title": "shape-12"
+        },
+        "blank": null,
+        "heading": null,
+        "index": 27,
+        "kind": "coloring",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "27",
+          "style": "arabic",
+          "value": 27
+        },
+        "section": "artwork",
+        "side": "recto"
+      },
+      {
+        "blank": {
+          "before_section": null,
+          "reason": "reverse_blank"
+        },
+        "heading": null,
+        "index": 28,
+        "kind": "blank",
+        "matter": null,
+        "number": {
+          "displayed": false,
+          "label": "28",
+          "style": "arabic",
+          "value": 28
+        },
+        "section": "artwork",
+        "side": "verso"
+      }
+    ],
+    "plan_version": 1,
+    "statistics": {
+      "artwork_pages": 12,
+      "back_matter_pages": 0,
+      "blank_pages": 13,
+      "divider_pages": 0,
+      "first_artwork_page": 5,
+      "front_matter_pages": 3,
+      "logical_pages": 28,
+      "reverse_blank_pages": 12
+    }
+  },
+  "verification": {
+    "issues": [],
+    "valid": true
+  }
+}
