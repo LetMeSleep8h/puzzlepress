@@ -1,14 +1,16 @@
 """The project's imported assets: what exists, where each is used, and safe removal.
 
-Photographs live in `cover-assets/` and imported fonts in `cover-assets/fonts/`,
-under content-addressed names (import reuses identical bytes, so duplicates are
-never stored twice). References are read from authored source only: the cover
-(any version) and the interior style. Studio also passes the unsaved draft, so
+Photographs live in `cover-assets/`, imported fonts in `cover-assets/fonts/` and
+coloring-book artwork in `coloring-assets/`, under content-addressed names (import
+reuses identical bytes, so duplicates are never stored twice). References are read
+from authored source only: the cover (any version), the interior style and the
+coloring artwork library. Studio also passes the unsaved draft, so
 an asset the draft uses is protected before it is saved.
 
 Removal is never immediate deletion. An unreferenced asset is moved, with one
 atomic rename inside the same directory tree, to `cover-assets/.trash/`
-(`.trash/fonts/` for fonts), which no listing or import enumerates. It can be
+(`.trash/fonts/` for fonts; artwork to `coloring-assets/.trash/`), which no
+listing or import enumerates. It can be
 restored under its original name, or purged from the trash as a second,
 explicit step. Every path is derived from a validated asset reference and
 re-checked against the resolved project folder; symlinks, other folders and
@@ -22,6 +24,11 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .coloring.assets import artwork_directory, stored_files
+from .coloring.inspection import header_facts
+from .coloring.issues import ArtworkError
+from .coloring_config import ARTWORK_DIRECTORY
+from .coloring_validation import ARTWORK_NAME
 from .cover.assets import _checked_directory, inspect_photo, list_assets
 from .cover.font_assets import font_directory, inspect_font, list_fonts
 from .cover.issues import CoverError
@@ -49,7 +56,7 @@ class AssetUse:
     source: str  # "saved" (book.yaml on disk) or "draft" (Studio's unsaved draft).
     path: str  # Configuration path, e.g. cover.elements.0.image.
     label: str  # Where it is used, in words.
-    area: str  # The Studio section to open: cover or book.
+    area: str  # The Studio section to open: cover, book or artwork.
 
     def to_dict(self) -> dict[str, object]:
         return {"source": self.source, "path": self.path, "label": self.label, "area": self.area}
@@ -106,12 +113,20 @@ def asset_uses(
                     found.append(
                         AssetUse(source, f"cover.fonts.{index}", f"Cover font '{font.id}'", "cover")
                     )
+        if project.coloring is not None:
+            for index, art in enumerate(project.coloring.artwork):
+                if art.path == reference:
+                    found.append(
+                        AssetUse(
+                            source, f"coloring.artwork.{index}", f"Artwork '{art.id}'", "artwork"
+                        )
+                    )
     return tuple(found)
 
 
 @dataclass(frozen=True)
 class LibraryEntry:
-    kind: str  # photo or font
+    kind: str  # photo, font or artwork
     path: str
     name: str
     bytes: int
@@ -179,6 +194,33 @@ def library(
                 asset_uses(font.path, saved, draft),
             )
         )
+    try:
+        artwork = stored_files(source_directory)
+    except ArtworkError as error:
+        raise AssetError(error.code, error.message) from error
+    for reference in artwork:
+        file = source_directory / reference
+        facts: dict[str, object] = {}
+        problem = None
+        try:
+            facts = header_facts(file.read_bytes())
+        except ArtworkError as error:
+            problem = error.code
+        except OSError:
+            problem = "artwork_missing"
+        digest = facts.get("sha256")
+        entries.append(
+            LibraryEntry(
+                "artwork",
+                reference,
+                reference.rsplit("/", 1)[1],
+                _size(file),
+                digest if isinstance(digest, str) else None,
+                facts,
+                problem,
+                asset_uses(reference, saved, draft),
+            )
+        )
     return tuple(entries)
 
 
@@ -209,6 +251,15 @@ class _Located:
 
 def _locate(source_directory: Path, reference: str) -> _Located:
     """Resolve a reference to its real directory; never trust a caller's path."""
+    if reference.startswith(f"{ARTWORK_DIRECTORY}/"):
+        name = reference.removeprefix(f"{ARTWORK_DIRECTORY}/")
+        if not ARTWORK_NAME.fullmatch(name):
+            raise AssetError("asset_unsafe", "This is not imported artwork in the project.")
+        try:
+            directory = artwork_directory(source_directory)
+        except ArtworkError as error:
+            raise AssetError(error.code, error.message) from error
+        return _Located("artwork", name, directory, directory / TRASH)
     try:
         if reference.startswith(f"{FONT_DIRECTORY}/"):
             name = reference.removeprefix(f"{FONT_DIRECTORY}/")
@@ -327,6 +378,7 @@ def list_trash(source_directory: Path) -> tuple[TrashEntry, ...]:
     for kind, directory, pattern, prefix in (
         ("photo", trash, PHOTO_NAME, ASSET_DIRECTORY),
         ("font", trash / "fonts", FONT_NAME, FONT_DIRECTORY),
+        ("artwork", project / ARTWORK_DIRECTORY / TRASH, ARTWORK_NAME, ARTWORK_DIRECTORY),
     ):
         if not directory.is_dir() or directory.is_symlink():
             continue
@@ -388,6 +440,11 @@ def facts_of(source_directory: Path, reference: str) -> dict[str, object]:
     if path.is_symlink() or not path.is_file():
         raise AssetError("asset_missing", f"{reference} is not in the project.")
     data = path.read_bytes()
+    if located.kind == "artwork":
+        try:
+            return header_facts(data)
+        except ArtworkError as error:
+            return {"problem": error.code, "sha256": hashlib.sha256(data).hexdigest()}
     try:
         if located.kind == "photo":
             return inspect_photo(data).to_dict()
