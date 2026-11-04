@@ -33,6 +33,8 @@ function usePath(allow: (next: string, current: string) => boolean) {
         event.shiftKey ||
         event.altKey ||
         link.target ||
+        // A download is a file from the API, never a Studio page: the browser handles it.
+        link.hasAttribute('download') ||
         link.origin !== window.location.origin ||
         link.hash
       )

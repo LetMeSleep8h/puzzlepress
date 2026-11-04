@@ -195,3 +195,30 @@ test('API server errors render useful messages', async () => {
     ),
   );
 });
+
+test('the router leaves download links (template Export, interior.pdf) to the browser', async () => {
+  // Regression: the client router used to swallow a template's Export click and push
+  // the API URL as a Studio page ("This Studio page does not exist").
+  mockApi();
+  render(<App />);
+  await screen.findByRole('link', { name: 'Garden Word Searches' });
+  const start = location.pathname;
+  const click = (link: HTMLAnchorElement) => {
+    document.body.append(link);
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(event);
+    link.remove();
+    return event;
+  };
+  const exported = document.createElement('a');
+  exported.href = '/api/projects/garden-demo/cover/templates/mine/export';
+  exported.setAttribute('download', '');
+  exported.textContent = 'Export';
+  expect(click(exported).defaultPrevented).toBe(false);
+  expect(location.pathname).toBe(start);
+  // An ordinary same-origin link is still a Studio route.
+  const page = document.createElement('a');
+  page.href = '/books/garden-demo';
+  expect(click(page).defaultPrevented).toBe(true);
+  expect(location.pathname).toBe('/books/garden-demo');
+});
