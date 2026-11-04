@@ -317,6 +317,17 @@ def produce(
 
     loaded = load_project(project_path)
     project = loaded.project
+    if project.coloring is not None:
+        raise ProjectError(
+            (
+                ValidationIssue(
+                    "coloring",
+                    "not_available_for_engine",
+                    "book produce packages word-search books in this version. Build and "
+                    "check a coloring interior with `book build` and `book preflight`.",
+                ),
+            )
+        )
     source = loaded.source_path.parent
     protected = [source, *(Path(p) for p in previous)]
     manifest = None

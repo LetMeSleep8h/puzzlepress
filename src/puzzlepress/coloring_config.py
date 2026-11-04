@@ -3,7 +3,8 @@
 Artwork files live in the project's `coloring-assets/` folder under content-addressed
 names (`<stem>-<first 12 hex of SHA-256>.png|jpg`) and are never rewritten. The
 source pins each file's full SHA-256. Adjustments are non-destructive settings over
-the original bytes; nothing in this version applies them to pixels.
+the original bytes, applied in memory by `coloring.prepare` when a build or preview
+needs pixels; the originals are never rewritten.
 
 Normalized values always carry every default, so an omitted setting and the same
 setting written out explicitly serialize, and therefore hash, identically.
@@ -14,11 +15,12 @@ from enum import StrEnum
 
 COLORING_VERSION = 1
 ARTWORK_DIRECTORY = "coloring-assets"
-# Provisional caps: no coloring interior is built yet, so these are not measured
-# generation budgets. Interval 4 measures layout and rendering before raising them.
+# Provisional caps until layout and rendering are measured at these sizes (see
+# docs/coloring.md); never raised without measuring a build at the new size.
 MAX_ARTWORK = 300
 MAX_PAGES = 300
 MAX_TITLE = 200
+MAX_DIVIDER_TEXT = 600
 
 
 class Border(StrEnum):
@@ -78,10 +80,29 @@ class Artwork:
 
 
 @dataclass(frozen=True)
-class ColoringPage:
-    artwork: str  # An artwork id.
+class ColoringDivider:
+    """A section divider page: the author's title and optional text, never generated."""
+
+    title: str
+    text: str | None = None
 
     def to_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {"title": self.title}
+        if self.text is not None:
+            data["text"] = self.text
+        return data
+
+
+@dataclass(frozen=True)
+class ColoringPage:
+    """One entry in publication order: an artwork page, or a section divider."""
+
+    artwork: str | None = None  # An artwork id.
+    divider: ColoringDivider | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        if self.divider is not None:
+            return {"divider": self.divider.to_dict()}
         return {"artwork": self.artwork}
 
 
@@ -103,6 +124,15 @@ class ColoringBook:
 
     def artwork_by_id(self, artwork_id: str) -> Artwork | None:
         return next((item for item in self.artwork if item.id == artwork_id), None)
+
+    @property
+    def artwork_pages(self) -> tuple[tuple[int, str], ...]:
+        """(position in `pages`, 1-based; artwork id) for every artwork entry."""
+        return tuple(
+            (number, page.artwork)
+            for number, page in enumerate(self.pages, start=1)
+            if page.artwork is not None
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {

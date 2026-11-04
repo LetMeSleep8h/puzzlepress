@@ -231,8 +231,8 @@ def library_report(
     """
     book = require_coloring(project)
     pages: dict[str, list[int]] = {}
-    for number, page in enumerate(book.pages, start=1):
-        pages.setdefault(page.artwork, []).append(number)
+    for number, artwork in book.artwork_pages:
+        pages.setdefault(artwork, []).append(number)
     entries: list[ArtworkEntryReport] = []
     inspections: dict[str, Inspection | None] = {}
     for item in book.artwork:

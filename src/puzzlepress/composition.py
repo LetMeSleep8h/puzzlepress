@@ -106,8 +106,18 @@ class PageNumberPolicy:
     show_front_matter: bool = False
     show_solutions: bool = True
     show_back_matter: bool = True
+    # Coloring books only (None for word search, so its identities never change):
+    # whether coloring pages print their number. Coloring books have no solutions.
+    show_artwork: bool | None = None
 
     def to_dict(self) -> dict[str, object]:
+        if self.show_artwork is not None:
+            return {
+                "scheme": self.scheme.value,
+                "show_front_matter": self.show_front_matter,
+                "show_artwork": self.show_artwork,
+                "show_back_matter": self.show_back_matter,
+            }
         return {
             "scheme": self.scheme.value,
             "show_front_matter": self.show_front_matter,
@@ -159,8 +169,31 @@ class DividerPolicy:
 
 
 @dataclass(frozen=True)
+class ArtworkPolicy:
+    """Where a coloring book's artwork section starts (right-hand page by default).
+
+    Page order, section dividers and blank reverse pages are the `coloring`
+    section's: composition only places the section among the book's matter.
+    """
+
+    start: SectionStart = SectionStart.RECTO
+
+    def to_dict(self) -> dict[str, object]:
+        return {"start": self.start.value}
+
+
+# A coloring composition has no solutions; this neutral policy is never serialized.
+NO_SOLUTIONS = SolutionPolicy(SolutionPlacement.OMIT)
+
+
+@dataclass(frozen=True)
 class Composition:
-    """Solution policy is required: a book must state its solution decision."""
+    """Solution policy is required: a book must state its solution decision.
+
+    A coloring book's composition sets `artwork` instead and states no solution
+    decision (`solutions` is NO_SOLUTIONS); it serializes front matter, the artwork
+    section, back matter and page numbers only.
+    """
 
     solutions: SolutionPolicy
     front_matter: tuple[MatterItem, ...] = ()
@@ -171,8 +204,17 @@ class Composition:
     dividers: DividerPolicy | None = None
     # Recorded only for spreads, so single-page books keep their identities.
     puzzle_layout: PuzzleLayout = PuzzleLayout.SINGLE
+    # Coloring books only: the artwork section's placement.
+    artwork: ArtworkPolicy | None = None
 
     def to_dict(self) -> dict[str, object]:
+        if self.artwork is not None:
+            return {
+                "front_matter": [item.to_dict() for item in self.front_matter],
+                "artwork": self.artwork.to_dict(),
+                "back_matter": [item.to_dict() for item in self.back_matter],
+                "page_numbers": self.page_numbers.to_dict(),
+            }
         puzzles: dict[str, object] = {"start": self.puzzles_start.value}
         if self.puzzle_layout is not PuzzleLayout.SINGLE:
             puzzles["layout"] = self.puzzle_layout.value

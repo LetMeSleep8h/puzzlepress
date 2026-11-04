@@ -12,12 +12,14 @@ from .coloring_config import (
     ARTWORK_DIRECTORY,
     COLORING_VERSION,
     MAX_ARTWORK,
+    MAX_DIVIDER_TEXT,
     MAX_PAGES,
     MAX_TITLE,
     Adjustments,
     Artwork,
     Border,
     ColoringBook,
+    ColoringDivider,
     ColoringLayout,
     ColoringPage,
 )
@@ -157,6 +159,31 @@ def _artwork(reader: _Reader, raw: object, path: str) -> Artwork | None:
     return Artwork(identifier, str(reference), digest, title, adjustments)
 
 
+def _divider(reader: _Reader, raw: object, path: str) -> ColoringDivider | None:
+    data = reader.mapping(raw, path, {"title", "text"})
+    if not isinstance(raw, dict):
+        return None
+    title = _title(reader, data.get("title"), f"{path}.title")
+    if title is None and "title" not in data:
+        reader.issue(f"{path}.title", "required", "Give the divider page a title.")
+    text = data.get("text")
+    if text is not None and (
+        not isinstance(text, str)
+        or not text.strip()
+        or len(text.strip()) > MAX_DIVIDER_TEXT
+        or any((ord(c) < 32 and c != "\n") or 0xD800 <= ord(c) <= 0xDFFF for c in text)
+    ):
+        reader.issue(
+            f"{path}.text",
+            "text",
+            f"Expected 1..{MAX_DIVIDER_TEXT} characters of plain text; line breaks are allowed.",
+        )
+        text = None
+    if title is None:
+        return None
+    return ColoringDivider(title, text.strip() if isinstance(text, str) else None)
+
+
 def validate_coloring(value: object) -> tuple[ColoringBook | None, tuple[ValidationIssue, ...]]:
     reader = _Reader()
     path = "coloring"
@@ -182,10 +209,20 @@ def validate_coloring(value: object) -> tuple[ColoringBook | None, tuple[Validat
     pages: list[ColoringPage] = []
     for index, raw in enumerate(_list(reader, root.get("pages"), f"{path}.pages", MAX_PAGES)):
         page_path = f"{path}.pages.{index}"
+        if isinstance(raw, dict) and "divider" in raw:
+            reader.mapping(raw, page_path, {"divider"})
+            divider = _divider(reader, raw["divider"], f"{page_path}.divider")
+            if divider is not None:
+                pages.append(ColoringPage(divider=divider))
+            continue
         data = reader.mapping(raw, page_path, {"artwork"})
         reference = data.get("artwork")
         if not isinstance(reference, str) or not reference:
-            reader.issue(f"{page_path}.artwork", "required", "Name the artwork for this page.")
+            reader.issue(
+                f"{page_path}.artwork",
+                "required",
+                "Name the artwork for this page, or make it a divider: {divider: {title: ...}}.",
+            )
         elif reference not in known:
             reader.issue(
                 f"{page_path}.artwork",

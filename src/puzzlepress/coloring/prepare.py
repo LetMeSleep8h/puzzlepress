@@ -198,8 +198,10 @@ class Prepared:
         }
 
 
-def prepare_artwork(data: bytes, adjustments: Adjustments, name: str = "") -> Prepared:
-    """Prepare one original. Raises ArtworkError; never falls back to other settings."""
+def _pipeline(
+    data: bytes, adjustments: Adjustments, name: str
+) -> tuple[Image.Image, Image.Image, int]:
+    """(unadjusted reference, prepared pixels, despeckled pixel count). Raises ArtworkError."""
     image = open_artwork(data, name)
     width, height = image.size
     if width * height > MAX_PREPARE_PIXELS:
@@ -228,9 +230,30 @@ def prepare_artwork(data: bytes, adjustments: Adjustments, name: str = "") -> Pr
             ) from error
     out = _threshold(out, adjustments.threshold)
     out = _line_weight(out, adjustments.line_weight)
+    return reference, out, removed
+
+
+def prepare_artwork(data: bytes, adjustments: Adjustments, name: str = "") -> Prepared:
+    """Prepare one original. Raises ArtworkError; never falls back to other settings."""
+    reference, out, removed = _pipeline(data, adjustments, name)
     measures = _measure(reference, out, removed)
     key = cache_key(hashlib.sha256(data).hexdigest(), adjustments)
     return Prepared(key, adjustments, reference, out, measures, _findings(measures, adjustments))
+
+
+def prepared_pixels(data: bytes, adjustments: Adjustments, name: str = "") -> Image.Image:
+    """Exactly the pixels `prepare_artwork` prepares (mode L), without measuring them.
+
+    Builds print these; quality measures are preflight's, computed by
+    `prepare_artwork` over the same pipeline.
+    """
+    return _pipeline(data, adjustments, name)[1]
+
+
+def pixel_digest(image: Image.Image) -> str:
+    """`sha256-` over mode, size and raw bytes: what a page prints, independent of files."""
+    header = f"{image.mode}:{image.width}x{image.height}:".encode("ascii")
+    return "sha256-" + hashlib.sha256(header + image.tobytes()).hexdigest()
 
 
 def _line_work(gray: Image.Image) -> tuple[int, int] | None:

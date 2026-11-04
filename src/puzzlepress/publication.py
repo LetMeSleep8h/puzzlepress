@@ -18,6 +18,7 @@ from .composition import (
     SectionStart,
     SolutionPlacement,
 )
+from .engines.kind import EngineKind
 from .errors import ProjectError, ValidationIssue
 from .identity import build_identity
 from .models import Project
@@ -28,12 +29,17 @@ BLANK_REASON = "section_recto_start"
 DIVIDER_BLANK_REASON = "divider_recto_start"
 # A spread's word list must be a left-hand page; a blank right-hand page aligns it.
 SPREAD_BLANK_REASON = "spread_verso_start"
+# Coloring books: the blank back of a single-sided coloring or divider page, and the
+# blank that puts a coloring page or divider on a right-hand page.
+REVERSE_BLANK_REASON = "reverse_blank"
+ARTWORK_BLANK_REASON = "artwork_recto_start"
 
 
 class Section(StrEnum):
     FRONT_MATTER = "front_matter"
     PUZZLES = "puzzles"
     SOLUTIONS = "solutions"
+    ARTWORK = "artwork"  # Coloring books' pages, between front and back matter.
     BACK_MATTER = "back_matter"
 
 
@@ -47,7 +53,8 @@ class PageKind(StrEnum):
     PUZZLE_WORDS = "puzzle_words"  # A spread's word-list page, facing its grid page.
     SOLUTIONS = "solutions"
     BLANK = "blank"
-    DIVIDER = "divider"  # A theme divider (composition.puzzles.dividers).
+    DIVIDER = "divider"  # A theme divider, or a coloring book's section divider.
+    COLORING = "coloring"  # One prepared drawing on its own page.
 
 
 class Side(StrEnum):
@@ -139,6 +146,33 @@ class PuzzleRef:
 
 
 @dataclass(frozen=True)
+class ArtworkRef:
+    """Authoritative link to one prepared drawing.
+
+    `source` is the original file's pinned SHA-256; `prepared` is the digest of the
+    exact pixels the page prints (`sha256-` over mode, size and bytes); `entry` is
+    the 1-based position in `coloring.pages`.
+    """
+
+    id: str
+    ordinal: int
+    entry: int
+    title: str | None
+    source: str
+    prepared: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "ordinal": self.ordinal,
+            "entry": self.entry,
+            "title": self.title,
+            "source_sha256": self.source,
+            "prepared": self.prepared,
+        }
+
+
+@dataclass(frozen=True)
 class SolutionRef:
     puzzle: PuzzleRef
     puzzle_page: int
@@ -158,6 +192,7 @@ class PlanPage:
     blank_reason: str | None = None
     blank_before: Section | None = None
     divider: DividerContent | None = None
+    artwork: ArtworkRef | None = None
 
     @property
     def side(self) -> Side:
@@ -178,6 +213,8 @@ class PlanPage:
         extra: dict[str, object] = {}
         if self.divider is not None:  # Only divider pages: earlier plan digests are unchanged.
             extra["divider"] = self.divider.to_dict()
+        if self.artwork is not None:  # Only coloring pages.
+            extra["artwork"] = self.artwork.to_dict()
         return extra | {
             "index": self.index,
             "side": self.side.value,
@@ -229,6 +266,22 @@ class PlanStatistics:
     first_puzzle_page: int | None
     first_solution_page: int | None
     divider_pages: int = 0
+    artwork_pages: int = 0  # Coloring pages (coloring books only).
+    first_artwork_page: int | None = None
+    reverse_blank_pages: int = 0  # Blank backs of single-sided pages.
+
+    def coloring_dict(self) -> dict[str, object]:
+        """A coloring book's counts, without puzzle or solution terms."""
+        return {
+            "logical_pages": self.logical_pages,
+            "front_matter_pages": self.front_matter_pages,
+            "artwork_pages": self.artwork_pages,
+            "divider_pages": self.divider_pages,
+            "blank_pages": self.blank_pages,
+            "reverse_blank_pages": self.reverse_blank_pages,
+            "back_matter_pages": self.back_matter_pages,
+            "first_artwork_page": self.first_artwork_page,
+        }
 
 
 def plan_statistics(pages: tuple[PlanPage, ...]) -> PlanStatistics:
@@ -252,7 +305,13 @@ def plan_statistics(pages: tuple[PlanPage, ...]) -> PlanStatistics:
         first_puzzle_page=first(PageKind.PUZZLE),
         first_solution_page=first(PageKind.SOLUTIONS),
         divider_pages=sum(p.kind is PageKind.DIVIDER for p in pages),
+        artwork_pages=sum(p.kind is PageKind.COLORING for p in pages),
+        first_artwork_page=first(PageKind.COLORING),
+        reverse_blank_pages=sum(p.blank_reason == REVERSE_BLANK_REASON for p in pages),
     )
+
+
+_PUZZLE_FIELDS = frozenset({"puzzle", "solution_page", "solutions"})
 
 
 @dataclass(frozen=True)
@@ -264,14 +323,33 @@ class PublicationPlan:
     statistics: PlanStatistics
     diagnostics: tuple[ValidationIssue, ...]
     plan_version: int = PLAN_VERSION
+    engine: EngineKind = EngineKind.WORD_SEARCH
 
     @property
     def complete(self) -> bool:
-        """Every planned puzzle and solution references a generated puzzle."""
+        """Every planned page has its content (word search: generated puzzles)."""
         return not self.diagnostics
 
     def to_dict(self) -> dict[str, object]:
         stats = self.statistics
+        if self.engine is not EngineKind.WORD_SEARCH:
+            return {
+                "plan_version": self.plan_version,
+                "engine": self.engine.value,
+                "identity": self.identity,
+                "book_id": self.book_id,
+                "language": self.language,
+                "complete": self.complete,
+                # No puzzle or solution fields: they never apply to these pages.
+                "pages": [
+                    {k: v for k, v in page.to_dict().items() if k not in _PUZZLE_FIELDS}
+                    for page in self.pages
+                ],
+                "statistics": stats.coloring_dict(),
+                "diagnostics": [
+                    {"path": d.path, "code": d.code, "message": d.message} for d in self.diagnostics
+                ],
+            }
         return {
             "plan_version": self.plan_version,
             "identity": self.identity,

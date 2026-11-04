@@ -178,3 +178,63 @@ def pencil_sketch(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
     big = fine_detail((width * 2, height * 2)).point(lambda v: 96 if v < 128 else 246)
     del seed  # One layout; the parameter keeps the fixture signature uniform.
     return big.resize(size, Image.Resampling.BOX)
+
+
+# ------------------------------------------------------------- composed coloring books
+
+SMALL_SIZE = (300, 400)  # Small SYNTHETIC drawings keep plan and layout tests quick.
+FRONT_MATTER = (
+    {"kind": "title_page"},
+    {"kind": "copyright_page", "text": "Copyright 2026 Synthetic Author. All rights reserved."},
+    {"kind": "instructions", "title": "How to use this book", "text": "Color one page a day."},
+)
+
+
+def composed_coloring_book(
+    directory: Path,
+    count: int,
+    *,
+    front: int = 2,
+    reverse: bool = True,
+    start: str = "recto",
+    dividers: dict[int, str] | None = None,
+    size: tuple[int, int] = SMALL_SIZE,
+    images: list[Image.Image] | None = None,
+    border: str = "none",
+    numbers: dict[str, object] | None = None,
+    back: list[dict[str, object]] | None = None,
+) -> Path:
+    """A SYNTHETIC coloring book with `count` drawings and a coloring composition.
+
+    `dividers` maps a 0-based drawing position to a divider title placed before it.
+    Drawings are imported through the library, so files are real, content-addressed
+    project assets.
+    """
+    from puzzlepress.coloring.library import import_files
+    from puzzlepress.project import load_project
+
+    write_coloring_book(directory)
+    drawings = images or [line_art(seed, size) for seed in range(count)]
+    if drawings:
+        import_files(
+            directory, [(f"drawing {i + 1}.png", encode(d)) for i, d in enumerate(drawings)]
+        )
+    data = load_project(directory).project.to_dict()
+    pages: list[object] = []
+    for position, page in enumerate(data["coloring"]["pages"]):  # type: ignore[index]
+        if dividers and position in dividers:
+            pages.append({"divider": {"title": dividers[position]}})
+        pages.append(page)
+    coloring = data["coloring"]
+    assert isinstance(coloring, dict)
+    coloring["pages"] = pages
+    coloring["layout"] = {"blank_reverse": reverse, "border": border}
+    data["composition"] = {
+        "front_matter": list(FRONT_MATTER[:front]),
+        "artwork": {"start": start},
+        "back_matter": back or [],
+        "page_numbers": numbers or {},
+    }
+    project = validate_project(data).require_project()
+    (directory / "book.yaml").write_text(dump_project(project), encoding="utf-8")
+    return directory

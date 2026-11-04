@@ -15,7 +15,7 @@ from pathlib import Path
 from puzzlepress.batch import BatchReport
 from puzzlepress.book_cli import describe
 from puzzlepress.composition import SolutionPlacement
-from puzzlepress.engines.registry import engine_for
+from puzzlepress.engines.registry import word_search_publication
 from puzzlepress.identity import build_identity
 from puzzlepress.interior import DEFAULT_PROFILE, InteriorError, build_interior, write_interior
 from puzzlepress.interior.build import (
@@ -232,7 +232,7 @@ class PrintService:
             answers: dict[str, object] | None = None
             try:
                 if publication is None:
-                    publication = engine_for(project).build_publication(project)
+                    publication = word_search_publication(project)
                     self._publications[identity] = publication
                     while len(self._publications) > 2:
                         self._publications.popitem(last=False)

@@ -71,10 +71,15 @@ def build_interior(
     from .images import InteriorPhotos, encode_gray, load_photos
 
     engine = engine_for(project)
-    report, plan = engine.build_publication(project)
+    report, plan = engine.build_publication(project, source_directory)
     verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
+    if not isinstance(report, BatchReport):
+        raise InteriorError(
+            "engine",
+            (LayoutIssue("engine_not_buildable", "Coloring interiors cannot be laid out yet."),),
+        )
     style = project.interior
     photos = load_photos(source_directory, style.images() if style else ())
     placed = InteriorPhotos(style_images(style), {k: v.info for k, v in photos.items()})
@@ -396,10 +401,15 @@ def sample_interior(
     from .images import InteriorPhotos, encode_gray, load_photos
 
     engine = engine_for(project)
-    report, plan = publication or engine.build_publication(project)
+    report, plan = publication or engine.build_publication(project, source_directory)
     verification = engine.verify_publication(plan, project, report)
     if not verification.valid:
         raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
+    if not isinstance(report, BatchReport):
+        raise InteriorError(
+            "engine",
+            (LayoutIssue("engine_not_buildable", "Coloring interiors cannot be laid out yet."),),
+        )
     style = project.interior
     photos = load_photos(source_directory, style.images() if style else ())
     placed = InteriorPhotos(style_images(style), {k: v.info for k, v in photos.items()})

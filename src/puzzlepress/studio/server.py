@@ -315,7 +315,9 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
 
     @app.post("/api/projects/{key}/draft/plan")
     def plan_draft(key: str, body: DraftRequest) -> dict[str, object]:
-        return service.plan_project(drafts.validate(key, body.source))
+        return service.plan_project(
+            drafts.validate(key, body.source), service.store.source(key).parent
+        )
 
     @app.post("/api/projects/{key}/draft/save")
     def save_draft(key: str, body: SaveRequest) -> dict[str, object]:

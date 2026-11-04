@@ -99,8 +99,8 @@ class DuplicateReport:
 
 def _pages_of(book: ColoringBook) -> dict[str, tuple[int, ...]]:
     found: dict[str, list[int]] = {}
-    for number, page in enumerate(book.pages, start=1):
-        found.setdefault(page.artwork, []).append(number)
+    for number, artwork in book.artwork_pages:
+        found.setdefault(artwork, []).append(number)
     return {key: tuple(value) for key, value in found.items()}
 
 
