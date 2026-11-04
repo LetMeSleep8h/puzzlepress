@@ -98,6 +98,12 @@ def test_detected_format_names_the_file_not_the_extension(book):
         ("../../escape/evil.png", "evil", "evil"),
         ("C:\\Users\\me\\Owl_Night.PNG", "owl-night", "Owl Night"),
         ("....png", "artwork", "..."),
+        # Names pathlib splits differently from Python 3.14; ours must not change.
+        (".png", "png", ".png"),
+        ("a..png", "a", "a."),
+        ("trailing.", "trailing", "trailing"),
+        ("archive.tar.png", "archive-tar", "archive.tar"),
+        ("no-extension", "no-extension", "no-extension"),
         ("猫.png", "artwork", "猫"),
         ("tab\there\x00.png", "tab-here", "tab here"),
         ("CON.png", "con", "CON"),
