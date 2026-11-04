@@ -65,6 +65,13 @@ PAPER_WARNING = 240  # Median non-ink level below this prints as a tint.
 # visibly dusty in review measured 14.8 (despeckle 3 left its 13-21 px dots).
 SPECKS_PER_MP_WARNING = 5.0
 CHANGE_REVIEW = 40.0  # Mean absolute change (levels) worth a visual review.
+# Faint lines: how dark the darkest tenth of the line work (gray at or below
+# LINE_LEVEL) gets. Black strokes reach 0-48 (thin anti-aliased ones 43); a soft pencil
+# page measured 96 and 77 after contrast 1.6, both visibly pale in print review, and
+# one-pixel black lines reduced to half size 129-132.
+LINE_LEVEL = 200
+LINE_CORE_SHARE = 0.10
+FAINT_CORE = 64  # 75% ink.
 
 
 def cache_key(sha256: str, adjustments: Adjustments) -> str:
@@ -154,6 +161,8 @@ class PreparationMeasures:
     mean_change: float  # Mean absolute gray change, 0..255.
     not_measured: tuple[str, ...] = ()  # Measures skipped because a scan bound was hit.
     new_edges: tuple[str, ...] = ()  # Image edges ink reaches only after preparation.
+    # Gray of the darkest tenth of the prepared line work; None with no line work.
+    line_core_level: int | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -171,6 +180,7 @@ class PreparationMeasures:
             "specks_per_megapixel_after": self.specks_per_megapixel_after,
             "paper_level_after": self.paper_level_after,
             "mean_change": self.mean_change,
+            "line_core_level": self.line_core_level,
         }
 
 
@@ -316,6 +326,7 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     new_edges = tuple(e for e in _edges(_reduced(out)) if e not in edges_before)
     change = ImageChops.difference(reference, out)
     mean_change = sum(level * count for level, count in enumerate(change.histogram())) / total
+    core = _line_core(out.histogram(), total)
     return PreparationMeasures(
         pixels=(width, height),
         ink_before=round(ink_before / total, 4),
@@ -331,7 +342,21 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
         mean_change=round(mean_change, 2),
         not_measured=tuple(not_measured),
         new_edges=new_edges,
+        line_core_level=core,
     )
+
+
+def _line_core(levels: list[int], total: int) -> int | None:
+    """The gray level the darkest LINE_CORE_SHARE of the line work reaches."""
+    line_pixels = sum(levels[: LINE_LEVEL + 1])
+    if line_pixels < BLANK_INK * total:
+        return None
+    need, seen = line_pixels * LINE_CORE_SHARE, 0
+    for level in range(LINE_LEVEL + 1):
+        seen += levels[level]
+        if seen >= need:
+            return level
+    return LINE_LEVEL
 
 
 def _paper_median(gray: Image.Image) -> int:
@@ -437,6 +462,15 @@ def _findings(m: PreparationMeasures, adjustments: Adjustments) -> tuple[Artwork
             "Raise background cleanup or set a threshold.",
             f"median {m.paper_level_after}",
             f"at least {PAPER_WARNING}",
+        )
+    if m.line_core_level is not None and m.line_core_level > FAINT_CORE:
+        add(
+            "faint_lines",
+            Severity.WARNING,
+            "The lines print as light gray, not black: even the darkest of them are pale. "
+            "Raise the contrast, lower the brightness or set a threshold.",
+            f"darkest lines gray {m.line_core_level}",
+            f"at most {FAINT_CORE}",
         )
     if m.specks_per_megapixel_after is not None and (
         m.specks_per_megapixel_after > SPECKS_PER_MP_WARNING

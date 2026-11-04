@@ -701,6 +701,15 @@ _quality_rule(
     "Every drawing's paper prints white.",
 )
 _quality_rule(
+    "coloring_faint_lines",
+    Severity.WARNING,
+    "Lines print dark",
+    "The darkest tenth of a drawing's line work (gray 200 or darker) reaches gray 64 "
+    "(75% ink) or darker; paler lines print as light gray that is hard to color inside.",
+    ("faint_lines",),
+    "Every drawing's lines print dark.",
+)
+_quality_rule(
     "coloring_line_quality",
     Severity.WARNING,
     "Line quality",

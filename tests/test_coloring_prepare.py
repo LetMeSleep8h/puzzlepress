@@ -484,3 +484,38 @@ def test_cli_adjust_sets_and_resets(tmp_path, capsys):
     assert code == 1 and "invalid_setting" in err
     code, _, _ = run(capsys, "coloring", "adjust", str(book), "a", "--reset")
     assert code == 0 and load_project(book).project.coloring.artwork[0].adjustments == Adjustments()
+
+
+@pytest.mark.parametrize(
+    ("adjust", "core", "faint"),
+    [
+        ({}, 96, True),
+        ({"contrast": 1.6, "background_cleanup": 0.4}, 77, True),
+        ({"contrast": 2.5, "background_cleanup": 0.4}, 48, False),
+        ({"threshold": 0.7}, 0, False),
+    ],
+)
+def test_faint_line_work_is_a_warning(adjust, core, faint):
+    """Calibration (docs/coloring.md): the pencil page's darkest lines per setting."""
+    prepared = prepare_artwork(encode(pencil_sketch(5)), Adjustments(**adjust))
+    assert prepared.measures.line_core_level == core
+    assert ("faint_lines" in [f.code for f in prepared.findings]) is faint
+
+
+def test_black_line_art_is_not_faint_but_half_size_hairlines_are():
+    for image in (
+        line_art(1),
+        fine_detail(),
+        dense_pattern(),
+        line_art(3, line=2).resize((1088, 1463)),
+    ):
+        prepared = prepare_artwork(encode(image), Adjustments())
+        assert prepared.measures.line_core_level is not None
+        assert prepared.measures.line_core_level <= 48
+        assert "faint_lines" not in [f.code for f in prepared.findings]
+    hairlines = prepare_artwork(encode(line_art(3, line=1).resize((1088, 1463))), Adjustments())
+    assert hairlines.measures.line_core_level is not None
+    assert hairlines.measures.line_core_level > 64
+    assert "faint_lines" in [f.code for f in hairlines.findings]
+    blank = prepare_artwork(encode(Image.new("L", (300, 300), 255)), Adjustments())
+    assert blank.measures.line_core_level is None

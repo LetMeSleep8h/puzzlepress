@@ -18,6 +18,7 @@ from coloring_helpers import (
     fine_detail,
     line_art,
     noisy_scan,
+    pencil_sketch,
     white_on_black,
 )
 from PIL import Image, ImageDraw
@@ -154,6 +155,7 @@ def test_rule_codes_are_stable_and_separate_from_word_search():
         "coloring_thin_lines",
         "coloring_heavy_ink",
         "coloring_gray_background",
+        "coloring_faint_lines",
         "coloring_line_quality",
         "coloring_duplicate_artwork",
         "coloring_similar_artwork",
@@ -319,6 +321,23 @@ def test_quality_rules_report_measured_problems_at_their_severities(tmp_path):
     excessive = next(f for f in report.findings if f.rule.code == "coloring_excessive_ink")
     assert "Invert" in excessive.message
     assert report.structurally_valid and not report.kdp_ready
+
+
+def test_faint_pencil_lines_are_reported_until_the_contrast_darkens_them(tmp_path):
+    """Found in the sample review: a pale pencil page passed every other check."""
+    second = pencil_sketch(5)
+    ImageDraw.Draw(second).line((40, 40, 400, 40), fill=150, width=3)  # A different file.
+    images = [pencil_sketch(5), second]
+    directory = composed_coloring_book(tmp_path / "book", 2, images=images)
+    data = load_project(directory).project.to_dict()
+    data["coloring"]["artwork"][1]["adjustments"]["contrast"] = 2.5
+    save(directory, data)
+    _, result = written(directory, tmp_path / "out")
+    faint = [f for f in result.report.findings if f.rule.code == "coloring_faint_lines"]
+    assert [(f.subject, f.page.physical_page if f.page else None) for f in faint] == [
+        ("drawing-1", 3)
+    ]
+    assert faint[0].severity is Severity.WARNING and "light gray" in faint[0].message
 
 
 def test_review_prompts_never_block(tmp_path):

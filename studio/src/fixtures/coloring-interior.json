@@ -76,7 +76,7 @@
         "content": 3
       },
       "outcome": {
-        "passed": 50,
+        "passed": 51,
         "failed": 4,
         "not_applicable": 0,
         "not_evaluated": 0
@@ -993,6 +993,21 @@
         "outcome": "passed",
         "findings": 0,
         "note": "Every drawing's paper prints white.",
+        "measure": null
+      },
+      {
+        "code": "coloring_faint_lines",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "Lines print dark",
+        "description": "The darkest tenth of a drawing's line work (gray 200 or darker) reaches gray 64 (75% ink) or darker; paler lines print as light gray that is hard to color inside.",
+        "basis": "puzzlepress_contract",
+        "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "passed",
+        "findings": 0,
+        "note": "Every drawing's lines print dark.",
         "measure": null
       },
       {
