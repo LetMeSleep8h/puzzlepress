@@ -1,8 +1,9 @@
 # Multi-engine architecture and coloring book engine: assessment and plan
 
 Status: branch `feat/multi-engine-coloring`, cut from main `693aa00`. The author
-approved D1-D6 as recommended. Interval 1 (foundation) is implemented; the
-coloring engine (Intervals 2-7) is not.
+approved D1-D6 as recommended. Interval 1 (foundation, merged as PR #15) and
+Interval 2 (coloring schema, artwork import and library; guide
+[coloring.md](coloring.md)) are implemented; Intervals 3-7 are not.
 
 ## 1. What the repository is today
 
