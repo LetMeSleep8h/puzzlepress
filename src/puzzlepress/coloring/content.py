@@ -14,7 +14,7 @@ settings.
 """
 
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PIL import Image
@@ -25,7 +25,8 @@ from ..identity import build_identity
 from ..models import Project
 from .assets import read_artwork
 from .issues import ArtworkError
-from .prepare import PREPARATION_VERSION, pixel_digest, prepared_pixels
+from .memo import Memo
+from .prepare import PREPARATION_VERSION, cache_key, pixel_digest, prepared_pixels
 
 # Deflate level for packed samples. Changing it changes PDF bytes: it is part of
 # the coloring renderer version (interior.coloring.COLORING_RENDERER_VERSION).
@@ -65,6 +66,14 @@ def pack(artwork: Artwork, image: Image.Image) -> PreparedArt:
     return PreparedArt(
         artwork, image.width, image.height, bits, zlib.compress(raw, DEFLATE_LEVEL), digest
     )
+
+
+# Packed prepared samples by preparation address (puzzlepress.coloring.memo), so a
+# preflight's expected rebuild reuses what the build just prepared from the same
+# verified bytes. Bounded by packed size; line art packs to tens of kilobytes.
+PACKED: Memo[PreparedArt] = Memo(
+    entries=4096, size=256 * 1024 * 1024, measure=lambda a: len(a.samples)
+)
 
 
 @dataclass(frozen=True)
@@ -107,10 +116,22 @@ def prepare_content(project: Project, source_directory: Path | None) -> Coloring
         if artwork is None:  # Validation guarantees every page names known artwork.
             raise RuntimeError(f"Page names unknown artwork {artwork_id!r}")
         try:
+            # Always read and verified against the pinned digest, even when remembered.
             data = read_artwork(source_directory, artwork)
+            # Packed bytes also depend on the deflate level and the zlib build.
+            key = (
+                f"{cache_key(artwork.sha256, artwork.adjustments)}:deflate-{DEFLATE_LEVEL}:"
+                f"{zlib.ZLIB_RUNTIME_VERSION}"
+            )
+            known = PACKED.get(key)
+            if known is not None:
+                art[artwork_id] = replace(known, artwork=artwork)
+                continue
             image = prepared_pixels(data, artwork.adjustments, artwork.path)
         except ArtworkError as error:
             failures[artwork_id] = error.about(artwork.path)
             continue
-        art[artwork_id] = pack(artwork, image)
+        packed = pack(artwork, image)
+        PACKED.put(key, packed)
+        art[artwork_id] = packed
     return ColoringContent(build_identity(project), art, failures)

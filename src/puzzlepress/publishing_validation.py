@@ -30,12 +30,14 @@ from .publishing_config import (
     Attestations,
     Audience,
     ContentOrigin,
+    ContentRights,
     Contributor,
     ContributorRole,
     Isbn,
     IsbnMode,
     PublishingConfig,
     ReadingAge,
+    RightsBasis,
     Series,
 )
 
@@ -53,14 +55,19 @@ FIELDS = {
     "ai_disclosure",
     "attestations",
     "notes",
+    "content_rights",
 }
-Choice = TypeVar("Choice", IsbnMode, ContentOrigin, ContributorRole)
+Choice = TypeVar("Choice", IsbnMode, ContentOrigin, ContributorRole, RightsBasis)
 
 
 def validate_publishing(
-    value: object, has_composition: bool
+    value: object, has_composition: bool, coloring: bool = False
 ) -> tuple[PublishingConfig | None, tuple[ValidationIssue, ...]]:
-    """Validate the publishing section; `has_composition` states whether one is declared."""
+    """Validate the publishing section; `has_composition` states whether one is declared.
+
+    `coloring` admits the coloring-only declarations (`content_rights` and the
+    artwork origins in `ai_disclosure`); other books report them as not applicable.
+    """
     reader = _Reader()
     path = "publishing"
     data = reader.mapping(value, path, FIELDS)
@@ -97,7 +104,22 @@ def validate_publishing(
     isbn = _isbn(reader, data.get("isbn", {}), f"{path}.isbn")
     edition = _optional_int(reader, data.get("edition"), f"{path}.edition", 1, MAX_EDITION)
     series = _series(reader, data.get("series"), f"{path}.series")
-    disclosure = _disclosure(reader, data.get("ai_disclosure", {}), f"{path}.ai_disclosure")
+    disclosure = _disclosure(
+        reader, data.get("ai_disclosure", {}), f"{path}.ai_disclosure", coloring
+    )
+    content_rights = None
+    if "content_rights" in data:
+        if coloring:
+            content_rights = _content_rights(
+                reader, data["content_rights"], f"{path}.content_rights"
+            )
+        else:
+            reader.issue(
+                f"{path}.content_rights",
+                "not_applicable_for_engine",
+                "Artwork rights declarations apply to coloring books. Word-search books "
+                "declare their rights with the rights confirmation.",
+            )
     attestations = _attestations(
         reader, data.get("attestations", {}), f"{path}.attestations", version
     )
@@ -119,6 +141,7 @@ def validate_publishing(
             attestations=attestations,
             notes=notes,
             version=version,
+            content_rights=content_rights,
         ),
         (),
     )
@@ -250,8 +273,11 @@ def _series(reader: _Reader, value: object, path: str) -> Series | None:
     return Series(title, number) if title is not None else None
 
 
-def _disclosure(reader: _Reader, value: object, path: str) -> AiDisclosure:
-    data = reader.mapping(value, path, {"text", "images", "translations"})
+ARTWORK_ORIGINS = ("interior_artwork", "cover_artwork")
+
+
+def _disclosure(reader: _Reader, value: object, path: str, coloring: bool) -> AiDisclosure:
+    data = reader.mapping(value, path, {"text", "images", "translations", *ARTWORK_ORIGINS})
     unknown = ContentOrigin.UNKNOWN
     text = _choice(reader, data.get("text", "unknown"), f"{path}.text", ContentOrigin, unknown)
     images = _choice(
@@ -267,7 +293,49 @@ def _disclosure(reader: _Reader, value: object, path: str) -> AiDisclosure:
                 "choice",
                 "'none' applies to translations only; declare who created this content.",
             )
-    return AiDisclosure(text, images, translations)
+    artwork: dict[str, ContentOrigin | None] = {}
+    for kind in ARTWORK_ORIGINS:
+        if kind not in data:
+            artwork[kind] = None
+        elif not coloring:
+            reader.issue(
+                f"{path}.{kind}",
+                "not_applicable_for_engine",
+                "Artwork origins apply to coloring books; declare images with 'images'.",
+            )
+            artwork[kind] = None
+        else:
+            origin = _choice(reader, data[kind], f"{path}.{kind}", ContentOrigin, unknown)
+            if origin is ContentOrigin.NONE and kind == "interior_artwork":
+                reader.issue(
+                    f"{path}.{kind}",
+                    "choice",
+                    "'none' applies to cover artwork only; declare who created the drawings.",
+                )
+            artwork[kind] = origin
+    return AiDisclosure(
+        text, images, translations, artwork["interior_artwork"], artwork["cover_artwork"]
+    )
+
+
+def _content_rights(reader: _Reader, value: object, path: str) -> ContentRights:
+    fields = ("interior_artwork", "cover_artwork", "text")
+    data = reader.mapping(value, path, {*fields, "notes"})
+    undecided = RightsBasis.UNDECIDED
+    values: dict[str, RightsBasis] = {}
+    for kind in fields:
+        basis = _choice(
+            reader, data.get(kind, "undecided"), f"{path}.{kind}", RightsBasis, undecided
+        )
+        if basis is RightsBasis.NONE and kind != "cover_artwork":
+            reader.issue(
+                f"{path}.{kind}",
+                "choice",
+                "'none' applies to cover artwork only (a cover without images).",
+            )
+        values[kind] = basis
+    notes = _optional_text(reader, data.get("notes"), f"{path}.notes", MAX_NOTES, multiline=True)
+    return ContentRights(values["interior_artwork"], values["cover_artwork"], values["text"], notes)
 
 
 def _attestations(reader: _Reader, value: object, path: str, version: int) -> Attestations:

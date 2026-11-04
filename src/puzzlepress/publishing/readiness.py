@@ -32,7 +32,7 @@ from ..preflight.model import RuleResult as PreflightRuleResult
 from ..preflight.model import Scope as PreflightScope
 from .metadata import MetadataReport, validate_metadata
 from .model import Area, Collector, Finding, Outcome, RuleResult, Severity
-from .rules import CODES, KDP_RULES_CHECKED, RULES, RULESET_ID, RULESET_VERSION
+from .rules import CODES, RULES, ruleset_for
 
 # 2: confirmations carry the review identity they apply to and their state.
 REPORT_VERSION = 2
@@ -225,9 +225,9 @@ class PublishingReadinessReport:
         return {
             "report_version": REPORT_VERSION,
             "ruleset": {
-                "id": RULESET_ID,
-                "version": RULESET_VERSION,
-                "kdp_rules_checked": KDP_RULES_CHECKED,
+                "id": self.metadata.ruleset.id,
+                "version": self.metadata.ruleset.version,
+                "kdp_rules_checked": self.metadata.ruleset.checked,
             },
             "book_id": self.book_id,
             "statement": self.statement(),
@@ -289,7 +289,7 @@ def evaluate_readiness(
 ) -> PublishingReadinessReport:
     """Validate metadata, then inspect the interior and cover in `output`. Writes nothing."""
     metadata = validate_metadata(project)
-    c = Collector(RULES)
+    c = Collector(metadata.ruleset.rules)
     try:
         directory = check_output_directory(output, project_directory)
     except InteriorError as error:
@@ -320,7 +320,7 @@ def _assemble(
     cover_state: str,
 ) -> PublishingReadinessReport:
     artifact_results = c.results(ARTIFACT_CODES)
-    order = {code: i for i, code in enumerate(CODES)}
+    order = {code: i for i, code in enumerate(ruleset_for(project.coloring is not None).codes)}
     results = tuple(
         sorted((*metadata.results, *artifact_results), key=lambda r: order[r.rule.code])
     )

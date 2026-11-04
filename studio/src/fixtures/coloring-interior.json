@@ -1,7 +1,7 @@
 {
   "key": "coloring-print",
   "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
-  "ruleset": 1,
+  "ruleset": 2,
   "profiles": [
     {
       "id": "paperback-8.5x11",
@@ -20,7 +20,7 @@
     "report_version": 1,
     "ruleset": {
       "id": "puzzlepress-kdp-coloring",
-      "version": 1,
+      "version": 2,
       "kdp_rules_checked": "2026-10-07"
     },
     "book_id": "synthetic-coloring-book",
@@ -1016,7 +1016,7 @@
         "category": "content",
         "severity": "warning",
         "title": "Line quality",
-        "description": "Measured damage from preparation: fine lines thinned (under 90% kept), detail lost (under 60%), strokes broken apart, isolated specks left (over 5 per megapixel) or ink pushed to an image edge.",
+        "description": "Measured damage from preparation: fine lines thinned (under 90% kept), detail lost (under 60%), light strokes of the original erased (under 50% of gray 129-200 strokes still printed), strokes broken apart, isolated specks left (over 5 per megapixel) or ink pushed to an image edge.",
         "basis": "puzzlepress_contract",
         "source": "PuzzlePress line-art conventions (docs/coloring.md#calibration)",
         "help": "docs/preflight.md#rule-catalogue",

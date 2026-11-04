@@ -3,10 +3,12 @@
 This version can represent a coloring book, import, inspect and de-duplicate its
 artwork, prepare line art for black-ink printing, compose the book (front matter,
 section dividers, blank reverse pages, page numbers), build a deterministic PDF
-interior from the prepared pixels, and preflight it, from the CLI or Studio. It
-cannot yet make a cover, publishing metadata or a package for a coloring book:
-those sections are refused (`not_available_for_engine`) and `book produce` refuses
-coloring books. Plan: [multi-engine-plan.md](multi-engine-plan.md).
+interior from the prepared pixels and preflight it, design its cover, record its
+publishing metadata and rights declarations, and produce a verified KDP package,
+from the CLI or Studio. The end-to-end walkthrough is
+[Creating and Publishing a Coloring Book](coloring-publishing.md). Interior style
+sections (word-search typography) stay refused for coloring books
+(`not_available_for_engine`). Plan: [multi-engine-plan.md](multi-engine-plan.md).
 
 ## Source
 
@@ -63,7 +65,7 @@ composition:                             # required to plan or build
 | A divider has a one-line title (<=200) and optional text (<=600, line breaks allowed) | `required`, `text` |
 | At most 300 artwork and 300 page entries | `count` |
 | Composition: puzzle and solution settings (`puzzles`, `solutions`, `show_solutions`) do not apply | `not_applicable_for_engine` |
-| No `cover`, `publishing` or `interior` style section yet | `not_available_for_engine` |
+| No `interior` style section (covers and publishing are shared sections) | `not_available_for_engine` |
 
 Defaults are normalized, so omitted and explicit values hash equally. The section
 and the composition are part of build identity (envelope `coloring_version: 1`,
@@ -193,7 +195,22 @@ checked against a pixel flood fill in the tests).
 | `background_tint` | warning | median non-ink level under 240 |
 | `specks_remaining` | warning | over 5 isolated marks per megapixel |
 | `prepared_touches_edge` | warning | ink reaches an image edge the original did not |
+| `faint_strokes_erased` | warning | under 50 % of the original's light strokes (below) still print |
 | `large_change` | warning | mean change over 40 levels: a prompt to compare, not a defect |
+
+**Light strokes.** Ink measures count gray 128 or darker, so pencil lines and soft
+detail between gray 129 and 200 were invisible to them, and contrast, brightness
+or a threshold could erase them with no finding (seen in Interval 4's review).
+They are now measured on their own: a pixel of the original counts as a light
+stroke when it is gray 129-200, at least 3 of its 3 x 3 neighbourhood is drawn
+(gray 200 or darker), so paper grain and lone noise do not count, and it does not
+touch ink, so the anti-aliased rim of a black line is part of that line and a
+threshold that drops the rim is not reported. It is kept while the prepared page
+prints it at gray 224 or darker (about 12 % ink). Measured only when light strokes
+cover 0.1 % of the page; reported (`faint_strokes_erased`, a warning, never
+blocking) when under half are kept, because erasing construction lines can be
+exactly what the author wants. The difference view marks erased light strokes in
+orange and kept ones in light gray.
 
 All thresholds are PuzzlePress conventions, not KDP values or print-quality
 guarantees. Most findings report measured damage. `large_change` is different: it
@@ -224,6 +241,14 @@ transparent; yellow lines), each under 15 settings:
   and 0 with a 0.7 threshold; one-pixel black lines reduced to half size 129-132.
   Added after a visual review of the sample books, where the pencil page at
   contrast 1.6 printed visibly pale yet passed every other check.
+
+- Light strokes (Interval 5): the pencil sketch kept 100 % at defaults, contrast
+  1.6, threshold 0.7, cleanup 0.6, despeckle 3 and thickening, and 0-19 % at
+  contrast 2.5, brightness +0.3, thresholds 0.5 and 0.35 and thinning; an ink and
+  pencil composite behaved the same. Crisp black fixtures and a 3x-supersampled
+  anti-aliased line drawing measured no light strokes at all (so no finding under
+  any threshold). The 50 % limit sits in that gap; real pencil scans may fall
+  inside it.
 
 Timing here (Windows, Python 3.13): 0.6-2.5 s for a full page, up to 3 s for the
 dense pattern; mostly-ink pages stop at the scan bound in under 1 s.
@@ -314,7 +339,8 @@ every page, odd pages right-hand:
 
 ## Preflight
 
-`book preflight` runs the separate ruleset `puzzlepress-kdp-coloring` v1, so
+`book preflight` runs the separate ruleset `puzzlepress-kdp-coloring` v2 (2 adds
+`faint_strokes_erased` to line quality), so
 word-search reports keep their ruleset and bytes. Shared rules keep their codes and
 evaluators: `interior_artifacts`, `manifest_format`, `manifest_book`,
 `manifest_pdf_digest`, `interior_identity`, `source_current`,
@@ -345,9 +371,8 @@ evaluators: `interior_artifacts`, `manifest_format`, `manifest_book`,
 | `coloring_thin_lines` | KDP | blocking | `thin_lines_destroyed` |
 | `coloring_heavy_ink` | KDP | warning | `heavy_ink` |
 | `coloring_gray_background` | KDP | warning | `background_tint` |
-| `coloring_faint_lines` | KDP | warning | `large_change` | warning | mean change over 40 levels: a prompt to compare, not a defect |
-| `faint_lines` | warning | the darkest tenth of the line work (gray 200 or darker) is lighter than gray 64 (75 % ink) | |
-| `coloring_line_quality` | KDP | warning | `thin_lines_lost`, `detail_lost`, `strokes_broken`, `specks_remaining`, `prepared_touches_edge` |
+| `coloring_faint_lines` | KDP | warning | `faint_lines`: the darkest tenth of the line work (gray 200 or darker) is lighter than gray 64 (75 % ink) |
+| `coloring_line_quality` | KDP | warning | `thin_lines_lost`, `detail_lost`, `faint_strokes_erased`, `strokes_broken`, `specks_remaining`, `prepared_touches_edge` |
 | `coloring_duplicate_artwork` | KDP | warning | the same file under two entries, or a drawing on several pages |
 | `coloring_similar_artwork` | KDP | info (manual review) | two files look alike (the duplicate heuristic) |
 | `coloring_visual_review` | KDP | info (manual review) | `large_change` |
@@ -428,25 +453,39 @@ the inspected file (`GET /api/projects/{key}/interior/pdf?pdf=<sha256>`; 409
 the proof out of date with the reasons and a Rebuild button; the word-search
 production rebuild panel is not offered.
 
+## Studio Pages
+
+**Pages** (`/books/{key}/pages`) edits the composition visually: drawings and
+section dividers in printing order (drag and drop, or Up and Down for keyboard
+use), add a drawing from the library, repeat one on purpose (flagged as used more
+than once), remove a page entry (the file stays in the library), divider titles
+and text, the title, language and title-page details, copyright, instructions and
+back matter, blank backs, the border, the recto start and page numbering, with
+undo. Python plans every draft (debounced; only the newest answer is shown, and a
+busy engine is retried): each entry shows its PDF page and side, and the preview
+lays the plan out as spreads, marking the blank pages Python added and why, the
+printed page numbers, and the live area and art box from Python's geometry for the
+default profile. It is a plan preview drawn from small thumbnails; Print proof
+shows the built pages. The built interior's state (missing, current, out of date)
+and its finding counts are shown, and saving a new order makes it out of date.
+Pages, Cover and Publishing share one draft saved with the revision check.
+
 ## Limitations
 
 8.5 x 11 in, no bleed only: art always prints inside the margins. No auto-crop, no
-captions, no per-page placement or scale: every drawing is fitted whole into the
-same art box. Covers, publishing metadata, production and packages are not
-available for coloring books. Studio has no page-order or composition editor; the
-composition is edited in `book.yaml`. The similarity heuristic and every preparation
-threshold were measured on synthetic drawings only; real scans need review, and no
-real artwork was available to this engine (real books live outside it). Line work
-lighter than gray 128 in the original is not counted by the fine-line and detail
-measures, so contrast that pushes faint pencil lines to white is not reported (seen
-on the synthetic pencil page at contrast 2.5, whose 1-px gray lines vanished). A
+per-page placement or scale: every drawing is fitted whole into the same art box,
+and no caption is printed. The similarity heuristic and every preparation threshold
+were measured on synthetic drawings only; no genuine coloring artwork was available
+to this engine (real books live outside it), so real scans need the human review in
+[coloring-publishing.md](coloring-publishing.md#real-artwork-review). Light-stroke
+detection cannot tell construction lines from detail; it asks for a comparison. A
 coloring interior is byte-reproducible only with the zlib implementation and Pillow
 it was rendered with; elsewhere preflight reports the difference and does not claim
-a match. Preflight re-prepares every drawing with its measures (about 0.6 s for each
-synthetic full-size drawing), so it is the slow step: about 1.5 minutes at 150
-drawings, and Studio's first proof of a long book waits that long. The difference preview colors changes of
-ink (level 128 or darker) only, so a faint gray stroke that fades further is not
-shown. Prepared images exist only in memory (Studio cache), in a built PDF, or
-where `prepare --output` writes them; nothing is cached on disk. Studio has no
-artwork trash controls (the CLI's `remove --trash` and the asset library API do
-this). Inspection costs about 0.1 s and preparation 0.6-3 s per full-size drawing.
+a match. Preflight still prepares and measures every drawing once per process (about
+0.6 s each; see the measurements in coloring-publishing.md); measures and packed
+pixels are remembered in memory by content address for the rest of the process,
+never on disk, so a second preflight or a readiness check in the same run reuses
+them. Prepared images exist only in memory, in a built PDF, or where `prepare
+--output` writes them. Studio has no artwork trash controls (the CLI's `remove
+--trash` and the asset library API do this) and no graphical illustration editor.
+Inspection costs about 0.1 s and preparation 0.6-3 s per full-size drawing.

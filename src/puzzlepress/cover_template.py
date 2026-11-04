@@ -7,9 +7,13 @@ the imported fonts it uses. It never holds a book's identity: no title, author
 or imprint words, no back-cover copy, no photograph and no attestation.
 
 Book-bound words are semantic bindings resolved when a template is applied:
-`{title}`, `{subtitle}`, `{author}`, `{imprint}`, `{puzzle_count}`,
-`{theme_count}` and `{solutions}`. Text whose binding has no value in the book
-is left out rather than invented. Photographs are numbered slots filled with
+`{title}` (the book title), `{subtitle}`, `{author}`, `{imprint}`,
+`{puzzle_count}`, `{theme_count}` and `{solutions}` (word search) and
+`{artwork_count}` (coloring pages). Text whose binding has no value in the book
+is left out rather than invented, so a word-search binding never prints on a
+coloring cover. `{page_count}` and `{trim_size}` are live variables
+(puzzlepress.cover.variables): applying a template keeps them as written, and
+the cover layout fills them in from the built interior. Photographs are numbered slots filled with
 the cover's own photographs in stack order; an unfilled required slot becomes
 a visible placeholder, never an unrelated picture. Spine boxes may say
 `"width": "spine"` so they follow the built interior's spine.
@@ -29,6 +33,7 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 from .content_validation import _Reader
+from .cover.variables import LIVE_VARIABLES
 from .cover_config import (
     METADATA_ROLES,
     CoverConfig,
@@ -52,7 +57,18 @@ MAX_SLOTS = 4
 IDENTITY_PREFIX = "pp1-cover-template-sha256-"
 # The reference trim template coordinates are authored against (8.5 x 11 in).
 REFERENCE_TRIM = (612.0, 792.0)
-BINDINGS = ("title", "subtitle", "author", "imprint", "puzzle_count", "theme_count", "solutions")
+BINDINGS = (
+    "title",
+    "subtitle",
+    "author",
+    "imprint",
+    "puzzle_count",
+    "theme_count",
+    "solutions",
+    "artwork_count",
+    "page_count",
+    "trim_size",
+)
 BINDING = re.compile(r"\{([a-z_]+)\}")
 TEMPLATE_FIELDS = {
     "template_version",
@@ -200,9 +216,17 @@ def template_values(project: Project) -> dict[str, str]:
         themes = {p.theme for p in puzzles if p.theme}
         if len(themes) >= 2:
             values["theme_count"] = str(len(themes))
+    if project.coloring is not None and project.coloring.artwork_pages:
+        values["artwork_count"] = str(len(project.coloring.artwork_pages))
     composition = project.composition
-    if composition is not None and composition.solutions.placement.value == "end":
+    if (
+        project.coloring is None
+        and composition is not None
+        and composition.solutions.placement.value == "end"
+    ):
         values["solutions"] = "Solutions at the back"
+    # Live variables stay in the text; the cover layout fills them in.
+    values.update({name: "{" + name + "}" for name in LIVE_VARIABLES})
     return values
 
 

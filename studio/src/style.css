@@ -4787,3 +4787,187 @@ button.primary.danger {
   align-items: center;
   gap: var(--space-1);
 }
+
+/* Coloring Pages composer: authored order on the left, Python's plan on the right. */
+.coloring-pages-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.coloring-pages-editor > section,
+.coloring-pages-preview {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
+  min-width: 0;
+}
+.coloring-pages-preview {
+  position: sticky;
+  top: var(--space-2);
+  max-height: calc(100vh - 2 * var(--space-2));
+  overflow: auto;
+}
+.page-order {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+.page-order > li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.page-order > li.dragging {
+  opacity: 0.55;
+  background: var(--wash);
+}
+.drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 44px;
+  user-select: none;
+}
+.page-thumb {
+  width: 44px;
+  height: 57px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.divider-thumb {
+  display: grid;
+  place-items: center;
+  color: var(--green);
+  font-size: 22px;
+}
+.page-order-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.page-order-body strong {
+  overflow-wrap: anywhere;
+}
+.page-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.page-order-actions button,
+.add-entry button {
+  min-height: 44px;
+}
+.add-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+.add-entry .editor-field {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.page-spreads {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 14px;
+}
+.page-spreads .spread {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.page-spreads .spread.first {
+  grid-template-columns: 1fr 1fr;
+}
+.page-spreads .spread.first .page-card {
+  grid-column: 2;
+}
+.page-card {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.page-card svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+.page-card .trim {
+  fill: #fff;
+  stroke: #969e91;
+  stroke-width: 2;
+}
+.page-card .live {
+  fill: none;
+  stroke: var(--green);
+  stroke-dasharray: 8 6;
+  stroke-width: 2;
+}
+.page-card .art {
+  fill: none;
+  stroke: #b36b00;
+  stroke-width: 2;
+}
+.page-card .label {
+  font: 600 34px var(--sans, sans-serif);
+  fill: var(--ink);
+}
+.page-card.automatic svg {
+  background: repeating-linear-gradient(135deg, #fff 0 10px, var(--canvas) 10px 20px);
+}
+.page-card.automatic .trim {
+  fill: transparent;
+  stroke-dasharray: 10 8;
+}
+.page-card figcaption {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.coloring-start {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+}
+@media (max-width: 1150px) {
+  .coloring-pages-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .coloring-pages-preview {
+    position: static;
+    max-height: none;
+  }
+}
+@media (max-width: 600px) {
+  .page-order > li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .page-order > li .drag-handle {
+    display: none;
+  }
+  .page-order-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .page-spreads .spread {
+    gap: 2px;
+  }
+}

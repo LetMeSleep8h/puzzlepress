@@ -41,6 +41,7 @@ from ..coloring_config import Adjustments
 from .components import TooMuchInk, isolated_specks, label, paint_white, remove_isolated
 from .inspection import INK_LEVEL, _edges, _reduced, flattened, open_artwork
 from .issues import ArtworkError, ArtworkFinding, Severity
+from .memo import Memo
 
 PREPARATION_VERSION = 1
 MAX_PREPARE_PIXELS = 40_000_000  # 5100 x 6600 is 8.5 x 11 in at 600 DPI (33.7 MP).
@@ -72,6 +73,17 @@ CHANGE_REVIEW = 40.0  # Mean absolute change (levels) worth a visual review.
 LINE_LEVEL = 200
 LINE_CORE_SHARE = 0.10
 FAINT_CORE = 64  # 75% ink.
+# Faint strokes: original gray lighter than ink (INK_LEVEL) but at most FAINT_LEVEL,
+# counted only where at least FAINT_NEIGHBORS of the 3 x 3 neighbourhood is drawn, so
+# paper grain and isolated noise are not line work. Such a pixel is kept while the
+# prepared page prints it at FAINT_KEPT or darker (about 12 % ink). Ink measures above
+# never see these strokes, which is how contrast or a threshold could erase pencil
+# lines without a finding. Conventions, not print guarantees (docs/coloring.md).
+FAINT_LEVEL = 200
+FAINT_KEPT = 224
+FAINT_NEIGHBORS = 3
+FAINT_MIN_SHARE = 0.001  # Measured only when faint strokes cover 0.1 % of the page.
+FAINT_ERASED = 0.50  # Share kept below which the faint strokes are reported.
 
 
 def cache_key(sha256: str, adjustments: Adjustments) -> str:
@@ -145,6 +157,24 @@ def _count(mask: Image.Image) -> int:
     return mask.histogram()[255]
 
 
+def faint_mask(reference: Image.Image) -> Image.Image:
+    """Faint stroke pixels of the original: lighter than ink, at most FAINT_LEVEL, with
+    at least FAINT_NEIGHBORS drawn pixels (faint or ink) in their 3 x 3 block, and not
+    touching ink: the gray rim of an anti-aliased black line is part of that line, and
+    a threshold that drops the rim keeps the line."""
+    drawn = reference.point(lambda v: 255 if v <= FAINT_LEVEL else 0)
+    # Sum of the 3 x 3 drawn pixels, as a count 0..9 scaled by 255.
+    density = drawn.filter(ImageFilter.Kernel((3, 3), [1] * 9, scale=9))
+    dense = density.point(lambda v: 255 if v * 9 >= FAINT_NEIGHBORS * 255 - 4 else 0)
+    faint = reference.point(lambda v: 255 if INK_LEVEL < v <= FAINT_LEVEL else 0)
+    near_ink = _mask(reference).filter(ImageFilter.MaxFilter(3))
+    return ImageChops.subtract(ImageChops.darker(faint, dense), near_ink)
+
+
+def _visible(gray: Image.Image) -> Image.Image:
+    return gray.point(lambda v: 255 if v <= FAINT_KEPT else 0)
+
+
 @dataclass(frozen=True)
 class PreparationMeasures:
     pixels: tuple[int, int]
@@ -163,6 +193,11 @@ class PreparationMeasures:
     new_edges: tuple[str, ...] = ()  # Image edges ink reaches only after preparation.
     # Gray of the darkest tenth of the prepared line work; None with no line work.
     line_core_level: int | None = None
+    # Faint strokes in the original (gray INK_LEVEL+1..FAINT_LEVEL in stroke-like
+    # groups) and the share still printed visibly; None when there are too few.
+    # 0 when under FAINT_MIN_SHARE of the original is gray 129-200 (not counted then).
+    faint_line_pixels: int = 0
+    faint_line_retention: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -181,6 +216,8 @@ class PreparationMeasures:
             "paper_level_after": self.paper_level_after,
             "mean_change": self.mean_change,
             "line_core_level": self.line_core_level,
+            "faint_line_pixels": self.faint_line_pixels,
+            "faint_line_retention": self.faint_line_retention,
         }
 
 
@@ -243,12 +280,35 @@ def _pipeline(
     return reference, out, removed
 
 
+# Measures and findings by preparation address (puzzlepress.coloring.memo): a few
+# hundred bytes each, so the bound is on entries.
+MEASURED: Memo[tuple["PreparationMeasures", tuple[ArtworkFinding, ...]]] = Memo(
+    entries=4096, size=4096, measure=lambda _: 1
+)
+
+
 def prepare_artwork(data: bytes, adjustments: Adjustments, name: str = "") -> Prepared:
     """Prepare one original. Raises ArtworkError; never falls back to other settings."""
     reference, out, removed = _pipeline(data, adjustments, name)
     measures = _measure(reference, out, removed)
     key = cache_key(hashlib.sha256(data).hexdigest(), adjustments)
-    return Prepared(key, adjustments, reference, out, measures, _findings(measures, adjustments))
+    findings = _findings(measures, adjustments)
+    MEASURED.put(key, (measures, findings))
+    return Prepared(key, adjustments, reference, out, measures, findings)
+
+
+def measure_artwork(
+    data: bytes, adjustments: Adjustments, name: str = ""
+) -> tuple["PreparationMeasures", tuple[ArtworkFinding, ...]]:
+    """The measures and findings `prepare_artwork` gives, computed once per preparation
+    address in this process. `data` must already be verified against its pinned digest.
+    Errors are never remembered: a failing original fails again on every call."""
+    key = cache_key(hashlib.sha256(data).hexdigest(), adjustments)
+    known = MEASURED.get(key)
+    if known is not None:
+        return known
+    prepared = prepare_artwork(data, adjustments, name)
+    return prepared.measures, prepared.findings
 
 
 def prepared_pixels(data: bytes, adjustments: Adjustments, name: str = "") -> Image.Image:
@@ -327,6 +387,17 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     change = ImageChops.difference(reference, out)
     mean_change = sum(level * count for level, count in enumerate(change.histogram())) / total
     core = _line_core(out.histogram(), total)
+    # Light strokes are a subset of the gray 129-200 pixels: when the histogram shows
+    # too few of those to measure, the filters are skipped (the result is the same).
+    candidates = sum(reference.histogram()[INK_LEVEL + 1 : FAINT_LEVEL + 1])
+    faint_pixels = faint_kept = 0
+    if candidates >= FAINT_MIN_SHARE * total:
+        faint = faint_mask(reference)
+        faint_pixels = _count(faint)
+        faint_kept = (
+            faint_pixels if out is reference else _count(ImageChops.darker(faint, _visible(out)))
+        )
+    measurable = faint_pixels >= FAINT_MIN_SHARE * total
     return PreparationMeasures(
         pixels=(width, height),
         ink_before=round(ink_before / total, 4),
@@ -343,6 +414,8 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
         not_measured=tuple(not_measured),
         new_edges=new_edges,
         line_core_level=core,
+        faint_line_pixels=faint_pixels,
+        faint_line_retention=round(faint_kept / faint_pixels, 4) if measurable else None,
     )
 
 
@@ -472,6 +545,18 @@ def _findings(m: PreparationMeasures, adjustments: Adjustments) -> tuple[Artwork
             f"darkest lines gray {m.line_core_level}",
             f"at most {FAINT_CORE}",
         )
+    if m.faint_line_retention is not None and m.faint_line_retention < FAINT_ERASED:
+        add(
+            "faint_strokes_erased",
+            Severity.WARNING,
+            "Light gray strokes in the original (pencil lines, soft shading or fine detail) "
+            "mostly no longer print after preparation. They may be construction lines you "
+            "meant to remove, or detail you meant to keep: compare the original with the "
+            "difference view (orange marks erased light strokes). Lower the contrast or "
+            "raise the threshold to keep them.",
+            f"{m.faint_line_retention:.0%} of light strokes kept",
+            f"at least {FAINT_ERASED:.0%}",
+        )
     if m.specks_per_megapixel_after is not None and (
         m.specks_per_megapixel_after > SPECKS_PER_MP_WARNING
     ):
@@ -518,13 +603,21 @@ def _fit(image: Image.Image, side: int) -> Image.Image:
 KEPT_COLOR = (64, 64, 64)
 REMOVED_COLOR = (214, 40, 40)
 ADDED_COLOR = (36, 90, 214)
+FAINT_KEPT_COLOR = (176, 176, 176)
+FAINT_ERASED_COLOR = (232, 134, 0)
 
 
 def difference_image(reference: Image.Image, prepared: Image.Image) -> Image.Image:
-    """Ink kept in dark gray, ink removed in red, ink added in blue, paper white."""
+    """Ink kept in dark gray, ink removed in red, ink added in blue; light strokes kept in
+    light gray and light strokes erased in orange; paper white."""
     before = _mask(reference)
     after = _mask(prepared)
     image = Image.new("RGB", reference.size, (255, 255, 255))
+    if any(reference.histogram()[INK_LEVEL + 1 : FAINT_LEVEL + 1]):
+        faint = faint_mask(reference)
+        visible = _visible(prepared)
+        image.paste(FAINT_KEPT_COLOR, mask=ImageChops.darker(faint, visible))
+        image.paste(FAINT_ERASED_COLOR, mask=ImageChops.subtract(faint, visible))
     image.paste(KEPT_COLOR, mask=ImageChops.darker(before, after))
     image.paste(REMOVED_COLOR, mask=ImageChops.subtract(before, after))
     image.paste(ADDED_COLOR, mask=ImageChops.subtract(after, before))
@@ -553,6 +646,7 @@ __all__ = [
     "PreparationMeasures",
     "cache_key",
     "difference_image",
+    "measure_artwork",
     "prepare_artwork",
     "prepared_png",
     "preview_png",

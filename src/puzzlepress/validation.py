@@ -182,25 +182,23 @@ def validate_project(data: object) -> ValidationResult:
             root["composition"], "word_search" in root, coloring=engine is EngineKind.COLORING
         )
         issues.extend(composition_issues)
-    if engine is EngineKind.COLORING:
-        # Covers, publishing metadata and interior styles read word-search content in
-        # this version; coloring books get them in a later version, never half-applied.
-        for section in ("cover", "publishing", "interior"):
-            if section in root:
-                issue(
-                    section,
-                    "not_available_for_engine",
-                    f"Coloring books cannot have a {section} section in this version. "
-                    "Remove it; the coloring interior builds without it.",
-                )
+    if engine is EngineKind.COLORING and "interior" in root:
+        # Interior styles (puzzle grids, word lists, solution pages, theme photos) are
+        # word-search typography; a coloring book's layout lives in `coloring.layout`.
+        issue(
+            "interior",
+            "not_available_for_engine",
+            "Coloring books cannot have an interior style section. Remove it; the "
+            "coloring layout (border, blank backs) is set in coloring.layout.",
+        )
     cover = None
-    if "cover" in root and engine is not EngineKind.COLORING:
+    if "cover" in root:
         cover, cover_issues = validate_cover(root["cover"], "composition" in root)
         issues.extend(cover_issues)
     publishing = None
-    if "publishing" in root and engine is not EngineKind.COLORING:
+    if "publishing" in root:
         publishing, publishing_issues = validate_publishing(
-            root["publishing"], "composition" in root
+            root["publishing"], "composition" in root, coloring=engine is EngineKind.COLORING
         )
         issues.extend(publishing_issues)
     if composition is not None and composition.dividers is not None and word_search is not None:

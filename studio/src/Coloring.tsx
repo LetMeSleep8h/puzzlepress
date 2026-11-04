@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdjustPanel } from './AdjustPanel';
 import { ApiError, request, upload } from './api';
+import { ColoringPages } from './ColoringPages';
+import { Cover } from './Cover';
+import { useDraft } from './draft';
 import { Print } from './Print';
+import { Publishing } from './Publishing';
 import type { ArtworkEntry, ColoringListing, Project } from './types';
 import { Empty, ErrorState, Loading, Status } from './ui';
 
-// Coloring books in this version: an artwork library and print proofs of the built
-// interior. Every fact, finding, page and duplicate below is Python's; the browser
-// only displays it and sends files.
+// Coloring books: artwork library, pages, cover, print proofs and publishing. Every
+// fact, finding, page and duplicate below is Python's; the browser only displays it,
+// edits the authored source and sends files.
 const SECTIONS: [string, string][] = [
   ['artwork', 'Artwork'],
+  ['pages', 'Pages'],
+  ['cover', 'Cover'],
   ['print', 'Print proof'],
+  ['publishing', 'Publishing'],
 ];
+const DRAFT_SECTIONS = ['pages', 'cover', 'publishing'];
 
 export function ColoringNav({ base, section }: { base: string; section: string }) {
   return (
@@ -41,17 +49,44 @@ export function ColoringNav({ base, section }: { base: string; section: string }
   );
 }
 
-export function ColoringWorkspace({ project, section }: { project: Project; section: string }) {
+export function ColoringWorkspace({
+  project,
+  section,
+  onDirty = () => {},
+  onSaved = () => {},
+}: {
+  project: Project;
+  section: string;
+  onDirty?: (dirty: boolean) => void;
+  onSaved?: (project: Project) => void;
+}) {
+  // One draft for Pages, Cover and Publishing, saved atomically with a revision check.
+  const draft = useDraft(project, onSaved, onDirty);
+  // The artwork panel saves imports, removals and settings directly. Coming back to the
+  // draft sections, a clean draft reloads the saved source so it sees them; a draft
+  // with unsaved edits is kept, and saving it then reports the changed source.
+  const previous = useRef(section);
+  useEffect(() => {
+    const left = previous.current;
+    previous.current = section;
+    if (
+      DRAFT_SECTIONS.includes(section) &&
+      !DRAFT_SECTIONS.includes(left) &&
+      !draft.dirty &&
+      !draft.busy
+    )
+      void draft.run('reload');
+    // Only a change of section triggers a reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
   if (section === 'overview') return <ColoringOverview project={project} />;
   if (section === 'artwork') return <Artwork projectKey={project.key} />;
-  // Coloring sources are edited as files and through the artwork panel, which saves
-  // directly, so the print proof never has unsaved Studio changes to warn about.
-  if (section === 'print') return <Print project={project} dirty={false} />;
+  if (section === 'print') return <Print project={draft.saved} dirty={draft.dirty} />;
+  if (section === 'pages') return <ColoringPages d={draft} />;
+  if (section === 'cover') return <Cover d={draft} />;
+  if (section === 'publishing') return <Publishing d={draft} />;
   return (
-    <Empty title="Not available for coloring books yet">
-      This version imports, prepares and prints coloring-book artwork. Covers and publishing for
-      coloring books are not available yet.
-    </Empty>
+    <Empty title="This page does not exist for coloring books">Use the navigation above.</Empty>
   );
 }
 

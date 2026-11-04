@@ -95,14 +95,15 @@ def run_publish_command(args: argparse.Namespace) -> int:
 
 
 def _validate(loaded: LoadedProject, args: argparse.Namespace) -> int:
-    from .publishing import RULESET_ID, RULESET_VERSION, validate_metadata
+    from .publishing import validate_metadata
 
     report = validate_metadata(loaded.project)
     if args.json:
         _bytes(_json_bytes(report.to_dict()))
         return 0 if report.valid else 1
     verdicts = report.verdicts()
-    print(f"Publishing metadata: {report.book_id} ({RULESET_ID} v{RULESET_VERSION})")
+    ruleset = report.ruleset
+    print(f"Publishing metadata: {report.book_id} ({ruleset.id} v{ruleset.version})")
     print(f"Metadata: {verdicts['metadata'].upper()}")
     print(f"AI disclosure: {verdicts['disclosure'].upper()}")
     print(f"Author confirmations: {verdicts['attestations'].upper()}")
@@ -138,7 +139,7 @@ def _confirmations(loaded: LoadedProject, states: "tuple[Confirmation, ...]") ->
 
 
 def _inspect(loaded: LoadedProject, args: argparse.Namespace) -> int:
-    from .publishing import RULESET_ID, RULESET_VERSION, evaluate_readiness, readiness_bytes
+    from .publishing import evaluate_readiness, readiness_bytes
     from .publishing.package import PackageError, assemble_package, export_state
 
     source = loaded.source_path.parent
@@ -157,7 +158,8 @@ def _inspect(loaded: LoadedProject, args: argparse.Namespace) -> int:
     v = report.verdicts()
     interior, cover = v["interior"], v["cover"]
     assert isinstance(interior, dict) and isinstance(cover, dict)
-    print(f"Publishing readiness: {report.book_id} ({RULESET_ID} v{RULESET_VERSION})")
+    ruleset = report.metadata.ruleset
+    print(f"Publishing readiness: {report.book_id} ({ruleset.id} v{ruleset.version})")
     print(
         f"Metadata: {v['metadata']} | AI disclosure: {v['disclosure']} | "
         f"confirmations: {v['attestations']}"

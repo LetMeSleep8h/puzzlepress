@@ -149,7 +149,9 @@ def _image(canvas: Canvas, block: ImageBlock, jpeg: bytes, size: tuple[int, int]
     """Embed the grayscale JPEG unchanged as one DCTDecode DeviceGray XObject, clipped."""
     name = "PPInteriorPhoto" + hashlib.sha256(jpeg).hexdigest()[:16]
     raw: Any = canvas  # ReportLab's private registration API (pinned 5.0.x).
-    if name not in raw._formsinuse:
+    # Registered once per document: `_formsinuse` is reset on every page, so checking
+    # it re-registered a photograph shown on a second page and ReportLab refused it.
+    if raw._doc.idToObject.get(raw._doc.getXObjectName(name)) is None:
         image: Any = pdfdoc.PDFImageXObject(name)
         image.width, image.height = size
         image.bitsPerComponent = 8

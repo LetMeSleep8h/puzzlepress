@@ -318,16 +318,31 @@ def produce(
     loaded = load_project(project_path)
     project = loaded.project
     if project.coloring is not None:
-        raise ProjectError(
-            (
-                ValidationIssue(
-                    "coloring",
-                    "not_available_for_engine",
-                    "book produce packages word-search books in this version. Build and "
-                    "check a coloring interior with `book build` and `book preflight`.",
-                ),
+        # Previous-book word comparison, expected puzzle counts and photo manifests are
+        # word-search checks; refused rather than silently ignored.
+        unused = [
+            name
+            for name, given in (
+                ("--previous", bool(previous)),
+                ("--expected-puzzles", expected_puzzles is not None),
+                ("--photos", photo_manifest is not None),
             )
-        )
+            if given
+        ]
+        if unused:
+            raise ProjectError(
+                (
+                    ValidationIssue(
+                        "coloring",
+                        "not_applicable_for_engine",
+                        f"{', '.join(unused)} compare word-search puzzles and photographs; "
+                        "coloring books check their artwork for duplicates within the book.",
+                    ),
+                )
+            )
+        from .coloring import produce_coloring
+
+        return produce_coloring(loaded, output, profile)
     source = loaded.source_path.parent
     protected = [source, *(Path(p) for p in previous)]
     manifest = None

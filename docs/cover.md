@@ -9,6 +9,14 @@ lines and text boxes ([production design](production-design-polish.md)). It is n
 an image editor and has no AI generation, stock search, effects, transparency or
 free-form paths.
 
+Word-search and coloring books share this cover unchanged: the cover reads only
+the built interior's page count, trim and paper, so a coloring cover's spine is
+sized from the coloring interior exactly like a word-search one. A cover may use
+a drawing as its photograph (imported into `cover-assets` like any photo). Text
+boxes may print `{page_count}` and `{trim_size}`, filled in from the verified
+interior whenever the cover is laid out
+([template variables](cover-templates-rich-text.md)).
+
 ```text
 interior.pdf + interior.json ──> verified interior facts (page count, trim, paper)
                                          │

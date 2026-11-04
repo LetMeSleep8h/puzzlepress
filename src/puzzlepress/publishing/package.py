@@ -24,12 +24,10 @@ from ..cover.preflight import RULESET_VERSION as COVER_RULESET_VERSION
 from ..identity import IDENTITY_VERSION
 from ..interior.build import check_output_directory
 from ..interior.issues import InteriorError
-from ..preflight.model import RULESET_ID as INTERIOR_RULESET_ID
-from ..preflight.model import RULESET_VERSION as INTERIOR_RULESET_VERSION
+from ..preflight.engine import ruleset_for as interior_ruleset_for
 from .identity import canonical
 from .provenance import provenance_record
 from .readiness import PublishingReadinessReport, readiness_bytes
-from .rules import RULESET_ID, RULESET_VERSION
 from .submission import checklist_markdown, kdp_metadata
 
 PACKAGE_VERSION = 1
@@ -81,14 +79,16 @@ class PublishingPackage:
 def identity_inputs(
     report: PublishingReadinessReport, entries: list[dict[str, object]]
 ) -> dict[str, object]:
+    publishing = report.metadata.ruleset
+    interior_id, interior_version = interior_ruleset_for(report.project)
     return {
         "package_version": PACKAGE_VERSION,
         "book_id": report.book_id,
         "identities": report.identities(),
         "print": report.print_configuration(),
         "rulesets": {
-            "publishing": {"id": RULESET_ID, "version": RULESET_VERSION},
-            "interior": {"id": INTERIOR_RULESET_ID, "version": INTERIOR_RULESET_VERSION},
+            "publishing": {"id": publishing.id, "version": publishing.version},
+            "interior": {"id": interior_id, "version": interior_version},
             "cover": {"id": COVER_RULESET_ID, "version": COVER_RULESET_VERSION},
         },
         "files": entries,

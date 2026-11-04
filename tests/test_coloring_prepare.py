@@ -30,6 +30,7 @@ from puzzlepress.coloring_config import Adjustments
 from puzzlepress.coloring_validation import validate_adjustments
 from puzzlepress.errors import ProjectError
 from tests.coloring_helpers import (
+    FULL_SIZE,
     dense_pattern,
     encode,
     fine_detail,
@@ -155,7 +156,10 @@ def test_thinning_thick_lines_slightly_is_not_a_finding():
 
 def test_a_threshold_that_erases_faint_lines_is_blocking():
     pencil = encode(pencil_sketch(0))
-    assert codes(prepare_artwork(pencil, Adjustments(threshold=0.5))) == []
+    # Interval 5: a 0.5 threshold keeps every ink line (gray 128 or darker) but erases
+    # the sketch's light pencil strokes; that is now reported, as a warning only.
+    assert codes(prepare_artwork(pencil, Adjustments(threshold=0.5))) == ["faint_strokes_erased"]
+    assert codes(prepare_artwork(pencil, Adjustments(threshold=0.7))) == []
     erased = prepare_artwork(pencil, Adjustments(threshold=0.35))
     assert severity(erased, "prepared_blank") == "blocking"
     assert severity(erased, "thin_lines_destroyed") == "blocking"
@@ -519,3 +523,85 @@ def test_black_line_art_is_not_faint_but_half_size_hairlines_are():
     assert "faint_lines" in [f.code for f in hairlines.findings]
     blank = prepare_artwork(encode(Image.new("L", (300, 300), 255)), Adjustments())
     assert blank.measures.line_core_level is None
+
+
+# ---------------------------------------------------------------- faint strokes (Interval 5)
+
+
+def _antialiased(seed: int) -> Image.Image:
+    big = line_art(seed, (FULL_SIZE[0] * 3, FULL_SIZE[1] * 3), line=8)
+    return big.resize(FULL_SIZE, Image.Resampling.LANCZOS)
+
+
+@pytest.mark.parametrize(
+    ("settings", "erased"),
+    [
+        ({}, False),
+        ({"contrast": 1.6}, False),
+        ({"threshold": 0.7}, False),
+        ({"background_cleanup": 0.6}, False),
+        ({"contrast": 2.5}, True),
+        ({"brightness": 0.3}, True),
+        ({"line_weight": -1}, True),
+    ],
+)
+def test_erased_light_strokes_are_reported(settings, erased):
+    prepared = prepare_artwork(encode(pencil_sketch(0)), Adjustments(**settings))
+    retention = prepared.measures.faint_line_retention
+    assert retention is not None and prepared.measures.faint_line_pixels > 10_000
+    assert (retention < prepare.FAINT_ERASED) is erased
+    finding = [f for f in prepared.findings if f.code == "faint_strokes_erased"]
+    assert bool(finding) is erased
+    assert all(f.severity.value == "warning" for f in finding)  # never blocking
+
+
+def test_antialiased_rims_of_black_lines_are_not_faint_strokes():
+    # The gray rim of an anti-aliased line belongs to the line: a threshold that
+    # drops it keeps the line, so nothing is reported.
+    data = encode(_antialiased(8))
+    for threshold in (0.35, 0.5):
+        prepared = prepare_artwork(data, Adjustments(threshold=threshold))
+        assert prepared.measures.faint_line_retention is None
+        assert "faint_strokes_erased" not in codes(prepared)
+
+
+def test_difference_view_marks_erased_light_strokes_in_orange():
+    prepared = prepare_artwork(encode(pencil_sketch(0)), Adjustments(contrast=2.5))
+    colors = {
+        color
+        for _, color in prepare.difference_image(prepared.reference, prepared.image).getcolors(
+            2**24
+        )
+    }
+    assert prepare.FAINT_ERASED_COLOR in colors
+    kept = prepare_artwork(encode(pencil_sketch(0)), Adjustments())
+    colors = {
+        color for _, color in prepare.difference_image(kept.reference, kept.image).getcolors(2**24)
+    }
+    assert prepare.FAINT_ERASED_COLOR not in colors and prepare.FAINT_KEPT_COLOR in colors
+
+
+def test_measures_are_remembered_by_content_address_only():
+    prepare.MEASURED.clear()
+    data = png(41)
+    first = prepare.measure_artwork(data, Adjustments(contrast=1.3))
+    assert prepare.MEASURED.misses == 1 and prepare.MEASURED.hits == 0
+    assert prepare.measure_artwork(data, Adjustments(contrast=1.3)) == first
+    assert prepare.MEASURED.hits == 1
+    # Other settings or other bytes are another address.
+    prepare.measure_artwork(data, Adjustments(contrast=1.4))
+    prepare.measure_artwork(png(42), Adjustments(contrast=1.3))
+    assert prepare.MEASURED.hits == 1 and len(prepare.MEASURED) == 3
+    fresh = prepare_artwork(data, Adjustments(contrast=1.3))
+    assert (fresh.measures, fresh.findings) == first
+
+
+def test_memo_holds_its_bounds():
+    from puzzlepress.coloring.memo import Memo
+
+    memo: Memo[bytes] = Memo(entries=3, size=10, measure=len)
+    for key, value in (("a", b"1234"), ("b", b"1234"), ("c", b"123")):
+        memo.put(key, value)
+    assert memo.get("a") is None and memo.get("b") == b"1234"  # size bound dropped "a"
+    memo.put("d", b"x" * 11)  # larger than the whole bound: never held
+    assert memo.get("d") is None and len(memo) == 2

@@ -32,6 +32,19 @@ COVERS = {
     "description, keywords, categories and audience",
     "isbn": "the ISBN option and number, title, subtitle, author and imprint",
 }
+# Coloring books: the rights confirmation covers the artwork, not word lists.
+COLORING_COVERS = {
+    **COVERS,
+    "rights": "every drawing the pages print (by its SHA-256) and its caption, section "
+    "divider titles and text, front and back matter text, the artwork rights declaration, "
+    "the cover's back text, extra cover text, imported cover fonts and every cover "
+    "photograph or artwork",
+}
+
+
+def covers(name: str, coloring: bool) -> str:
+    """What confirmation `name` covers, in words, for this kind of book."""
+    return (COLORING_COVERS if coloring else COVERS)[name]
 
 
 def _content(project: Project) -> dict[str, object]:
@@ -78,6 +91,22 @@ def _content(project: Project) -> dict[str, object]:
             {"sha256": font.sha256, "license": font.license, "source": font.source}
             for font in cover.fonts
         ]
+    # Coloring content, present only for coloring books so word-search reviews stay valid.
+    book = project.coloring
+    if book is not None:
+        used = {artwork_id for _, artwork_id in book.artwork_pages}
+        content["artwork"] = sorted(
+            ({"sha256": art.sha256, "title": art.title} for art in book.artwork if art.id in used),
+            key=canonical,
+        )
+        content["dividers"] = [
+            {"title": page.divider.title, "text": page.divider.text}
+            for page in book.pages
+            if page.divider is not None
+        ]
+        publishing = project.publishing
+        rights = publishing.content_rights if publishing is not None else None
+        content["content_rights"] = rights.to_dict() if rights is not None else None
     return content
 
 

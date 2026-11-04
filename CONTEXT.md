@@ -2,15 +2,58 @@
 
 ## Completed scope
 
-Multi-engine Interval 4 (coloring composition, lossless interior, coloring preflight)
-on branch `feat/multi-engine-coloring`; committed locally, not pushed. Guide:
+Multi-engine Interval 5 (coloring covers, publishing, production and the Studio
+Pages composer) on branch `feat/coloring-publishing`, cut from main after PR #18;
+committed locally, not pushed. Guide: docs/coloring-publishing.md.
+
+- Coloring books take the shared `cover` and `publishing` sections (interior style
+  stays word search). The cover pipeline is unchanged: wrap and spine from the built
+  coloring interior's page count and the profile's paper.
+- Template variables: `{artwork_count}` is an apply-time binding; `{page_count}` and
+  `{trim_size}` are live variables (`cover/variables.py`) kept in the text and
+  filled in by the cover layout from the verified interior, so a page-count change
+  re-renders the number with the spine and stales the cover. Existing covers and
+  templates keep their bytes. Studio warns about a binding typed into a text box.
+- Publishing: separate ruleset `puzzlepress-kdp-publishing-coloring` v1 (word-search
+  reports, packages and identities unchanged). Adds `ai_disclosure.interior_artwork`
+  / `cover_artwork` (written only when present), `content_rights` (own work,
+  commissioned, licensed, public domain, AI tool terms, cover `none`), rules
+  `artwork_origin_declared`, `artwork_origin_consistent`, `content_rights_declared`,
+  `content_rights_review`, coloring low-content wording and drawing-count claims.
+  The rights review identity covers artwork digests and captions, dividers and the
+  declaration. KDP Content Guidelines and Low-Content Books pages re-read
+  2026-11-04; the AI form's option wording was not found on an official page and
+  is not modeled.
+- `book produce` for coloring (`production/coloring.py`): interior, cover, both
+  preflights, `artwork-integrity.json`, `artwork-duplicates.json/.md`, readiness,
+  KDP metadata, package under `publishing/` only when ready, validation and
+  `production.json` v2 (engine, environment, status, guarantee statement). Staged in
+  a sibling directory, verified, swapped; lock file against concurrent runs.
+  Word-search options refused for coloring books. Word-search production unchanged.
+- Light strokes (gray 129-200, stroke-like, not an anti-aliased rim) are measured;
+  `faint_strokes_erased` warning under `coloring_line_quality`; coloring preflight
+  ruleset 2; orange in the difference view. In-process memos (`coloring/memo.py`)
+  for measures and packed pixels keyed by content address (plus deflate level and
+  zlib build for packed bytes).
+- Studio: coloring navigation Overview, Artwork, Pages, Cover, Print proof,
+  Publishing; one draft for Pages/Cover/Publishing. Pages composer
+  (`ColoringPages.tsx`): reorder by drag or buttons, add, repeat, remove, dividers,
+  matter, layout, numbering, undo; Python plan preview with spreads, automatic
+  blanks, numbers and live area/art box from Python geometry; built-interior state.
+  Draft plans of coloring books return incomplete plans with reasons and geometry.
+- Fixed: the router swallowed download links (template Export; reproduced in a
+  browser, now left to the browser); the JPEG interior path re-registered one
+  photograph on a second page (`redefining named object`).
+
+Earlier: multi-engine Interval 4 (coloring composition, lossless interior, coloring
+preflight) on branch `feat/multi-engine-coloring`, merged as PR #18. Guide:
 docs/coloring.md (Composition and page parity, Interior, Preflight).
 
 - Composition for coloring books: front matter, `artwork.start` (recto default),
   back matter, page numbers with `show_artwork`; puzzle and solution settings are
   `not_applicable_for_engine`. `coloring.pages` takes `{divider: {title, text?}}`.
-  Cover, publishing and interior style stay refused for coloring books; `book
-  produce` refuses them.
+  Cover, publishing and interior style stayed refused for coloring books in that
+  interval, and `book produce` refused them (Interval 5 adds all but interior style).
 - `coloring/content.py`: used originals read and verified, prepared with saved
   settings (`prepared_pixels`, the preview pipeline without measures), kept as
   packed deflated samples (1 bit when two-level, else 8). `coloring/plan.py`: plan
@@ -612,6 +655,35 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Coloring covers, publishing, production and Pages, 2026-11-04 (Windows, Python 3.13):
+
+- Baseline before changes (clean main worktree): **2101 passed, 9 skipped**. After:
+  **2151 passed, 9 skipped** (symlink permission), including the golden test against
+  baseline v3 (word-search outputs, PDFs, manifests and reports byte-identical).
+  Ruff lint and format, strict mypy (153 files), pip check, `git diff --check`.
+  AGENTS CLI commands exit as on main (both `publish` commands exit 1 on main too;
+  scratch output directories, since `.pytest_cache` is unreadable here).
+- Frontend: tsc, ESLint, build, Prettier on changed files. Vitest **112/114** in the
+  last full run: two existing word-search tests (Composer "edits matter, policies
+  and keyboard order", Cover "crop controls") hit their 5 s limit at 5.0-5.3 s and
+  pass alone (Composer 8/8, Cover 13/13; the Composer one takes 4.8 s with main's
+  Composer.tsx). All new tests pass. Playwright **38/39**: new `coloring-pages.spec.ts` (keyboard and
+  drag reorder, divider, save, reload, axe, 1440/1024/768/390 without overflow,
+  40 px targets), the template Export download regression and all coloring specs
+  pass; `templates.spec.ts` rich text fails at line 329 as before. Rewritten
+  `docs/images/studio` captures restored.
+- Export bug reproduced in the browser pane before the fix (click prevented, API URL
+  pushed as a route, no request reached the server) and verified after (GET 200).
+- Synthetic production book (`tests/coloring_production.py`): `book produce` ready,
+  complete package, cover prints "28 pages, 8.5 x 11 in" from the built interior.
+- Measurements (same machine, idle): 150 drawings / 302 pages build 20.2 s (main)
+  vs 20.3 s; first preflight 122.9 s vs 100.6 s; second preflight in the process
+  118.4 s vs 14.9 s; peak 147 MB vs 141 MB; coloring produce 125.1 s (120 MB).
+  12-drawing produce 24.5 s without the memo, 14.3 s with it, byte-identical.
+- Real artwork: none available (the books repository has automotive cover
+  photographs only). A read-only inspection of one photograph reported color, gray
+  paper and edge contact. Human review procedure in docs/coloring-publishing.md.
+
 Coloring composition, interior and preflight, 2026-11-04 (Windows):
 
 - Python 3.13: **2101 passed, 9 skipped** (symlink permission, Windows drive paths),
@@ -820,21 +892,20 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
 
 ## Limits and decisions for review
 
+Coloring publishing (Interval 5): no genuine coloring artwork was available; every
+threshold (including light strokes) is calibrated on synthetic drawings and needs
+the human review procedure in docs/coloring-publishing.md. Light-stroke detection
+cannot tell construction lines from detail. The first preflight of a process still
+measures every drawing; the memo helps only repeated work in one process and is
+never on disk. The composer preview draws Python's plan with thumbnails, not built
+pages. No project-creation API or type picker, no generic undo/redo hook, no zoom
+or pan, no illustration editor. KDP's AI form wording, prices and markets are not
+modeled. A stale `.produce.lock` after a crash must be deleted by hand.
+
 Coloring interior (Interval 4): 8.5 x 11 in, no bleed, one art box for every page
-(no auto-crop, captions, per-page placement or scale); no composition or page-order
-editor in Studio; covers, publishing, production and packages not available for
-coloring books. Preflight re-prepares every drawing (about 0.6 s each) and is the
-slow step. Thresholds are synthetic-calibrated conventions; the fine-line and detail
-measures ignore original line work lighter than gray 128, so faint pencil lines that
-contrast pushes to white are not reported. Coloring PDFs are byte-reproducible only
-with the recorded zlib implementation and Pillow. The 300-entry caps were not
-measured at their limit. Found, not fixed (outside this interval): Studio's client
-router intercepts the cover-template Export link (`download` without `target`),
-so that download does not start from a click (read in code, not tried in a
-browser); the photograph JPEG path checks registration per page, so a layout that
-places one photograph on two pages fails to render (`redefining named object`,
-verified with a direct render; whether a real interior style can do that was not
-checked).
+(no auto-crop, captions, per-page placement or scale). Coloring PDFs are
+byte-reproducible only with the recorded zlib implementation and Pillow. The
+300-entry caps were not measured at their limit.
 
 Line-art preparation (Interval 3): thresholds are conventions measured on
 synthetic drawings only (fine-line retention never fell between 0.05 and 0.99

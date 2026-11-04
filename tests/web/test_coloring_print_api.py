@@ -56,7 +56,7 @@ def test_build_preflight_and_page_meanings(client):
     assert status["build"] == {"success": True}
     report = status["report"]
     assert report["ruleset"]["id"] == "puzzlepress-kdp-coloring"
-    assert status["ruleset"] == 1
+    assert status["ruleset"] == 2  # 2: erased light strokes (Interval 5)
     assert report["structural"]["status"] == "valid"
     pages = status["preview"]["pages"]
     assert [(p["physical_page"], p["side"], p["kind"], p["folio"]) for p in pages] == [
@@ -145,3 +145,43 @@ def test_frontend_fixtures_match_the_engine_output(client):
 
     assert meaning(stored) == meaning(status)
     assert detail["source"] == project["source"] and detail["engine"] == project["engine"]
+
+
+# ------------------------------------------------------------------ Pages composer (Interval 5)
+
+
+def test_composer_plans_drafts_with_python_geometry(client):
+    project = client.get("/api/projects/coloring-print").json()
+    source = project["source"]
+    response = client.post("/api/projects/coloring-print/draft/plan", json={"source": source})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["verification"]["valid"] and data["plan"]["complete"]
+    geometry = data["geometry"]
+    assert geometry["border"] == "thin" and geometry["trim"] == {"width": 612.0, "height": 792}
+    recto, verso = geometry["sides"]["recto"], geometry["sides"]["verso"]
+    # Mirrored margins: the gutter is on the inside of each page.
+    assert recto["live"]["x"] > verso["live"]["x"]
+    assert recto["art"]["width"] < recto["live"]["width"]  # inside the border
+    # A reordered draft is planned as written; nothing is saved.
+    reordered = json.loads(json.dumps(source))
+    reordered["coloring"]["pages"].reverse()
+    data = client.post("/api/projects/coloring-print/draft/plan", json={"source": reordered}).json()
+    ids = [p["artwork"]["id"] for p in data["plan"]["pages"] if p["kind"] == "coloring"]
+    assert ids == [p["artwork"] for p in reordered["coloring"]["pages"] if "artwork" in p]
+    assert client.get("/api/projects/coloring-print").json()["revision"] == project["revision"]
+
+
+def test_composer_gets_an_incomplete_plan_with_its_reasons(client):
+    source = client.get("/api/projects/coloring-print").json()["source"]
+    source["coloring"]["pages"] = []
+    response = client.post("/api/projects/coloring-print/draft/plan", json={"source": source})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert not data["verification"]["valid"] or not data["plan"]["complete"]
+    codes = {i["code"] for i in data["verification"]["issues"] + data["plan"]["diagnostics"]}
+    assert "no_coloring_pages" in codes
+
+
+def test_pages_route_serves_the_shell(client):
+    assert client.get("/books/coloring-print/pages").status_code == 200

@@ -17,6 +17,12 @@ compose them into an ordered book, build a deterministic print interior PDF, pre
 it, proof every real page, build a full-wrap paperback cover around your own
 photograph, and assemble a verified package for manual KDP upload, all locally.
 
+Coloring books use the same pipeline: import and prepare your own line art,
+arrange drawings and section dividers in Studio's Pages composer, build a lossless
+interior, design the cover, declare artwork origin and rights, and produce a
+verified package with `book produce`. See
+[Creating and Publishing a Coloring Book](docs/coloring-publishing.md).
+
 **Interval 11 complete:** research and book planning. Plan a book in
 `planning.yaml` beside `book.yaml`: research notes labelled by the kind of
 evidence they are, comparable books you have read, audience and positioning,
@@ -252,7 +258,8 @@ Contracts: [book planning](docs/book-planning.md), [project format](docs/project
 [print interior](docs/print-interior.md), [interior design](docs/interior-design.md),
 [preflight and preview](docs/preflight.md),
 [paperback cover](docs/cover.md), [KDP publishing package](docs/publishing.md),
-[Studio architecture](docs/studio.md).
+[Studio architecture](docs/studio.md), [coloring books](docs/coloring.md),
+[coloring publishing](docs/coloring-publishing.md).
 Contribution rules: [AGENTS.md](AGENTS.md). Current handoff: [CONTEXT.md](CONTEXT.md).
 
 ## Current limitations

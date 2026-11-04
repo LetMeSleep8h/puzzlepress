@@ -57,6 +57,7 @@ from .model import (
     SpineStatus,
 )
 from .richtext import Base, layout_rich
+from .variables import live_values, resolve, resolve_rich
 from .watermark import attach, place_watermark
 
 LIGHT: RGB = (1.0, 1.0, 1.0)
@@ -791,10 +792,12 @@ def _text_box(
         hex_rgb(element.color),
         element.align,
     )
+    values = live_values(geometry)
     if element.rich is not None:
-        lines_rich, _ = _rich(element.rich, style, box, fonts, f"cover.{role}")
+        document = resolve_rich(element.rich, values)
+        lines_rich, _ = _rich(document, style, box, fonts, f"cover.{role}")
         return lines_rich, CoverTextBox(role, box)
-    text = style.text(element.text)
+    text = style.text(resolve(element.text, values))
     _check_glyphs(text, style.face, f"cover.{role}")
     lines = wrap(text, style.face, element.size, box.width, style.tracking)
     if lines is None:

@@ -558,11 +558,13 @@ def test_cli_refuses_directories_and_word_search_books(book, tmp_path, capsys):
     assert code == 1 and "not_a_coloring_book" in err and "Traceback" not in err
 
 
-def test_publishing_and_production_refuse_coloring_books(book, capsys, tmp_path):
+def test_uncomposed_coloring_books_cannot_publish_or_produce(book, capsys, tmp_path):
+    # Interval 5 packages coloring books; one without a composition has no interior.
     import_files(book, [("a.png", png(1))])
     code, _, err = run(capsys, "publish", "inspect", str(book))
     assert code == 1 and "Traceback" not in err
     code, _, err = run(capsys, "book", "produce", str(book), "--output", str(tmp_path / "out"))
-    assert code == 1 and "not_available_for_engine" in err and "Traceback" not in err
+    assert code == 1 and "composition" in err and "Traceback" not in err
+    assert not (tmp_path / "out").exists()
     code, _, err = run(capsys, "puzzle", "batch", str(book))
     assert code == 1 and "Traceback" not in err

@@ -10,7 +10,7 @@ import hashlib
 
 from .. import __version__
 from ..publishing_config import ContentOrigin, IsbnMode
-from .metadata import ATTESTATION_TEXT, kdp_ai_answers
+from .metadata import kdp_ai_answers
 from .readiness import PublishingReadinessReport
 from .rules import KDP_METADATA, PAPERBACK_LANGUAGES
 
@@ -77,6 +77,14 @@ def kdp_metadata(report: PublishingReadinessReport) -> dict[str, object]:
         "ai_content": kdp_ai_answers(config.ai_disclosure),
         "notes": config.notes,
     }
+    if project.coloring is not None:
+        disclosure = config.ai_disclosure
+        data["artwork_origin"] = {
+            "interior_artwork": getattr(disclosure.interior_artwork, "value", None),
+            "cover_artwork": getattr(disclosure.cover_artwork, "value", None),
+            "kdp_images_answer_covers": "cover and interior images and artwork together",
+        }
+        data["content_rights"] = config.content_rights.to_dict() if config.content_rights else None
     return data
 
 
@@ -214,6 +222,15 @@ def checklist_markdown(report: PublishingReadinessReport) -> str:
                 "undecided": "DECIDE BEFORE SUBMITTING",
             }[verdict]
             lines.append(f"    - {kind}: {ORIGIN[origin]} ({told})")
+        if project.coloring is not None:
+            disclosure = config.ai_disclosure
+            lines.append(
+                "    - KDP's images answer covers both the interior drawings ("
+                + _origin(disclosure.interior_artwork)
+                + ") and the cover artwork ("
+                + _origin(disclosure.cover_artwork)
+                + ")."
+            )
     lines += ["", "## 2. Paperback content", ""]
     if config is not None:
         mode = config.isbn.mode
@@ -288,7 +305,7 @@ def checklist_markdown(report: PublishingReadinessReport) -> str:
         labels = {"confirmed": "Confirmed", "unconfirmed": "NOT CONFIRMED"}
         lines += ["", "## Your confirmations recorded in book.yaml", ""]
         lines += [
-            f"- {labels.get(c.state, 'NEEDS REVIEW AGAIN')}: {ATTESTATION_TEXT[c.name]}"
+            f"- {labels.get(c.state, 'NEEDS REVIEW AGAIN')}: {c.statement}"
             for c in report.metadata.confirmations
             if c.required
         ]
@@ -300,3 +317,11 @@ def checklist_markdown(report: PublishingReadinessReport) -> str:
         if config.notes:
             lines += ["", "## Notes", "", *config.notes.splitlines()]
     return "\n".join(lines) + "\n"
+
+
+def _origin(origin: ContentOrigin | None) -> str:
+    if origin is None:
+        return "NOT DECLARED"
+    if origin is ContentOrigin.NONE:
+        return "no artwork"
+    return ORIGIN[origin]

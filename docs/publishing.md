@@ -425,6 +425,60 @@ To update: re-read the pages, change values only in `publishing/rules.py`, bump
 `RULESET_VERSION` when a verdict can change, update this table and add boundary
 tests (`tests/test_publishing_metadata.py`).
 
+## Coloring books
+
+A coloring book uses the same section, readiness and package, judged by a
+separate ruleset, `puzzlepress-kdp-publishing-coloring` v1, so word-search
+reports, packages and identities keep their bytes. Shared rules keep their codes.
+The official pages behind the coloring additions were re-read on **2026-11-04**:
+
+| Page | What it says (paraphrased) | Used for |
+| --- | --- | --- |
+| [Content Guidelines](https://kdp.amazon.com/en_US/help/topic/G200672390) | Disclose AI-generated text, images or translations; content created by an AI-based tool is AI-generated "even if you applied substantial edits afterwards"; AI-assisted content (your own work edited, refined or checked with AI tools) need not be disclosed; AI-generated images "include cover and interior images and artwork". Publishers are responsible for rights; copyrighted content freely available on the web is not accepted unless the owner provided it; public-domain content is allowed and KDP may ask for proof. | artwork origins, the images answer, rights warnings |
+| [Low-Content Books](https://kdp.amazon.com/en_US/help/topic/GGE5T76TWKA85DJM) | Low-content books are repetitive pages designed to be filled in (journals, log books, planners). Coloring books and puzzle books are listed as "not generally low-content". Low-content books get no free KDP ISBN, no series and no Expanded Distribution. | low-content wording; the existing ISBN and series checks |
+
+The exact options KDP's form shows for its AI question were not found on an
+official help page, so PuzzlePress models only what the guidelines state and does
+not reproduce the form's choices.
+
+```yaml
+publishing:
+  ai_disclosure:
+    text: human              # captions, dividers, instructions, description
+    images: human            # KDP's one answer for cover AND interior images
+    translations: none
+    interior_artwork: human  # coloring books only: who drew the coloring pages
+    cover_artwork: none      # coloring books only; `none` = no artwork on the cover
+  content_rights:            # coloring books only; recorded, never verified
+    interior_artwork: own_work   # own_work | commissioned | licensed | public_domain
+    cover_artwork: none          #   | ai_tool_terms | undecided (cover also: none)
+    text: own_work
+    notes: null                  # licence names, sources, agreements
+```
+
+| Code | Severity | Checks |
+| --- | --- | --- |
+| `artwork_origin_declared` | error | `interior_artwork` and `cover_artwork` declared (not `unknown`) |
+| `artwork_origin_consistent` | error | `images` equals the most disclosing artwork origin (AI-generated over AI-assisted over human); a cover with no artwork contributes nothing |
+| `content_rights_declared` | error | `content_rights` present and no kind `undecided` |
+| `content_rights_review` | warning | licensed, public domain, commissioned or AI-tool-terms content (keep the evidence); AI-generated artwork declared as your own work; a cover declared without artwork whose origin says otherwise |
+| `low_content_decided`, `low_content_review` | error, warning | coloring wording: KDP lists coloring books as not generally low-content |
+| `description_claims` | error | counts of drawings, designs, illustrations, pictures or coloring pages equal the coloring pages (or the different drawings); no mention of solutions |
+
+Both artwork fields, and `content_rights`, are refused on word-search books
+(`not_applicable_for_engine`). Having a file is never treated as a right to
+publish it. The rights confirmation reads "I hold the rights to publish this
+book's artwork, cover images and text, on the basis I declared; owning a copy of a
+file is not that right." Its review identity covers every printed drawing by its
+SHA-256 and caption, divider titles and text, front and back matter, the rights
+declaration and the cover's text, fonts and images; reordering pages leaves it
+valid, replacing or retitling a drawing makes it stale. Provenance records the
+drawing digests and that PuzzlePress prepared the author's files with fixed image
+adjustments, never that anyone owns them.
+
+Not modeled for coloring books either: list price, royalty, territories and
+marketplaces, which KDP asks for during setup.
+
 ## Demos
 
 `books/publishing-demo` is the cover demo's twenty puzzles with 13 x 13 varied

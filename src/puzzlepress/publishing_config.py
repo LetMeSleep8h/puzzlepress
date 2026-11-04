@@ -52,6 +52,22 @@ class ContentOrigin(StrEnum):
     NONE = "none"  # Translations only: the book is not a translation.
 
 
+class RightsBasis(StrEnum):
+    """On what basis the author may publish a kind of content, as the author declares it.
+
+    Coloring books only (`publishing.content_rights`). Possessing a file is never a
+    basis: PuzzlePress records the declaration and cannot verify it.
+    """
+
+    UNDECIDED = "undecided"  # Not yet reviewed; blocks a package.
+    OWN_WORK = "own_work"  # Created by the author or the book's listed contributors.
+    COMMISSIONED = "commissioned"  # Made for the author under an agreement granting the rights.
+    LICENSED = "licensed"  # Used under a license that permits this commercial print use.
+    PUBLIC_DOMAIN = "public_domain"  # No longer under copyright; KDP may ask for proof.
+    AI_TOOL_TERMS = "ai_tool_terms"  # Generated with an AI tool, used under the tool's terms.
+    NONE = "none"  # Cover only: the cover has no artwork or photograph.
+
+
 class ContributorRole(StrEnum):
     AUTHOR = "author"
     EDITOR = "editor"
@@ -117,12 +133,39 @@ class AiDisclosure:
     text: ContentOrigin = ContentOrigin.UNKNOWN
     images: ContentOrigin = ContentOrigin.UNKNOWN
     translations: ContentOrigin = ContentOrigin.UNKNOWN
+    # Coloring books: the artwork behind KDP's single images answer, which covers
+    # interior and cover images alike. Written only when present (None elsewhere).
+    interior_artwork: ContentOrigin | None = None
+    cover_artwork: ContentOrigin | None = None  # `none`: the cover has no artwork.
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        data: dict[str, object] = {
             "text": self.text.value,
             "images": self.images.value,
             "translations": self.translations.value,
+        }
+        if self.interior_artwork is not None:
+            data["interior_artwork"] = self.interior_artwork.value
+        if self.cover_artwork is not None:
+            data["cover_artwork"] = self.cover_artwork.value
+        return data
+
+
+@dataclass(frozen=True)
+class ContentRights:
+    """Coloring books: the author's declared basis for publishing each kind of content."""
+
+    interior_artwork: RightsBasis = RightsBasis.UNDECIDED
+    cover_artwork: RightsBasis = RightsBasis.UNDECIDED
+    text: RightsBasis = RightsBasis.UNDECIDED  # Captions, dividers, matter, description.
+    notes: str | None = None  # Licence names, sources, agreements: the author's record.
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "interior_artwork": self.interior_artwork.value,
+            "cover_artwork": self.cover_artwork.value,
+            "text": self.text.value,
+            "notes": self.notes,
         }
 
 
@@ -136,7 +179,7 @@ class Attestations:
     round-trips unchanged, and none of them counts as a confirmation.
     """
 
-    rights: str | None = None  # Holds the rights to the text, word lists and photograph.
+    rights: str | None = None  # Holds the rights to the content (wording per engine).
     ai_disclosure: str | None = None  # Reviewed the AI disclosure as declared.
     metadata: str | None = None  # The book details and KDP metadata represent the book.
     isbn: str | None = None  # Own ISBN registered with this title, author and imprint.
@@ -168,6 +211,7 @@ class PublishingConfig:
     attestations: Attestations = field(default_factory=Attestations)
     notes: str | None = None
     version: int = PUBLISHING_VERSION
+    content_rights: ContentRights | None = None  # Coloring books only; written when present.
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -184,6 +228,11 @@ class PublishingConfig:
             "ai_disclosure": self.ai_disclosure.to_dict(),
             "attestations": self.attestations.to_dict(),
             "notes": self.notes,
+            **(
+                {"content_rights": self.content_rights.to_dict()}
+                if self.content_rights is not None
+                else {}
+            ),
         }
 
     def upgraded(self) -> "PublishingConfig":

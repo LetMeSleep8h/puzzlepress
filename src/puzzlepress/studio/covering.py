@@ -69,8 +69,10 @@ from puzzlepress.cover.model import (
 )
 from puzzlepress.cover.preflight import RULESET_VERSION, preflight_cover, report_bytes
 from puzzlepress.cover.validation import panel_of
+from puzzlepress.cover.variables import LIVE_VARIABLES
 from puzzlepress.cover_config import CoverConfig, CoverImage, Crop
-from puzzlepress.cover_design import PhotoElement, Region
+from puzzlepress.cover_design import PhotoElement, Region, TextBoxElement
+from puzzlepress.cover_template import BINDING, BINDINGS
 from puzzlepress.interior import InteriorError
 from puzzlepress.interior.build import check_output_directory
 from puzzlepress.interior.issues import LayoutIssue
@@ -222,6 +224,26 @@ def display_checks(project: Project) -> list[dict[str, str]]:
                     "message": f"The cover prints the {key} as {shown!r}; the book details say "
                     f"{detail!r}. KDP requires the cover to match the book details, so "
                     "publishing blocks until they match. Line breaks and capitals may differ.",
+                }
+            )
+    for element in project.cover.elements:
+        if not isinstance(element, TextBoxElement):
+            continue
+        text = element.rich.plain() if element.rich is not None else element.text
+        unresolved = sorted(
+            {name for name in BINDING.findall(text) if name in BINDINGS} - set(LIVE_VARIABLES)
+        )
+        if unresolved:
+            names = ", ".join("{" + name + "}" for name in unresolved)
+            checks.append(
+                {
+                    "code": "template_binding_in_text",
+                    "severity": "warning",
+                    "layer": element.id,
+                    "message": f"{names} is a template binding: it is filled in only when a "
+                    "template is applied, so this text box prints it literally. Type the words "
+                    "instead. Only {page_count} and {trim_size} are filled in from the built "
+                    "interior.",
                 }
             )
     for font in project.cover.fonts:
