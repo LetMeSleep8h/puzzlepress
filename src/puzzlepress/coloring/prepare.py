@@ -195,6 +195,7 @@ class PreparationMeasures:
     line_core_level: int | None = None
     # Faint strokes in the original (gray INK_LEVEL+1..FAINT_LEVEL in stroke-like
     # groups) and the share still printed visibly; None when there are too few.
+    # 0 when under FAINT_MIN_SHARE of the original is gray 129-200 (not counted then).
     faint_line_pixels: int = 0
     faint_line_retention: float | None = None
 
@@ -386,11 +387,16 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     change = ImageChops.difference(reference, out)
     mean_change = sum(level * count for level, count in enumerate(change.histogram())) / total
     core = _line_core(out.histogram(), total)
-    faint = faint_mask(reference)
-    faint_pixels = _count(faint)
-    faint_kept = (
-        faint_pixels if out is reference else _count(ImageChops.darker(faint, _visible(out)))
-    )
+    # Light strokes are a subset of the gray 129-200 pixels: when the histogram shows
+    # too few of those to measure, the filters are skipped (the result is the same).
+    candidates = sum(reference.histogram()[INK_LEVEL + 1 : FAINT_LEVEL + 1])
+    faint_pixels = faint_kept = 0
+    if candidates >= FAINT_MIN_SHARE * total:
+        faint = faint_mask(reference)
+        faint_pixels = _count(faint)
+        faint_kept = (
+            faint_pixels if out is reference else _count(ImageChops.darker(faint, _visible(out)))
+        )
     measurable = faint_pixels >= FAINT_MIN_SHARE * total
     return PreparationMeasures(
         pixels=(width, height),
@@ -607,10 +613,11 @@ def difference_image(reference: Image.Image, prepared: Image.Image) -> Image.Ima
     before = _mask(reference)
     after = _mask(prepared)
     image = Image.new("RGB", reference.size, (255, 255, 255))
-    faint = faint_mask(reference)
-    visible = _visible(prepared)
-    image.paste(FAINT_KEPT_COLOR, mask=ImageChops.darker(faint, visible))
-    image.paste(FAINT_ERASED_COLOR, mask=ImageChops.subtract(faint, visible))
+    if any(reference.histogram()[INK_LEVEL + 1 : FAINT_LEVEL + 1]):
+        faint = faint_mask(reference)
+        visible = _visible(prepared)
+        image.paste(FAINT_KEPT_COLOR, mask=ImageChops.darker(faint, visible))
+        image.paste(FAINT_ERASED_COLOR, mask=ImageChops.subtract(faint, visible))
     image.paste(KEPT_COLOR, mask=ImageChops.darker(before, after))
     image.paste(REMOVED_COLOR, mask=ImageChops.subtract(before, after))
     image.paste(ADDED_COLOR, mask=ImageChops.subtract(after, before))
