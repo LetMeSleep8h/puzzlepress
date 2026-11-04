@@ -43,9 +43,19 @@ def _plain(name: str) -> str:
     return name.replace("\\", "/").rsplit("/", 1)[-1]
 
 
+def _stem(name: str) -> str:
+    """The name without its extension: the text before the last dot, unless that dot
+    starts the name. Spelled out because `pathlib` changed for dot-heavy names in
+    Python 3.14 (`'....png'` has stem `'...'` before, `'....png'` from 3.14), and
+    stored file names must not depend on the Python version."""
+    plain = _plain(name)
+    dot = plain.rfind(".")
+    return plain[:dot] if dot > 0 else plain
+
+
 def artwork_stem(original_name: str) -> str:
     """ASCII stem for file names and IDs: accents folded, everything else a hyphen."""
-    stem = Path(_plain(original_name)).stem
+    stem = _stem(original_name)
     folded = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-z0-9]+", "-", folded.lower()).strip("-")[:40].strip("-")
     return slug or "artwork"
@@ -53,7 +63,7 @@ def artwork_stem(original_name: str) -> str:
 
 def artwork_title(original_name: str) -> str | None:
     """A readable title from the original name, Unicode kept, controls removed."""
-    stem = Path(_plain(original_name)).stem
+    stem = _stem(original_name)
     cleaned = "".join(
         " " if unicodedata.category(c).startswith(("C", "Z")) else c
         for c in unicodedata.normalize("NFC", stem)
