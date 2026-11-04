@@ -313,7 +313,14 @@ test('publishing: final steps keep decisions open and record a proof honestly', 
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
+  // Final steps come from GET /production, which reruns interior and cover preflight
+  // in Python: wait for that response instead of racing it on slower machines.
+  const assessed = page.waitForResponse(
+    (r) => r.url().endsWith('/production') && r.request().method() === 'GET',
+  );
   await page.goto(`/books/${KEY}/publishing`);
+  expect((await assessed).status()).toBe(200);
+  await expect(page.getByText('Checking every production step…')).toBeHidden();
   const overview = page.getByRole('region', { name: 'Final steps' });
   await expect(overview.getByRole('heading', { name: 'Final steps' })).toBeVisible();
   const checklist = overview.getByRole('list', { name: 'Production checklist' });
@@ -323,8 +330,13 @@ test('publishing: final steps keep decisions open and record a proof honestly', 
   );
   await expect(overview.getByLabel('Your decision')).toHaveValue('undecided');
   const proof = page.waitForResponse((r) => r.url().endsWith('/proofs/record'));
+  // Recording reloads the production status (GET /production) to list the record.
+  const reassessed = page.waitForResponse(
+    (r) => r.url().endsWith('/production') && r.request().method() === 'GET',
+  );
   await overview.getByRole('button', { name: 'Record proof' }).click();
   expect((await proof).status()).toBe(200);
+  expect((await reassessed).status()).toBe(200);
   await expect(overview.getByText(/Recorded proof-1/)).toBeVisible();
   await expect(overview.getByText('Print Previewer', { exact: true })).toBeVisible();
   await noAxeViolations(page);
