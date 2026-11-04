@@ -25,7 +25,7 @@ from ..coloring.content import ColoringContent
 from ..coloring.duplicates import DuplicateReport, find_duplicates
 from ..coloring.inspection import Inspection, inspect_artwork
 from ..coloring.issues import ArtworkError, ArtworkFinding
-from ..coloring.prepare import PreparationMeasures, prepare_artwork
+from ..coloring.prepare import PreparationMeasures, measure_artwork
 from ..coloring_config import Border
 from ..interior.build import toolchain
 from ..interior.coloring import (
@@ -57,7 +57,8 @@ from .rules import (
 )
 
 RULESET_ID = "puzzlepress-kdp-coloring"
-RULESET_VERSION = 1
+# 2: line quality also reports light strokes of the original that preparation erased.
+RULESET_VERSION = 2
 COLORING_CONTRACT = "PuzzlePress coloring interior contract (docs/coloring.md)"
 QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"
 
@@ -132,9 +133,9 @@ def load_artwork(project_directory: Path | None, project: Project) -> dict[str, 
             continue
         try:
             data = read_artwork(project_directory, artwork)
-            prepared = prepare_artwork(data, artwork.adjustments, artwork.path)
+            measures, findings = measure_artwork(data, artwork.adjustments, artwork.path)
             checks[artwork_id] = ArtworkCheck(
-                prepared.measures, prepared.findings, inspect_artwork(data, artwork.path)
+                measures, findings, inspect_artwork(data, artwork.path)
             )
         except ArtworkError as error:
             checks[artwork_id] = ArtworkCheck(error=error.about(artwork.path))
@@ -710,11 +711,13 @@ _quality_rule(
     Severity.WARNING,
     "Line quality",
     "Measured damage from preparation: fine lines thinned (under 90% kept), detail lost "
-    "(under 60%), strokes broken apart, isolated specks left (over 5 per megapixel) or ink "
-    "pushed to an image edge.",
+    "(under 60%), light strokes of the original erased (under 50% of gray 129-200 "
+    "strokes still printed), strokes broken apart, isolated specks left (over 5 per "
+    "megapixel) or ink pushed to an image edge.",
     (
         "thin_lines_lost",
         "detail_lost",
+        "faint_strokes_erased",
         "strokes_broken",
         "specks_remaining",
         "prepared_touches_edge",
