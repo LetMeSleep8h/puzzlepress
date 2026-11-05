@@ -24,7 +24,7 @@ NICE = 10
 
 if sys.platform == "win32":
 
-    def apply_limits(memory_mb: int | None) -> dict[str, object]:
+    def apply_limits(memory_mb: int | None, lower_priority: bool = True) -> dict[str, object]:
         """Lower this process's priority and cap its memory; report what took effect."""
 
         import ctypes
@@ -37,7 +37,9 @@ if sys.platform == "win32":
         kernel32.SetPriorityClass.restype = wintypes.BOOL
         process = kernel32.GetCurrentProcess()
         below_normal = 0x00004000
-        if kernel32.SetPriorityClass(process, below_normal):
+        if not lower_priority:
+            report["priority"] = "normal"
+        elif kernel32.SetPriorityClass(process, below_normal):
             report["priority"] = "below_normal"
         else:
             report["priority"] = f"not applied (Windows error {ctypes.get_last_error()})"
@@ -138,17 +140,20 @@ if sys.platform == "win32":
 
 else:
 
-    def apply_limits(memory_mb: int | None) -> dict[str, object]:
+    def apply_limits(memory_mb: int | None, lower_priority: bool = True) -> dict[str, object]:
         """Lower this process's priority and cap its memory; report what took effect."""
 
         import resource
 
         report: dict[str, object] = {}
-        try:
-            os.nice(NICE)
-            report["priority"] = f"nice +{NICE}"
-        except OSError as error:
-            report["priority"] = f"not applied ({error})"
+        if not lower_priority:
+            report["priority"] = "normal"
+        else:
+            try:
+                os.nice(NICE)
+                report["priority"] = f"nice +{NICE}"
+            except OSError as error:
+                report["priority"] = f"not applied ({error})"
         if memory_mb is None:
             report["memory_mb"] = "not limited"
             return report

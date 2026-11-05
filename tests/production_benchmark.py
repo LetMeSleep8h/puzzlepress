@@ -174,6 +174,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--cancel-from", type=int, default=150)
     parser.add_argument("--crash", action="store_true")
     parser.add_argument("--concurrent", action="store_true")
+    parser.add_argument(
+        "--normal-priority", action="store_true", help="Run workers at normal priority."
+    )
     args = parser.parse_args(argv)
     from fastapi.testclient import TestClient
 
@@ -206,8 +209,18 @@ def main(argv: list[str] | None = None) -> None:
     frontend = args.work / "frontend"
     frontend.mkdir(exist_ok=True)
     (frontend / "index.html").write_text("<!doctype html>", encoding="utf-8")
-    client = TestClient(create_app(library, frontend))
-    report: dict[str, object] = {"machine_note": "Compare on one machine and day only."}
+
+    def jobs(service: object) -> producing.ProducingService:
+        return producing.ProducingService(
+            service,  # type: ignore[arg-type]
+            lower_priority=not args.normal_priority,
+        )
+
+    client = TestClient(create_app(library, frontend, jobs))
+    report: dict[str, object] = {
+        "machine_note": "Compare on one machine and day only.",
+        "worker_priority": "normal" if args.normal_priority else "below_normal",
+    }
     for key in keys:
         print(f"producing {key}", file=sys.stderr, flush=True)
         report[key] = run_job(client, library, key)

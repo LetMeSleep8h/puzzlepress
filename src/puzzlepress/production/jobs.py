@@ -81,6 +81,7 @@ class JobSpec:
     created: str
     memory_limit_mb: int | None = None
     previous_release: str | None = None  # SHA-256 of the release's production.json then.
+    lower_priority: bool = True  # Run below normal priority (the default).
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -95,6 +96,7 @@ class JobSpec:
             "created": self.created,
             "memory_limit_mb": self.memory_limit_mb,
             "previous_release": self.previous_release,
+            "lower_priority": self.lower_priority,
         }
 
     @staticmethod
@@ -114,6 +116,7 @@ class JobSpec:
             str(data["created"]),
             int(limit) if isinstance(limit, int) else None,
             str(previous) if isinstance(previous, str) else None,
+            data.get("lower_priority") is not False,
         )
 
 

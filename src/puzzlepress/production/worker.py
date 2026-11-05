@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     jobs.append_event(
         directory, {"event": "state", "state": "starting", "pid": os.getpid()}, durable=True
     )
-    limits = apply_limits(spec.memory_limit_mb)
+    limits = apply_limits(spec.memory_limit_mb, spec.lower_priority)
     try:
         final = run(directory, spec, limits)
     except BaseException as error:  # Every ending is recorded; tracebacks go to worker.log.

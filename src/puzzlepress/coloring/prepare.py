@@ -374,17 +374,25 @@ def paper_background(gray: Image.Image) -> Image.Image | None:
     measure reads it exactly as before.
     """
     width, height = gray.size
-    block = max(1, min(BACKGROUND_BLOCK, width // 4, height // 4))
-    # A 3 x 3 maximum first lifts one- and two-pixel strokes to the paper beside them,
-    # so fine hatching closer than a block still reads as paper.
-    small = gray.filter(ImageFilter.MaxFilter(3))
-    small = small.reduce(block) if block > 1 else small
-    local = small.filter(ImageFilter.MaxFilter(BACKGROUND_WINDOW))
-    coarse = max(1, -(-max(local.size) // BACKGROUND_GRID))
-    if coarse > 1:
-        local = local.reduce(coarse)
     floor = round(_percentile(gray.histogram(), 0.95) * BACKGROUND_FLOOR)
-    local = local.point(lambda v: max(v, floor, 1)).filter(ImageFilter.BoxBlur(1))
+
+    def estimate(source: Image.Image) -> Image.Image:
+        block = max(1, min(BACKGROUND_BLOCK, width // 4, height // 4))
+        small = source.reduce(block) if block > 1 else source
+        local = small.filter(ImageFilter.MaxFilter(BACKGROUND_WINDOW))
+        coarse = max(1, -(-max(local.size) // BACKGROUND_GRID))
+        if coarse > 1:
+            local = local.reduce(coarse)
+        return local.point(lambda v: max(v, floor, 1)).filter(ImageFilter.BoxBlur(1))
+
+    # Every step is monotone, and the 3 x 3 maximum only raises levels, so the
+    # estimate without it is a lower bound: white there means white with it, and the
+    # full-size filter is skipped for most white pages (same result, less work).
+    if estimate(gray).getextrema()[0] >= WHITE_PAPER:  # type: ignore[operator]
+        return None
+    # A 3 x 3 maximum lifts one- and two-pixel strokes to the paper beside them, so
+    # fine hatching closer than a block still reads as paper.
+    local = estimate(gray.filter(ImageFilter.MaxFilter(3)))
     if local.getextrema()[0] >= WHITE_PAPER:  # type: ignore[operator]
         return None
     return local.resize((width, height), Image.Resampling.BILINEAR)

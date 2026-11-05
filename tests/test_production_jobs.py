@@ -235,3 +235,13 @@ def test_the_worker_produces_a_verified_release_in_place(tmp_path: Path) -> None
         f["name"]: f["sha256"]
         for f in manifest["files"]  # type: ignore[union-attr]
     }
+
+
+def test_priority_is_recorded_and_older_records_default_to_below_normal(tmp_path: Path) -> None:
+    normal = jobs.create_job(spec(tmp_path, lower_priority=False))
+    assert jobs.read_spec(normal).lower_priority is False
+    older = jobs.create_job(spec(tmp_path))
+    data = json.loads((older / jobs.SPEC_NAME).read_text(encoding="utf-8"))
+    del data["lower_priority"]
+    (older / jobs.SPEC_NAME).write_text(json.dumps(data), encoding="utf-8")
+    assert jobs.read_spec(older).lower_priority is True

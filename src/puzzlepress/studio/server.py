@@ -3,6 +3,7 @@
 import argparse
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import uvicorn
@@ -216,7 +217,12 @@ def error_response(
     return JSONResponse({"error": error}, status)
 
 
-def create_app(books: Path, frontend: Path) -> FastAPI:
+def create_app(
+    books: Path,
+    frontend: Path,
+    production_jobs: Callable[[StudioService], ProducingService] = ProducingService,
+) -> FastAPI:
+    """`production_jobs` builds the production job service (benchmarks set its limits)."""
     service = StudioService(ProjectStore(books.resolve()))
     drafts = DraftStore(service.store)
     printing = PrintService(service, drafts=drafts)
@@ -231,7 +237,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     reviews = ReviewService(service)
     production = ProductionService(service)
     creating = CreationService(service)
-    producing = ProducingService(service)
+    producing = production_jobs(service)
     app = FastAPI(title="PuzzlePress Studio", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]

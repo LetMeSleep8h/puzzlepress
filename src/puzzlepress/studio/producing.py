@@ -151,10 +151,12 @@ class ProducingService:
         service: StudioService,
         max_workers: int | None = None,
         memory_limit_mb: int | None = DEFAULT_MEMORY_MB,
+        lower_priority: bool = True,
     ) -> None:
         self.service = service
         self.max_workers = max_workers or default_workers()
         self.memory_limit_mb = memory_limit_mb
+        self.lower_priority = lower_priority
         self._lock = threading.Lock()
         self._jobs: dict[str, _Worker] = {}  # By release directory; queued or running.
         self._queue: list[str] = []  # Release directories waiting for a worker.
@@ -443,6 +445,7 @@ class ProducingService:
                 jobs.now(),
                 self.memory_limit_mb,
                 _manifest_digest(directory),
+                self.lower_priority,
             )
             try:
                 job = jobs.create_job(spec)
