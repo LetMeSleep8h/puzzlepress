@@ -183,6 +183,23 @@ def _count(mask: Image.Image) -> int:
     return mask.histogram()[255]
 
 
+def _rank3(gray: Image.Image, steps: int, dilate: bool) -> Image.Image:
+    """`steps` passes of a 3 x 3 maximum (dilate) or minimum filter, pixel-identical to
+    Pillow's MaxFilter / MinFilter(2 * steps + 1), whose edge replication equals ignoring
+    out-of-image pixels. Separable shifted copies cost a fraction of the rank filter on a
+    full-size page."""
+    pick = ImageChops.lighter if dilate else ImageChops.darker
+    pad = 0 if dilate else 255
+    out = gray
+    for _ in range(steps):
+        # max(o[x], o[x-1]) then max of that with its neighbour at x+1: a 3-wide window.
+        for offset in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            moved = Image.new("L", out.size, pad)
+            moved.paste(out, offset)
+            out = pick(out, moved)
+    return out
+
+
 def faint_mask(reference: Image.Image) -> Image.Image:
     """Faint stroke pixels of the original: lighter than ink, at most FAINT_LEVEL, with
     at least FAINT_NEIGHBORS drawn pixels (faint or ink) in their 3 x 3 block, and not
@@ -195,7 +212,7 @@ def faint_mask(reference: Image.Image) -> Image.Image:
     density = drawn.filter(ImageFilter.Kernel((3, 3), [1] * 9, scale=9))
     dense = density.point(lambda v: 255 if v * 9 >= FAINT_NEIGHBORS * 255 - 4 else 0)
     faint = reference.point(lambda v: 255 if INK_LEVEL < v <= FAINT_LEVEL else 0)
-    near_ink = _mask(reference).filter(ImageFilter.MaxFilter(2 * FAINT_RIM + 1))
+    near_ink = _rank3(_mask(reference), FAINT_RIM, dilate=True)
     return ImageChops.subtract(ImageChops.darker(faint, dense), near_ink)
 
 
@@ -407,7 +424,7 @@ def paper_background(gray: Image.Image) -> Image.Image | None:
         return None
     # A 3 x 3 maximum lifts one- and two-pixel strokes to the paper beside them, so
     # fine hatching closer than a block still reads as paper.
-    local = estimate(gray.filter(ImageFilter.MaxFilter(3)))
+    local = estimate(_rank3(gray, 1, dilate=True))
     if local.getextrema()[0] >= WHITE_PAPER:  # type: ignore[operator]
         return None
     return local.resize((width, height), Image.Resampling.BILINEAR)
@@ -463,18 +480,14 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     line_ink = _count(before)
     # Fine lines: line work an opening (3 x 3 erosion, then dilation) cannot restore,
     # so strokes at most two pixels wide; edges of wider strokes come back.
-    opened = lines.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
+    opened = _rank3(_rank3(lines, 1, dilate=True), 1, dilate=False)
     thin = ImageChops.subtract(before, _mask(opened))
     thin_pixels = _count(thin)
     # A fine-line pixel is kept while the prepared page still has ink within
     # THIN_REGISTRATION pixels of it (measures version 3): the stroke survives even if
     # its rim moved by a pixel. Erasing or thinning a one- or two-pixel line away
     # leaves no ink nearby and still counts as lost.
-    near = (
-        after.filter(ImageFilter.MaxFilter(2 * THIN_REGISTRATION + 1))
-        if THIN_REGISTRATION
-        else after
-    )
+    near = _rank3(after, THIN_REGISTRATION, dilate=True)
     thin_kept = _count(ImageChops.darker(thin, near))
     detail_kept = _count(ImageChops.darker(before, after))
     # Strokes are counted on the ink both images share, so growing marks (thickening)

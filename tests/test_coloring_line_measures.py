@@ -200,3 +200,24 @@ def test_the_specks_warning_does_not_presume_dust() -> None:
     found = _findings(replace(measures, specks_per_megapixel_after=40.0), Adjustments())
     message = next(f.message for f in found if f.code == "specks_remaining")
     assert "stippling" in message
+
+
+@pytest.mark.parametrize("steps", [0, 1, 2])
+@pytest.mark.parametrize("dilate", [True, False])
+def test_the_fast_rank_filter_matches_pillows(steps: int, dilate: bool) -> None:
+    # The measures use separable 3 x 3 passes for speed; they must stay pixel-identical
+    # to Pillow's MaxFilter / MinFilter (edges included), or every measure would shift.
+    import random
+
+    from PIL import ImageChops, ImageFilter
+
+    from puzzlepress.coloring.prepare import _rank3
+
+    rng = random.Random(steps * 2 + dilate)
+    for _ in range(60):
+        size = (rng.randint(1, 33), rng.randint(1, 33))
+        pixels = bytes(rng.choice((0, 255, rng.randint(0, 255))) for _ in range(size[0] * size[1]))
+        image = Image.frombytes("L", size, pixels)
+        rank = ImageFilter.MaxFilter if dilate else ImageFilter.MinFilter
+        expected = image.filter(rank(2 * steps + 1)) if steps else image
+        assert ImageChops.difference(expected, _rank3(image, steps, dilate)).getbbox() is None
