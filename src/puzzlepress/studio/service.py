@@ -174,7 +174,11 @@ class StudioService:
                 # An incomplete coloring plan (no pages yet, a drawing that cannot be
                 # read) is reported with its issues, so the composer can show them.
                 payload = engine.payload(content, plan, verification)
-                return {**payload, "geometry": coloring_page_geometry(project)}
+                return {
+                    **payload,
+                    "geometry": coloring_page_geometry(project),
+                    "placements": coloring_placements(project, content, plan),
+                }
             if not verification.valid:
                 raise RuntimeError(f"Publication plan failed verification: {verification.issues!r}")
             return engine.payload(content, plan, verification)
@@ -237,3 +241,45 @@ def coloring_page_geometry(project: Project) -> dict[str, object]:
         "border": border.value,
         "sides": sides,
     }
+
+
+def coloring_placements(project: Project, content: object, plan: object) -> dict[str, object]:
+    """Where each coloring page of a draft plan prints its drawing (PDF points, origin
+    bottom-left) and at what effective DPI, by physical page: computed by the same
+    `place_art` the interior layout uses, from the prepared pixel size."""
+    from puzzlepress.coloring.content import ColoringContent
+    from puzzlepress.coloring_config import CENTRED, Border
+    from puzzlepress.interior import DEFAULT_PROFILE, print_profile
+    from puzzlepress.interior.coloring import art_box, place_art
+    from puzzlepress.interior.engine import FOLIO_BAND
+    from puzzlepress.interior.geometry import page_frame
+    from puzzlepress.interior.model import Box
+    from puzzlepress.interior.spec import PrintSpecification
+    from puzzlepress.publication import PageKind, PublicationPlan
+
+    if not isinstance(content, ColoringContent) or not isinstance(plan, PublicationPlan):
+        return {}
+    profile = project.printing.profile if project.printing else DEFAULT_PROFILE
+    spec = print_profile(profile)
+    assert isinstance(spec, PrintSpecification)
+    book = project.coloring
+    border = book.layout.border if book else Border.NONE
+    placements = book.placements if book else {}
+    result: dict[str, object] = {}
+    for page in plan.pages:
+        ref = page.artwork
+        prepared = content.art.get(ref.id) if ref else None
+        if page.kind is not PageKind.COLORING or ref is None or prepared is None:
+            continue
+        frame = page_frame(spec, page.index).content
+        body = Box(frame.x, frame.y + FOLIO_BAND, frame.width, frame.height - FOLIO_BAND)
+        authored = placements.get(ref.entry, CENTRED)
+        box, dpi = place_art(art_box(body, border), prepared.width, prepared.height, authored)
+        result[str(page.index)] = {
+            "entry": ref.entry,
+            "box": {k: round(getattr(box, k), 3) for k in ("x", "y", "width", "height")},
+            "effective_dpi": round(dpi, 1),
+            "pixels": {"width": prepared.width, "height": prepared.height},
+            "placement": authored.to_dict(),
+        }
+    return result

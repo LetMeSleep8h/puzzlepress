@@ -26,7 +26,7 @@ from ..coloring.duplicates import DuplicateReport, find_duplicates
 from ..coloring.inspection import Inspection, inspect_artwork
 from ..coloring.issues import ArtworkError, ArtworkFinding
 from ..coloring.prepare import PreparationMeasures, measure_artwork
-from ..coloring_config import Border
+from ..coloring_config import Border, Placement
 from ..interior.build import toolchain
 from ..interior.coloring import (
     ART_ROLE,
@@ -90,6 +90,11 @@ class ColoringContext(Context):
     def border(self) -> Border:
         book = self.project.coloring
         return book.layout.border if book is not None else Border.NONE
+
+    @property
+    def placements(self) -> dict[int, Placement]:
+        book = self.project.coloring
+        return book.placements if book is not None else {}
 
     def environment_change(self) -> list[tuple[str, object, object]]:
         """(field, recorded, running) for each deflate or image-library difference."""
@@ -494,7 +499,7 @@ def _placement(r: PreflightRule, ctx: Context) -> Check:
     c = _coloring(ctx)
     if c.layout is None or c.plan is None or c.content is None:
         return _skip(NO_LAYOUT)
-    issues = validate_coloring_layout(c.layout, c.plan, c.content, c.border)
+    issues = validate_coloring_layout(c.layout, c.plan, c.content, c.border, c.placements)
     return Check(
         tuple(_finding(r, i.message, ctx, i.physical_page, region=i.code) for i in issues),
         note="Every drawing whole, uniformly scaled and inside its art box.",

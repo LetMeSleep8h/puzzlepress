@@ -7,7 +7,10 @@ coloring page holds one prepared drawing and, when the book asks for one, a rule
 border. The layout never reorders, inserts, omits or resizes pages.
 
 Placement: a drawing is fitted whole ("contain") and centred in the art box: the
-live area above the page-number band, inset inside a border when there is one.
+live area above the page-number band, inset inside a border when there is one. A
+page may author a placement (`coloring.pages[].placement`): the drawing drawn
+smaller (down to half the fit) and moved within the space that leaves, still whole
+and inside the art box, still the same pixels; pages without one are unchanged.
 The box is the same whether or not numbers print, so turning numbers off never
 moves art. Scale is uniform, so the aspect ratio is exact, and nothing is cropped
 or clipped. Effective DPI is the prepared pixels per printed inch; it is measured,
@@ -38,7 +41,7 @@ from pypdf.generic import ArrayObject, NameObject
 
 from ..coloring.content import ColoringContent, PreparedArt
 from ..coloring.prepare import PREPARATION_VERSION, pixel_digest
-from ..coloring_config import Border
+from ..coloring_config import CENTRED, Border, Placement
 from ..publication import PageKind, PublicationPlan
 from .design import CLASSIC
 from .engine import (
@@ -61,6 +64,7 @@ from .validation import EPSILON, validate_layout
 
 # 1: contain-fit, centred art in the body above the folio band; thin (1 pt) and
 # double (1.5 + 0.75 pt) borders; deflate level coloring.content.DEFLATE_LEVEL.
+# Authored placements (Interval 6) change only pages that have one, so this stays 1.
 COLORING_RENDERER_VERSION = 1
 ART_ROLE = "coloring_art"
 BORDER_ROLE = "coloring_border"
@@ -132,24 +136,47 @@ def _border(page: _Page, border: Border) -> None:
         offset += width + DOUBLE_GAP
 
 
-def place_art(box: Box, width: int, height: int) -> tuple[Box, float]:
-    """(placement, effective DPI): the whole drawing, uniformly scaled and centred."""
+def place_art(
+    box: Box, width: int, height: int, placement: Placement = CENTRED
+) -> tuple[Box, float]:
+    """(placement, effective DPI): the whole drawing, uniformly scaled, placed in `box`.
+
+    The centred default computes exactly what it always has, so its bytes hold."""
     scale = min(box.width / width, box.height / height)  # Points per pixel.
+    if placement == CENTRED:
+        placed_w, placed_h = width * scale, height * scale
+        return Box(
+            box.x + (box.width - placed_w) / 2,
+            box.y + (box.height - placed_h) / 2,
+            placed_w,
+            placed_h,
+        ), 72.0 / scale
+    scale *= placement.scale
     placed_w, placed_h = width * scale, height * scale
-    placement = Box(
-        box.x + (box.width - placed_w) / 2, box.y + (box.height - placed_h) / 2, placed_w, placed_h
-    )
-    return placement, 72.0 / scale
+    free_w, free_h = max(0.0, box.width - placed_w), max(0.0, box.height - placed_h)
+    return Box(
+        box.x + free_w * (1 + placement.x) / 2,
+        box.y + free_h * (1 + placement.y) / 2,
+        placed_w,
+        placed_h,
+    ), 72.0 / scale
 
 
-def _coloring_page(page: _Page, art: Mapping[str, PreparedArt], border: Border) -> None:
+def _coloring_page(
+    page: _Page,
+    art: Mapping[str, PreparedArt],
+    border: Border,
+    placements: Mapping[int, Placement],
+) -> None:
     ref = page.plan_page.artwork
     assert ref is not None
     prepared = art[ref.id]
     if border is not Border.NONE:
         _border(page, border)
     region = art_box(page.body, border)
-    placement, dpi = place_art(region, prepared.width, prepared.height)
+    placement, dpi = place_art(
+        region, prepared.width, prepared.height, placements.get(ref.entry, CENTRED)
+    )
     page.elements.append(
         ImageBlock(
             ART_ROLE,
@@ -204,7 +231,11 @@ def _bindings(plan: PublicationPlan, content: ColoringContent) -> tuple[LayoutIs
 
 
 def layout_coloring(
-    plan: PublicationPlan, content: ColoringContent, spec: PrintSpecification, border: Border
+    plan: PublicationPlan,
+    content: ColoringContent,
+    spec: PrintSpecification,
+    border: Border,
+    placements: Mapping[int, Placement] | None = None,
 ) -> InteriorLayout:
     """Lay out a verified coloring plan. Raises InteriorError with every diagnostic."""
     spec_issues = validate_print_spec(spec)
@@ -224,7 +255,7 @@ def layout_coloring(
         PageKind.NOTES: _notes_page,
         PageKind.DIVIDER: _divider_page,
         PageKind.BLANK: lambda page: None,
-        PageKind.COLORING: lambda page: _coloring_page(page, content.art, border),
+        PageKind.COLORING: lambda page: _coloring_page(page, content.art, border, placements or {}),
     }
     pages: list[PhysicalPage] = []
     issues: list[LayoutIssue] = []
@@ -256,7 +287,11 @@ def layout_coloring(
 
 
 def validate_coloring_layout(
-    layout: InteriorLayout, plan: PublicationPlan, content: ColoringContent, border: Border
+    layout: InteriorLayout,
+    plan: PublicationPlan,
+    content: ColoringContent,
+    border: Border,
+    placements: Mapping[int, Placement] | None = None,
 ) -> tuple[LayoutIssue, ...]:
     """The shared structural checks, plus each coloring page's drawing and border."""
     issues = list(validate_layout(layout, plan, None))
@@ -302,6 +337,17 @@ def validate_coloring_layout(
             fail("artwork_distorted", "The drawing is not uniformly scaled.")
         if abs(image.effective_dpi - width * 72.0 / placement.width) > 1e-6:
             fail("artwork_dpi", "The recorded effective DPI does not match the placement.")
+        authored = (placements or {}).get(ref.entry, CENTRED)
+        expected, _ = place_art(region, width, height, authored)
+        if any(
+            abs(getattr(placement, k) - getattr(expected, k)) > EPSILON
+            for k in ("x", "y", "width", "height")
+        ):
+            fail(
+                "artwork_placement",
+                "The drawing is not where its page places it (centred unless the page "
+                "authors a placement).",
+            )
         if [f.stroke_width for f in frames] != list(strokes) or any(
             f.fill_gray is not None or f.stroke_gray != 0.0 for f in frames
         ):
