@@ -23,6 +23,7 @@ class CreationService:
                     "description": spec.description,
                     "paper": spec.paper.value,
                     "trim": {"width": spec.trim.width, "height": spec.trim.height},
+                    "bleed": spec.bleed,
                 }
                 for spec in PROFILES.values()
             ],

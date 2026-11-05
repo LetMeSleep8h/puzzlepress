@@ -67,7 +67,7 @@ def _geometry(layout: InteriorLayout) -> list[dict[str, object]]:
     pages: list[dict[str, object]] = []
     for page in layout.pages:
         frame = page.frame
-        safe = kdp_safe_area(layout.spec, count, frame.recto)
+        safe = kdp_safe_area(layout.spec, count, frame.recto, frame.trim)
         pages.append(
             {
                 "physical_page": page.number,
@@ -127,8 +127,14 @@ class PrintService:
             "revision": revision,
             "ruleset": ruleset,
             "profiles": [
-                {"id": spec.profile_id, "description": spec.description, "paper": spec.paper.value}
+                {
+                    "id": spec.profile_id,
+                    "description": spec.description,
+                    "paper": spec.paper.value,
+                    "bleed": spec.bleed,
+                }
                 for spec in PROFILES.values()
+                if not spec.bleed or project.coloring is not None
             ],
             "profile": _built_profile(artifacts.manifest) or DEFAULT_PROFILE,
         }

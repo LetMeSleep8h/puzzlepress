@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from ..interior.build import interior_identity, style_currency, toolchain
 from ..interior.fonts import BUNDLED_FAMILY
+from ..interior.geometry import page_frame
 from ..interior.inspection import same_box
 from ..interior.model import (
     Box,
@@ -24,6 +25,7 @@ from ..interior.model import (
     TextLine,
 )
 from ..interior.spec import KDP, PrintSpecification, to_inches
+from ..interior.validation import bleeds
 from .context import Context
 from .model import (
     Basis,
@@ -479,6 +481,8 @@ def _page_count(r: PreflightRule, ctx: Context) -> Check:
 def _boxes(r: PreflightRule, ctx: Context) -> Check:
     if ctx.facts is None or ctx.spec is None:
         return _skip(NO_PDF if ctx.facts is None else NO_PROFILE)
+    if ctx.spec.bleed:
+        return _bleed_boxes(r, ctx)
     trim = Box(0.0, 0.0, ctx.spec.trim.width, ctx.spec.trim.height)
     findings = []
     for page in ctx.facts.pages:
@@ -496,6 +500,34 @@ def _boxes(r: PreflightRule, ctx: Context) -> Check:
                 )
             )
     return Check(tuple(findings), note="Every page is exactly the trim size.")
+
+
+def _bleed_boxes(r: PreflightRule, ctx: Context) -> Check:
+    """Full bleed: MediaBox = BleedBox = trim plus bleed, TrimBox at the binding edge."""
+    assert ctx.facts is not None and ctx.spec is not None
+    findings = []
+    for page in ctx.facts.pages:
+        frame = page_frame(ctx.spec, page.number)
+        side = "recto" if frame.recto else "verso"
+        for name, box, expected in (
+            ("MediaBox", page.media, frame.media),
+            ("BleedBox", page.bleed, frame.media),
+            ("TrimBox", page.trim, frame.trim),
+        ):
+            if not same_box(box, expected):
+                findings.append(
+                    _finding(
+                        r,
+                        f"{name} differs from the profile's full-bleed {side} page.",
+                        ctx,
+                        page.number,
+                        region=name,
+                    )
+                )
+    return Check(
+        tuple(findings),
+        note="Every page is the trim plus bleed, its trim box at the binding edge.",
+    )
 
 
 @rule(
@@ -691,6 +723,8 @@ def _live_area(r: PreflightRule, ctx: Context) -> Check:
     for page in ctx.layout.pages:
         content = page.frame.content
         for element in page.elements:
+            if bleeds(element):
+                continue  # Fill art: checked by the coloring bleed rules.
             ink = ink_bounds(element)
             if not content.contains(ink, 0.01):
                 overhang = max(
@@ -832,6 +866,8 @@ def _page_size(r: PreflightRule, ctx: Context) -> Check:
     if ctx.facts is None or ctx.spec is None:
         return _skip(NO_PDF if ctx.facts is None else NO_PROFILE)
     width, height = ctx.spec.trim.width, ctx.spec.trim.height
+    if ctx.spec.bleed:  # KDP: 0.125 in wider and 0.25 in taller than the trim.
+        width, height = width + KDP.interior_bleed, height + 2 * KDP.interior_bleed
     findings = []
     for page in ctx.facts.pages:
         if page.media is None:
@@ -845,7 +881,9 @@ def _page_size(r: PreflightRule, ctx: Context) -> Check:
                     r,
                     "The page is a two-page spread."
                     if spread
-                    else "The page size differs from the trim size.",
+                    else "The page size differs from the trim size."
+                    if not ctx.spec.bleed
+                    else "The page size differs from the trim plus bleed.",
                     ctx,
                     page.number,
                     region="MediaBox",
@@ -857,7 +895,12 @@ def _page_size(r: PreflightRule, ctx: Context) -> Check:
                     ),
                 )
             )
-    return Check(tuple(findings), note="Every page is a single trim-size page.")
+    return Check(
+        tuple(findings),
+        note="Every page is a single trim-size page."
+        if not ctx.spec.bleed
+        else "Every page is a single page of the trim plus bleed (0.125 x 0.25 in).",
+    )
 
 
 @rule(
@@ -873,7 +916,7 @@ def _no_bleed(r: PreflightRule, ctx: Context) -> Check:
     if ctx.spec is None or ctx.facts is None:
         return _skip(NO_PROFILE if ctx.spec is None else NO_PDF)
     if ctx.spec.bleed:
-        return Check((_finding(r, "Bleed profiles are not modeled by this rule set."),))
+        return _na("Full-bleed profile: its page boxes are checked by page_boxes.")
     trim = Box(0.0, 0.0, ctx.spec.trim.width, ctx.spec.trim.height)
     return Check(
         tuple(
@@ -891,16 +934,20 @@ def _no_bleed(r: PreflightRule, ctx: Context) -> Check:
     )
 
 
-def kdp_safe_area(spec: PrintSpecification, page_count: int, recto: bool) -> Box | None:
-    """The area KDP's margin rules leave for content on a page; None beyond the table."""
+def kdp_safe_area(
+    spec: PrintSpecification, page_count: int, recto: bool, trim: Box | None = None
+) -> Box | None:
+    """The area KDP's margin rules leave for content on a page; None beyond the table.
+    With bleed, measured from that page's trim box (0.375 in outside, top, bottom)."""
     gutter = KDP.required_gutter(page_count)
     if gutter is None:
         return None
-    outside = KDP.min_outside_margin
+    outside = KDP.min_outside_margin_with_bleed if spec.bleed else KDP.min_outside_margin
     left = gutter if recto else outside
+    x0, y0 = (trim.x, trim.y) if trim is not None else (0.0, 0.0)
     return Box(
-        left,
-        outside,
+        x0 + left,
+        y0 + outside,
         spec.trim.width - gutter - outside,
         spec.trim.height - 2 * outside,
     )
@@ -920,7 +967,14 @@ def _clearances(
 ) -> Iterator[tuple[str, float, Element]]:
     """(edge, distance from the trim edge, nearest element) for each trim edge."""
     width, height = spec.trim.width, spec.trim.height
-    inks = [(ink_bounds(e), e) for e in page.elements]
+    origin = page.frame.trim  # At (0, 0) without bleed.
+    inks = [
+        (_relative(ink_bounds(e), origin) if spec.bleed else ink_bounds(e), e)
+        for e in page.elements
+        if not bleeds(e)
+    ]
+    if not inks:
+        return
     left = min(inks, key=lambda item: item[0].x)
     right = min(inks, key=lambda item: width - item[0].right)
     bottom = min(inks, key=lambda item: item[0].y)
@@ -930,6 +984,10 @@ def _clearances(
     yield "outside", width - outside[0].right if page.frame.recto else outside[0].x, outside[1]
     yield "top", height - top[0].top, top[1]
     yield "bottom", bottom[0].y, bottom[1]
+
+
+def _relative(box: Box, origin: Box) -> Box:
+    return Box(box.x - origin.x, box.y - origin.y, box.width, box.height)
 
 
 def _margin_check(r: PreflightRule, ctx: Context, edges: tuple[str, ...], required: float) -> Check:
@@ -997,7 +1055,10 @@ def _gutter(r: PreflightRule, ctx: Context) -> Check:
 def _outside(r: PreflightRule, ctx: Context) -> Check:
     if ctx.layout is None:
         return _skip(NO_LAYOUT)
-    return _margin_check(r, ctx, ("outside", "top", "bottom"), KDP.min_outside_margin)
+    required = (
+        KDP.min_outside_margin_with_bleed if ctx.layout.spec.bleed else KDP.min_outside_margin
+    )
+    return _margin_check(r, ctx, ("outside", "top", "bottom"), required)
 
 
 def _per_element(
@@ -1210,6 +1271,21 @@ def _flattened(r: PreflightRule, ctx: Context) -> Check:
 def _marks(r: PreflightRule, ctx: Context) -> Check:
     if ctx.facts is None or ctx.layout is None:
         return _skip(NO_PDF if ctx.facts is None else NO_LAYOUT)
+    if ctx.layout.spec.bleed:
+        # Beyond the trim is bleed, exactly KDP's 0.125 in, where only fill art prints
+        # (the margin rules keep every other element inside the trim).
+        beyond = [
+            _finding(
+                r,
+                "The page extends beyond the trim plus bleed.",
+                ctx,
+                page.number,
+                region="MediaBox",
+            )
+            for page in ctx.layout.pages
+            if not same_box(ctx.facts.pages[page.number - 1].media, page.frame.media)
+        ]
+        return Check(tuple(beyond), note="No slug area beyond the bleed.")
     findings = [
         _finding(r, "The page extends beyond the trim.", ctx, page.number, region="MediaBox")
         for page in ctx.layout.pages

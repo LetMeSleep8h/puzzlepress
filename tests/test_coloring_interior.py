@@ -377,12 +377,21 @@ def test_empty_and_uncomposed_books_fail_with_actionable_errors(tmp_path, capsys
     assert not (tmp_path / "out").exists()
 
 
-def test_bleed_profiles_are_rejected(tmp_path):
+def test_a_coloring_book_builds_on_a_bleed_profile(tmp_path):
+    """Interval 9: bleed profiles build coloring interiors (pages trim plus bleed); the
+    contained drawings print exactly as on the same trim without bleed, moved with it."""
+    from puzzlepress.interior.spec import PROFILES
+
     directory = composed_coloring_book(tmp_path / "book", 1)
     project = load_project(directory).project
-    with pytest.raises(InteriorError) as raised:
-        build_interior(project, replace(SPEC, bleed=True), directory)
-    assert raised.value.stage == "print_spec"
+    bleed = build_interior(project, PROFILES["paperback-8.5x11-bleed"], directory)
+    plain = build_interior(project, SPEC, directory)
+    assert len(bleed.layout.pages) == len(plain.layout.pages)
+    for a, b in zip(bleed.layout.pages, plain.layout.pages, strict=True):
+        assert (a.frame.media.width, a.frame.media.height) == (612 + 9, 792 + 18)
+        dx, dy = a.frame.trim.x - b.frame.trim.x, a.frame.trim.y - b.frame.trim.y
+        assert (dx, dy) == ((0.0 if a.frame.recto else 9.0), 9.0)
+        assert [e.role for e in a.elements] == [e.role for e in b.elements]
 
 
 # ------------------------------------------------------------ identity and output

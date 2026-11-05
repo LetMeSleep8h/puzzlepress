@@ -230,6 +230,15 @@ def validate_project(data: object) -> ValidationResult:
     if "print" in root:
         printing, print_issues = validate_print(root["print"])
         issues.extend(print_issues)
+        if printing is not None and word_search is not None and printing.profile.endswith("-bleed"):
+            issues.append(
+                ValidationIssue(
+                    "print.profile",
+                    "bleed_not_for_engine",
+                    "Full-bleed profiles are for coloring books; word-search pages have nothing "
+                    "that prints past the trim. Choose the same trim without -bleed.",
+                )
+            )
     if issues:
         return ValidationResult(None, tuple(issues))
     return ValidationResult(

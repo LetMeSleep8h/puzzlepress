@@ -1,47 +1,103 @@
 {
   "key": "coloring-print",
   "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
-  "ruleset": 3,
+  "ruleset": 4,
   "profiles": [
     {
       "id": "paperback-8.5x11",
       "description": "8.5 x 11 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-8.5x11-cream",
       "description": "8.5 x 11 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
     },
     {
       "id": "paperback-6x9",
       "description": "6 x 9 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-6x9-cream",
       "description": "6 x 9 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
     },
     {
       "id": "paperback-8x10",
       "description": "8 x 10 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-8x10-cream",
       "description": "8 x 10 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
     },
     {
       "id": "paperback-8.5x8.5",
       "description": "8.5 x 8.5 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-8.5x8.5-cream",
       "description": "8.5 x 8.5 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
+    },
+    {
+      "id": "paperback-8.5x11-bleed",
+      "description": "8.5 x 11 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8.5x11-cream-bleed",
+      "description": "8.5 x 11 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
+    },
+    {
+      "id": "paperback-6x9-bleed",
+      "description": "6 x 9 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-6x9-cream-bleed",
+      "description": "6 x 9 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8x10-bleed",
+      "description": "8 x 10 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8x10-cream-bleed",
+      "description": "8 x 10 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8.5x8.5-bleed",
+      "description": "8.5 x 8.5 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8.5x8.5-cream-bleed",
+      "description": "8.5 x 8.5 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
     }
   ],
   "profile": "paperback-8.5x11",
@@ -50,8 +106,8 @@
     "report_version": 1,
     "ruleset": {
       "id": "puzzlepress-kdp-coloring",
-      "version": 3,
-      "kdp_rules_checked": "2026-10-07"
+      "version": 4,
+      "kdp_rules_checked": "2026-11-05"
     },
     "book_id": "synthetic-coloring-book",
     "source_identity": "pp1-sha256-f229dfb2559e19d094664cc576abe5d646d9b1b4f108cefbc9af764777fdf032",
@@ -586,6 +642,21 @@
         "measure": null
       },
       {
+        "code": "coloring_bleed_art",
+        "scope": "kdp",
+        "category": "content",
+        "severity": "warning",
+        "title": "Full-bleed drawings and trimming",
+        "description": "On a full-bleed page, a drawing that fills the page covers the bleed edges (top, bottom, outside) and the inside margin. Reported for review: line work cropped off the page, printed only in the bleed (cut at trimming), or inside the trim but outside KDP's safe area (0.375 in, gutter by page count), each above 0.1 % of the drawing's ink. Nothing is moved or rescaled to avoid it.",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Set Trim Size, Bleed, and Margins",
+        "help": "docs/preflight.md#rule-catalogue",
+        "outcome": "not_applicable",
+        "findings": 0,
+        "note": "No drawing fills a page.",
+        "measure": null
+      },
+      {
         "code": "blank_pages",
         "scope": "structural",
         "category": "content",
@@ -651,16 +722,16 @@
         "category": "page",
         "severity": "error",
         "title": "Maximum page count",
-        "description": "Page count is within KDP's black-ink maximum for the trim. KDP's current table omits the 8.5 x 11 in row; the lower indexed value (550, cream) is used.",
-        "basis": "kdp_ambiguous",
-        "source": "KDP help: Print Options",
+        "description": "Page count is within KDP's black-ink maximum for the trim on the profile's paper (8.5 x 11 and 8.5 x 8.5 in: 590 white, 550 cream; 6 x 9 and 8 x 10 in: 828 white, 776 cream).",
+        "basis": "kdp_requirement",
+        "source": "KDP help: Set Trim Size, Bleed, and Margins",
         "help": "docs/preflight.md#rule-catalogue",
         "outcome": "passed",
         "findings": 0,
-        "note": "6 of at most 550 pages.",
+        "note": "6 of at most 590 pages.",
         "measure": {
           "actual": 6,
-          "required": 550,
+          "required": 590,
           "unit": "pages",
           "comparison": "at_most"
         }

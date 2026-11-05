@@ -44,6 +44,7 @@ OPTIONS = {
     "print_profiles": [
         {"id": spec.profile_id, "description": spec.description}
         for spec in sorted(PROFILES.values(), key=lambda s: s.profile_id)
+        if not spec.bleed
     ],
     "puzzle_types": list(SUPPORTED_PUZZLE_TYPES),
     "directions": [direction_name(d) for d in Direction],

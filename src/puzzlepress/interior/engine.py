@@ -418,6 +418,15 @@ def layout_interior(
     element does not fit. Style readability notes are returned as warnings.
     """
     spec_issues = validate_print_spec(spec)
+    if spec.bleed:
+        spec_issues += (
+            LayoutIssue(
+                "unsupported_bleed_configuration",
+                "Full bleed is for coloring books; word-search pages have nothing that "
+                "prints past the trim. Use the same trim without bleed.",
+                region="print.bleed",
+            ),
+        )
     if spec_issues:
         raise InteriorError("print_spec", spec_issues)
     puzzles, binding_issues = verify_puzzle_bindings(plan, report)

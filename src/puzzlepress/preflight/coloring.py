@@ -32,6 +32,7 @@ from ..interior.build import toolchain
 from ..interior.coloring import (
     ART_ROLE,
     EmbeddedImage,
+    bleed_crop,
     coloring_toolchain,
     image_integrity,
     validate_coloring_layout,
@@ -47,6 +48,7 @@ from .model import Rule as PreflightRule
 from .rules import (
     CATALOGUE,
     CONTRACT,
+    MARGINS,
     NO_LAYOUT,
     NO_PDF,
     SUBMISSION,
@@ -54,14 +56,19 @@ from .rules import (
     Evaluator,
     _finding,
     _matches,
+    _na,
     _skip,
+    kdp_safe_area,
 )
 
 RULESET_ID = "puzzlepress-kdp-coloring"
 # 2: line quality also reports light strokes of the original that preparation erased.
 # 3: line measures read each image relative to its own paper (measures version 2), so
 #    background cleanup of tinted scans is no longer reported as fine-line loss.
-RULESET_VERSION = 3
+# 4: full bleed (Interval 9): `coloring_bleed_art`, and the shared page-box, page-size,
+#    margin, live-area and printer-mark rules judge full-bleed pages by their own boxes.
+RULESET_VERSION = 4
+BLEED_INK_NOTICE = 0.001  # Share of a drawing's ink worth a trimming note.
 COLORING_CONTRACT = "PuzzlePress coloring interior contract (docs/coloring.md)"
 QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"
 
@@ -508,6 +515,68 @@ def _placement(r: PreflightRule, ctx: Context) -> Check:
     return Check(
         tuple(_finding(r, i.message, ctx, i.physical_page, region=i.code) for i in issues),
         note="Every drawing whole, uniformly scaled and inside its art box.",
+    )
+
+
+@rule(
+    "coloring_bleed_art",
+    Scope.KDP,
+    Category.CONTENT,
+    "Full-bleed drawings and trimming",
+    "On a full-bleed page, a drawing that fills the page covers the bleed edges (top, "
+    "bottom, outside) and the inside margin. Reported for review: line work cropped off "
+    "the page, printed only in the bleed (cut at trimming), or inside the trim but outside "
+    "KDP's safe area (0.375 in, gutter by page count), each above 0.1 % of the drawing's "
+    "ink. Nothing is moved or rescaled to avoid it.",
+    MARGINS,
+    severity=Severity.WARNING,
+)
+def _bleed_art(r: PreflightRule, ctx: Context) -> Check:
+    c = _coloring(ctx)
+    if c.layout is None or c.content is None:
+        return _skip(NO_LAYOUT)
+    filled = [
+        (page, element)
+        for page in c.layout.pages
+        for element in page.elements
+        if isinstance(element, ImageBlock) and element.bleed
+    ]
+    if not filled:
+        return _na("No drawing fills a page.")
+    count = len(c.layout.pages)
+    findings = []
+    for page, block in filled:
+        art = next(
+            (a for a in c.content.art.values() if a.digest == block.sha256),
+            None,
+        )
+        safe = kdp_safe_area(c.layout.spec, count, page.frame.recto, page.frame.trim)
+        if art is None or safe is None:
+            continue
+        crop = bleed_crop(art.image(), block, page.frame.trim, safe)
+        for share, what in (
+            (crop.hidden, "is cropped off the page (outside the bleed)"),
+            (crop.trimmed, "prints only in the bleed and is cut off at trimming"),
+            (crop.unsafe, "lies inside the trim but outside the safe area"),
+        ):
+            if share > BLEED_INK_NOTICE:
+                findings.append(
+                    _finding(
+                        r,
+                        f"{share:.1%} of the drawing's line work {what}; check the crop "
+                        "in Pages and move or zoom the drawing if that detail matters.",
+                        ctx,
+                        page.number,
+                        region="bleed_art",
+                        bounds=block.box,
+                        measure=Measure(
+                            round(share * 100, 2), BLEED_INK_NOTICE * 100, "%", "at_most"
+                        ),
+                    )
+                )
+    return Check(
+        tuple(findings),
+        note=f"{len(filled)} drawing(s) fill their page; trimming effects measured.",
     )
 
 

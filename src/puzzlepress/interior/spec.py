@@ -49,6 +49,10 @@ class KdpConstraints:
     min_pages: int = 24
     min_outside_margin: float = inches(0.25)
     min_outside_margin_with_bleed: float = inches(0.375)
+    # Interior bleed ("Set Trim Size, Bleed, and Margins", read 2026-11-05): 0.125 in
+    # beyond the trim at the top, bottom and outside edge, none at the inside (gutter)
+    # edge, so a bleed page is 0.125 in wider and 0.25 in taller than the trim.
+    interior_bleed: float = inches(0.125)
     min_image_dpi: float = 300.0
     max_blank_run: int = 4  # Consecutive blank pages at the beginning or middle.
     max_trailing_blank_run: int = 10  # Consecutive blank pages at the end.
@@ -268,18 +272,21 @@ PAPERBACK_LETTER_CREAM = PrintSpecification(
 )
 
 
-def _profile(trim: TrimSize, paper: Paper, margins: Margins) -> PrintSpecification:
-    suffix = "" if paper is Paper.WHITE else f"-{paper.value}"
+def _profile(
+    trim: TrimSize, paper: Paper, margins: Margins, bleed: bool = False
+) -> PrintSpecification:
+    suffix = ("" if paper is Paper.WHITE else f"-{paper.value}") + ("-bleed" if bleed else "")
     inches_name = trim.name.replace("x", " x ")
     return PrintSpecification(
         profile_id=f"paperback-{trim.name}{suffix}",
         profile_version=1,
         description=f"{inches_name} in paperback interior, black ink on {paper.value} paper, "
-        "no bleed",
+        + ("full bleed" if bleed else "no bleed"),
         trim=trim,
         margins=margins,
         ink=Ink.BLACK,
         paper=paper,
+        bleed=bleed,
     )
 
 
@@ -293,7 +300,18 @@ _ADDED = tuple(
     for trim in SUPPORTED_TRIMS[1:]
     for paper in (Paper.WHITE, Paper.CREAM)
 )
-PROFILES = {spec.profile_id: spec for spec in (PAPERBACK_LETTER, PAPERBACK_LETTER_CREAM, *_ADDED)}
+# Full-bleed profiles (Interval 9): the same trims, papers and margins (every one at
+# least KDP's 0.375 in minimum with bleed), pages 0.125 x 0.25 in larger. Coloring
+# books only: word-search pages have nothing that prints past the trim.
+_BLEED = tuple(
+    _profile(trim, paper, _SMALL_MARGINS if trim.name == "6x9" else _LETTER_MARGINS, True)
+    for trim in SUPPORTED_TRIMS
+    for paper in (Paper.WHITE, Paper.CREAM)
+)
+BLEED_ENGINES = ("coloring",)
+PROFILES = {
+    spec.profile_id: spec for spec in (PAPERBACK_LETTER, PAPERBACK_LETTER_CREAM, *_ADDED, *_BLEED)
+}
 DEFAULT_PROFILE = PAPERBACK_LETTER.profile_id
 # Content boxes narrower or shorter than this cannot hold any supported template.
 MIN_CONTENT_EXTENT = inches(3)
@@ -325,16 +343,6 @@ def validate_print_spec(spec: PrintSpecification) -> tuple[LayoutIssue, ...]:
                 region="print.trim",
                 actual=f"{to_inches(trim.width):g}x{to_inches(trim.height):g} in",
                 required=", ".join(s.name for s in SUPPORTED_TRIMS),
-            )
-        )
-    if spec.bleed:
-        issues.append(
-            LayoutIssue(
-                "unsupported_bleed_configuration",
-                "Full-bleed interiors are not available in this version: page boxes, "
-                "bleed margins, art placed past the trim and their preflight rules are not "
-                "built (docs/print-interior.md, Full bleed). Use a no-bleed profile.",
-                region="print.bleed",
             )
         )
     minimum = KDP.min_outside_margin_with_bleed if spec.bleed else KDP.min_outside_margin

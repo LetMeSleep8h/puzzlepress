@@ -431,6 +431,7 @@ evaluators: `interior_artifacts`, `manifest_format`, `manifest_book`,
 | `coloring_artwork_sources` | structural | blocking | each used original is present and matches its pinned SHA-256 |
 | `coloring_page_parity` | structural | blocking | order, recto coloring pages and dividers, blank reverses |
 | `coloring_art_placement` | structural | blocking | whole, unclipped, uniformly scaled, inside the art box, clear of the border |
+| `coloring_bleed_art` | KDP | warning | on full-bleed pages, a filling drawing's line work cropped off the page, printed only in the bleed, or outside the safe area (each above 0.1 % of its ink); reported, never moved |
 | `kdp_image_resolution` | KDP | blocking | each drawing prints at 300 DPI or more; the finding names the pixels needed |
 | `coloring_blank_artwork` | KDP | blocking | `prepared_blank` |
 | `coloring_excessive_ink` | KDP | blocking | `excessive_ink` |

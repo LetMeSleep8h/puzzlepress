@@ -6,14 +6,19 @@ import pytest
 from coloring_helpers import composed_coloring_book
 
 from puzzlepress.cover.geometry import cover_geometry
-from puzzlepress.interior import PROFILES, build_interior, write_interior
+from puzzlepress.interior import PROFILES, InteriorError, build_interior, write_interior
 from puzzlepress.interior.spec import KDP, SUPPORTED_TRIMS, Paper, inches, validate_print_spec
 from puzzlepress.preflight import preflight_interior, read_interior_artifacts
 from puzzlepress.project import load_project
 from puzzlepress.publication import PageKind
 from tests.helpers import DEMO
 
-ADDED = [pid for pid in PROFILES if not pid.startswith("paperback-8.5x11")]
+ADDED = [
+    pid
+    for pid in PROFILES
+    if not pid.startswith("paperback-8.5x11") and not PROFILES[pid].bleed
+]
+BLEED = [pid for pid in PROFILES if PROFILES[pid].bleed]
 
 
 def test_added_profiles_are_kdp_sizes_with_the_letter_gutter() -> None:
@@ -86,13 +91,20 @@ def test_page_maximum_follows_trim_and_paper(trim: str, white: int, cream: int) 
     assert KDP.max_pages_for("5x8", Paper.WHITE) is None  # Not a supported profile.
 
 
-def test_full_bleed_stays_unavailable_everywhere() -> None:
-    """Interval 8 assessed full bleed against KDP's rules but did not build it: no
-    profile offers it and the specification refuses it with the reason."""
-    from dataclasses import replace
-
-    assert all(not spec.bleed for spec in PROFILES.values())
-    assert all("no bleed" in spec.description for spec in PROFILES.values())
-    issues = validate_print_spec(replace(PROFILES["paperback-8.5x11"], bleed=True))
-    refusal = next(i for i in issues if i.code == "unsupported_bleed_configuration")
-    assert "not available" in refusal.message
+def test_every_trim_and_paper_has_a_full_bleed_profile_for_coloring_only() -> None:
+    """Interval 9: a -bleed twin of each no-bleed profile (same trim, paper, margins);
+    word-search builds refuse them with the reason; the no-bleed profiles are unchanged."""
+    assert len(BLEED) == 8
+    for pid in BLEED:
+        spec = PROFILES[pid]
+        twin = PROFILES[pid.removesuffix("-bleed")]
+        assert (spec.trim, spec.paper, spec.margins) == (twin.trim, twin.paper, twin.margins)
+        assert not twin.bleed and "no bleed" in twin.description
+        assert "full bleed" in spec.description and validate_print_spec(spec) == ()
+        assert min(spec.margins.outside, spec.margins.top, spec.margins.bottom) >= (
+            KDP.min_outside_margin_with_bleed
+        )
+    project = load_project(DEMO).project
+    with pytest.raises(InteriorError) as raised:
+        build_interior(project, PROFILES["paperback-8.5x11-bleed"], DEMO)
+    assert raised.value.issues[0].code == "unsupported_bleed_configuration"

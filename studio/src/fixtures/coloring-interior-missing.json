@@ -1,47 +1,103 @@
 {
   "key": "coloring-print",
   "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
-  "ruleset": 3,
+  "ruleset": 4,
   "profiles": [
     {
       "id": "paperback-8.5x11",
       "description": "8.5 x 11 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-8.5x11-cream",
       "description": "8.5 x 11 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
     },
     {
       "id": "paperback-6x9",
       "description": "6 x 9 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-6x9-cream",
       "description": "6 x 9 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
     },
     {
       "id": "paperback-8x10",
       "description": "8 x 10 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-8x10-cream",
       "description": "8 x 10 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
     },
     {
       "id": "paperback-8.5x8.5",
       "description": "8.5 x 8.5 in paperback interior, black ink on white paper, no bleed",
-      "paper": "white"
+      "paper": "white",
+      "bleed": false
     },
     {
       "id": "paperback-8.5x8.5-cream",
       "description": "8.5 x 8.5 in paperback interior, black ink on cream paper, no bleed",
-      "paper": "cream"
+      "paper": "cream",
+      "bleed": false
+    },
+    {
+      "id": "paperback-8.5x11-bleed",
+      "description": "8.5 x 11 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8.5x11-cream-bleed",
+      "description": "8.5 x 11 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
+    },
+    {
+      "id": "paperback-6x9-bleed",
+      "description": "6 x 9 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-6x9-cream-bleed",
+      "description": "6 x 9 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8x10-bleed",
+      "description": "8 x 10 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8x10-cream-bleed",
+      "description": "8 x 10 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8.5x8.5-bleed",
+      "description": "8.5 x 8.5 in paperback interior, black ink on white paper, full bleed",
+      "paper": "white",
+      "bleed": true
+    },
+    {
+      "id": "paperback-8.5x8.5-cream-bleed",
+      "description": "8.5 x 8.5 in paperback interior, black ink on cream paper, full bleed",
+      "paper": "cream",
+      "bleed": true
     }
   ],
   "profile": "paperback-8.5x11",
