@@ -2,11 +2,13 @@
 
 import hashlib
 import re
+from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Lock
+from typing import Any
 
 from puzzlepress import __version__
 from puzzlepress.batch import generate_batch
@@ -261,6 +263,31 @@ def coloring_page_geometry(project: Project, page_count: int = 0) -> dict[str, o
     }
 
 
+# Crop measures by prepared-pixel digest and exact page boxes: a draft plan re-measures
+# only pages whose drawing or placement changed (bounded; identical inputs, identical
+# result).
+_CROPS: OrderedDict[tuple[object, ...], dict[str, object]] = OrderedDict()
+_CROP_ENTRIES = 1024
+
+
+def _crop(prepared: Any, block: Any, trim: Any, safe: Any) -> dict[str, object]:
+    from puzzlepress.interior.coloring import bleed_crop
+
+    def key_of(box: Any) -> tuple[float, ...]:
+        return (box.x, box.y, box.width, box.height)
+
+    key = (prepared.digest, key_of(block.box), key_of(block.placement), key_of(trim), key_of(safe))
+    known = _CROPS.get(key)
+    if known is None:
+        known = bleed_crop(prepared.image(), block, trim, safe).to_dict()
+        _CROPS[key] = known
+        while len(_CROPS) > _CROP_ENTRIES:
+            _CROPS.popitem(last=False)
+    else:
+        _CROPS.move_to_end(key)
+    return dict(known)
+
+
 def _points(box: object) -> dict[str, float]:
     return {k: round(getattr(box, k), 3) for k in ("x", "y", "width", "height")}
 
@@ -281,7 +308,6 @@ def coloring_placements(project: Project, content: object, plan: object) -> dict
     from puzzlepress.interior import DEFAULT_PROFILE, print_profile
     from puzzlepress.interior.coloring import (
         art_box,
-        bleed_crop,
         fill_box,
         place_art,
         place_fill,
@@ -338,9 +364,7 @@ def coloring_placements(project: Project, content: object, plan: object) -> dict
                 box=_points(clip),
                 drawing=_points(drawing),
                 effective_dpi=round(dpi, 1),
-                crop=bleed_crop(prepared.image(), block, page_box.trim, safe).to_dict()
-                if safe
-                else None,
+                crop=_crop(prepared, block, page_box.trim, safe) if safe else None,
             )
         else:
             box, dpi = place_art(art_box(body, border), prepared.width, prepared.height, authored)
