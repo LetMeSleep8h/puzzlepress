@@ -295,10 +295,35 @@ The memo reuses line-quality measures and packed prepared pixels for the same
 verified bytes, settings and versions within one process; it skips no check and
 writes nothing to disk. A first preflight still measures every drawing.
 
+### Interval 6 (production lock, placement and the memo review)
+
+`python tests/coloring_benchmark.py DIR` (150 synthetic drawings, 302 pages, blank
+backs; build, two preflights and `book produce` in one process). Two runs each,
+alternating, same Windows machine and day, Python 3.13; main at `b42b5bd`:
+
+| Step | main, run 1 / run 2 | Interval 6, run 1 / run 2 |
+| --- | --- | --- |
+| `book build` | 20.3 s / 27.9 s | 22.8 s / 20.2 s |
+| first preflight after the build | 119.8 s / 111.8 s | 111.4 s / 144.3 s |
+| second preflight, same process | 14.9 s / 15.0 s | 15.7 s / 18.1 s |
+| `book produce` after both (memo warm) | 21.4 s / 22.8 s | 24.6 s / 22.9 s |
+| peak working set (run 2) | 174.0 MB | 173.8 MB |
+
+The run-to-run spread on one code base (up to 33 s on a first preflight) is larger
+than any difference between the two, so these runs show no measurable change; the
+lock adds a file open and an OS lock call per run. The four sample books of
+`tests/coloring_samples.py` build byte-identical PDFs with equal build and interior
+identities on both.
+
 ## Known limitations
 
 - One trim (8.5 x 11 in, white or cream paper), no bleed: art prints inside the
-  margins. No auto-crop, captions or per-page placement.
+  margins. No auto-crop or captions; placement only shrinks and moves a drawing
+  inside its art box.
+- The production lock relies on the operating system's file lock; on a network
+  share that does not pass locks between computers, two computers could still
+  write one output. A lock written by another computer is therefore never reclaimed
+  automatically.
 - No graphical illustration editor; preparation is a fixed set of adjustments.
 - Line-quality thresholds are synthetic-calibrated conventions; see Real-artwork
   review. Light-stroke detection cannot tell construction lines from detail.

@@ -2,9 +2,56 @@
 
 ## Completed scope
 
-Multi-engine Interval 5 (coloring covers, publishing, production and the Studio
-Pages composer) on branch `feat/coloring-publishing`, cut from main after PR #18;
-committed locally, not pushed. Guide: docs/coloring-publishing.md.
+Multi-engine Interval 6 (visual book authoring and Studio UX) on branch
+`feat/studio-visual-authoring`, cut from main `b42b5bd` after PRs #18 and #19;
+committed locally, not pushed. Walkthrough: docs/studio-coloring-walkthrough.md.
+
+- Creation (`creation.py`, `creation_cli.py`, `studio/creating.py`): `puzzlepress
+  book new FOLDER --type word_search|coloring --title ...` and Studio **New book**
+  (`/create`, GET `/api/project-types`, POST `/api/projects` under the save lock).
+  Keys are lowercase hyphenated names directly in the library; exclusive `mkdir`,
+  creation marker, staged and read-back `book.yaml`; a failure removes only what it
+  wrote; an interrupted creation (marker plus staging files only) is recognised and
+  replaced (`recovered`); anything else is `project_exists`. Word search starts
+  with one puzzle titled "Starter puzzle: replace before publishing"; coloring
+  starts with no artwork (plan reports `no_coloring_pages`). Seed derived from the
+  key and written out; output `../../build/<key>`.
+- Optional `catalog` {subject, collection} (Library only, outside every identity)
+  and `print` {profile} (in build identity when present; book build, produce and
+  Studio print/rebuild use it; a different explicit profile is `profile_conflict`).
+  Absent sections change no bytes or identities.
+- Coloring placement: `coloring.pages[].placement` {scale 0.5..1, x, y -1..1};
+  centred normalizes to none. `place_art` default path unchanged (renderer 1); the
+  validator checks each drawing is where its page puts it (`artwork_placement`).
+  Lossless: same pixels, smaller, higher effective DPI. Draft plans carry Python's
+  placed boxes (`placements`).
+- Studio: Settings (both engines; coloring book details only there, word-search
+  title/language stay in Puzzles and title-page details in Book, linked); Pages
+  designer (select, zoomable page view, replace drawing, placement sliders,
+  centre/reset, duplicate, insert divider); `history.ts` scoped undo/redo with
+  grouped gestures and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y outside text fields, cleared
+  on save/reload/revert; `viewport.tsx`/`zoom.ts` Fit page, Fit width, steps, Reset
+  view, drag/keyboard pan (no re-render); Print proof gains Fit width, Reset view,
+  drag pan, `+ - 0`, and shows a book's own paper. Coloring Overview lists the
+  journey and why an empty book cannot pass. Library and app bar link New book.
+- Production lock (`production/lock.py`): OS lock (flock / msvcrt.locking) on
+  `.<output>.produce.lock`, released by the kernel on process death; live holder
+  refused with process and host; abandoned same-host record reclaimed and reported
+  (stderr `Recovered:`); empty, unreadable or other-host records refused, never
+  removed. Coloring produce restores a previous output an interrupted swap moved
+  aside and removes this output's own staging/backup folders (now named after the
+  output). Word-search produce takes the same lock; its outputs are unchanged.
+- Memo review: keys hold source digest, settings, preparation version, Pillow (plus
+  deflate level and zlib build for packed pixels); originals are read and verified
+  before lookup; bounded (4096 entries; 256 MB packed). Tests added.
+- `tests/artwork_review.py` (review harness: images, measures, print-size PDF,
+  review.md with human fields "not recorded"); `tests/coloring_benchmark.py`.
+- Fixed: main's Linux CI failure (run 41849615371) in
+  `test_frontend_fixtures_match_the_engine_output` (platform-dependent PNG digests
+  of synthetic drawings; compared without them).
+
+Earlier: multi-engine Interval 5 (coloring covers, publishing, production and the
+Studio Pages composer), merged as PR #19. Guide: docs/coloring-publishing.md.
 
 - Coloring books take the shared `cover` and `publishing` sections (interior style
   stays word search). The cover pipeline is unchanged: wrap and spine from the built
@@ -654,6 +701,35 @@ reload. Canonical YAML loses comments/formatting. One Studio process per library
 small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
+
+Visual authoring (Interval 6), 2026-11-04 (Windows, Python 3.13):
+
+- Baseline (main `b42b5bd` plus the CI fixture fix): the full suite exited 0 with 9
+  skips. After: **2213 passed, 10 skipped** (symlink permission, Windows drive
+  paths), including the golden test 4/4 against baseline v3 with PDF bytes compared
+  (word-search outputs, identities, plan JSON, manifests and reports byte-identical).
+  Ruff lint and format, strict mypy (159 files), pip check, `git diff --check`.
+  AGENTS CLI commands exit as on main (both `publish` commands exit 1 on main too;
+  scratch output directories).
+- Coloring: the four `tests/coloring_samples.py` books build byte-identical PDFs
+  with equal build and interior identities on this branch and on main.
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build. Vitest **124/124**
+  (an earlier full run timed out the existing Composer test at 5.1 s; it passes
+  alone and in the final run). Playwright **38/39**: new `authoring.spec.ts`
+  (New book to built, zoomable proof without YAML; axe and 1440/1024/768/390
+  without overflow) and every coloring spec pass; `templates.spec.ts` rich text
+  fails at line 300 as before. Rewritten `docs/images/studio` captures restored.
+- Visual review of the authoring captures found the New book form unstyled
+  (labels beside inputs, oversized radios) and Fit page at 18 % (the view's height
+  followed its content); both fixed and re-captured.
+- Locks: active, crashed and unattributable owners tested across real processes on
+  Windows; Linux uses the `fcntl` path (CI).
+- Benchmark (`tests/coloring_benchmark.py`, 150 drawings / 302 pages, two runs
+  each): no measurable difference from main; first preflight 111-144 s on both,
+  peak 174 MB on both (table in docs/coloring-publishing.md).
+- Real artwork: none legitimately available (the books repository has cover
+  photographs only, licence unrecorded). The review harness ran on the synthetic
+  set; no threshold changed and no print quality is claimed.
 
 Coloring covers, publishing, production and Pages, 2026-11-04 (Windows, Python 3.13):
 
