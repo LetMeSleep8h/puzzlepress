@@ -19,6 +19,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..cancellation import checkpoint
 from ..cover.preflight import RULESET_ID as COVER_RULESET_ID
 from ..cover.preflight import RULESET_VERSION as COVER_RULESET_VERSION
 from ..identity import IDENTITY_VERSION
@@ -324,7 +325,8 @@ def write_package(
     staged = Path(tempfile.mkdtemp(prefix=".publishing-", dir=directory))
     retired: Path | None = None
     try:
-        for name, data in package.files:
+        for index, (name, data) in enumerate(package.files):
+            checkpoint("write_package", index, len(package.files))
             _write(staged / name, data)
         _, problem = verify_package_files(_read_directory(staged))
         if problem:

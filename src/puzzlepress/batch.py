@@ -6,6 +6,7 @@ import re
 from dataclasses import asdict, dataclass
 from itertools import combinations
 
+from .cancellation import checkpoint
 from .content import PIPELINE_VERSION, QualityConfig, WordSearchContent
 from .content_validation import validate_word_search_content
 from .errors import ProjectError, ValidationIssue
@@ -237,7 +238,8 @@ def generate_batch(project: Project) -> BatchReport:
     results: list[PuzzleResult] = []
     findings: list[QualityFinding] = []
     generated: dict[str, WordSearch] = {}
-    for definition in content.puzzles:
+    for index, definition in enumerate(content.puzzles):
+        checkpoint("generate_puzzles", index, len(content.puzzles))
         seed = derive_puzzle_seed(project.build.seed, definition.id)
         try:
             puzzle = generate_word_search(

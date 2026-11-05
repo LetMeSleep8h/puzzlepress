@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .cancellation import checkpoint
 from .errors import ProjectError, ValidationIssue
 
 INVENTORY_KIND = "puzzlepress-puzzle-inventory"
@@ -397,6 +398,7 @@ def read_pdf_pages(data: bytes, name: str) -> tuple[list[_Page], list[SkippedPag
     pages: list[_Page] = []
     skipped: list[SkippedPage] = []
     for index in range(count):
+        checkpoint("read_pdf_text", index, count)
         page = _Page(index + 1)
         try:
             page.items = _page_items(reader.pages[index])

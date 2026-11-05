@@ -39,6 +39,7 @@ from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 from pypdf.generic import ArrayObject, NameObject
 
+from ..cancellation import checkpoint
 from ..coloring.content import ColoringContent, PreparedArt
 from ..coloring.prepare import PREPARATION_VERSION, pixel_digest
 from ..coloring_config import CENTRED, Border, Placement
@@ -412,7 +413,9 @@ def embedded_images(pdf: bytes) -> tuple[EmbeddedImage, ...] | LayoutIssue:
     try:
         reader = PdfReader(io.BytesIO(pdf), strict=True)
         found: list[EmbeddedImage] = []
+        count = len(reader.pages)
         for number, page in enumerate(reader.pages, start=1):
+            checkpoint("verify_images", number - 1, count)
             resources = page.get("/Resources")
             resources = resources.get_object() if resources is not None else {}
             xobjects = resources.get("/XObject")

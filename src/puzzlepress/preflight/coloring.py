@@ -21,6 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..cancellation import checkpoint
 from ..coloring.content import ColoringContent
 from ..coloring.duplicates import DuplicateReport, find_duplicates
 from ..coloring.inspection import Inspection, inspect_artwork
@@ -129,9 +130,11 @@ def load_artwork(project_directory: Path | None, project: Project) -> dict[str, 
     if book is None:
         return {}
     checks: dict[str, ArtworkCheck] = {}
+    total = len({artwork_id for _, artwork_id in book.artwork_pages})
     for _, artwork_id in book.artwork_pages:
         if artwork_id in checks:
             continue
+        checkpoint("measure_artwork", len(checks), total)
         artwork = book.artwork_by_id(artwork_id)
         assert artwork is not None
         if project_directory is None:
