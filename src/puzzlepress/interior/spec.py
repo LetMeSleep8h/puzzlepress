@@ -52,7 +52,17 @@ class KdpConstraints:
     # 8.5 x 11 row (2026-10-07); a search-indexed copy lists 24-590 white and
     # 24-550 cream. Profiles now state paper, but the white value is unverified on
     # the official table, so the lower value applies to both papers. Re-verify.
-    max_pages_by_trim: tuple[tuple[str, int], ...] = (("8.5x11", 550),)
+    #
+    # The 2026-11-05 reading of "Set Trim Size, Bleed, and Margins" lists every trim
+    # here: 8.5 x 11 and 8.5 x 8.5 at 24-590 white / 24-550 cream, 6 x 9 and 8 x 10 at
+    # 24-828 white / 24-776 cream. The key is the trim only, so each trim's lower
+    # (cream) value applies to both papers; 8.5 x 11 keeps its value and wording.
+    max_pages_by_trim: tuple[tuple[str, int], ...] = (
+        ("8.5x11", 550),
+        ("6x9", 776),
+        ("8x10", 776),
+        ("8.5x8.5", 550),
+    )
     # (maximum page count, minimum inside margin) in ascending order.
     gutter_table: tuple[tuple[int, float], ...] = (
         (150, inches(0.375)),
@@ -217,7 +227,15 @@ class PrintSpecification:
 
 
 # Trim sizes the renderer has templates for. More sizes are added here, not in layout.
-SUPPORTED_TRIMS = (TrimSize("8.5x11", inches(8.5), inches(11)),)
+# 8.5 x 11 stays first: it is the default and the cover templates' reference trim.
+# The others are on KDP's standard paperback list (read 2026-11-05) for black ink on
+# white or cream paper; none uses bleed (see docs/print-interior.md, Print profiles).
+SUPPORTED_TRIMS = (
+    TrimSize("8.5x11", inches(8.5), inches(11)),
+    TrimSize("6x9", inches(6), inches(9)),
+    TrimSize("8x10", inches(8), inches(10)),
+    TrimSize("8.5x8.5", inches(8.5), inches(8.5)),
+)
 
 # Fixed, explicit margins. The 0.75 in inside margin meets KDP gutters up to 700
 # pages; it is validated against the final page count, never enlarged.
@@ -245,7 +263,33 @@ PAPERBACK_LETTER_CREAM = PrintSpecification(
     paper=Paper.CREAM,
 )
 
-PROFILES = {spec.profile_id: spec for spec in (PAPERBACK_LETTER, PAPERBACK_LETTER_CREAM)}
+
+def _profile(trim: TrimSize, paper: Paper, margins: Margins) -> PrintSpecification:
+    suffix = "" if paper is Paper.WHITE else f"-{paper.value}"
+    inches_name = trim.name.replace("x", " x ")
+    return PrintSpecification(
+        profile_id=f"paperback-{trim.name}{suffix}",
+        profile_version=1,
+        description=f"{inches_name} in paperback interior, black ink on {paper.value} paper, "
+        "no bleed",
+        trim=trim,
+        margins=margins,
+        ink=Ink.BLACK,
+        paper=paper,
+    )
+
+
+# The same 0.75 in gutter (KDP's minimum up to 700 pages) and 0.5 in outside margin as
+# 8.5 x 11; 6 x 9 has 0.5 in top and bottom so its pages keep usable height.
+_SMALL_MARGINS = Margins(
+    inside=inches(0.75), outside=inches(0.5), top=inches(0.5), bottom=inches(0.5)
+)
+_ADDED = tuple(
+    _profile(trim, paper, _SMALL_MARGINS if trim.name == "6x9" else _LETTER_MARGINS)
+    for trim in SUPPORTED_TRIMS[1:]
+    for paper in (Paper.WHITE, Paper.CREAM)
+)
+PROFILES = {spec.profile_id: spec for spec in (PAPERBACK_LETTER, PAPERBACK_LETTER_CREAM, *_ADDED)}
 DEFAULT_PROFILE = PAPERBACK_LETTER.profile_id
 # Content boxes narrower or shorter than this cannot hold any supported template.
 MIN_CONTENT_EXTENT = inches(3)

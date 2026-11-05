@@ -68,7 +68,7 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await page.getByRole('textbox', { name: 'Book title' }).fill('Meadow Coloring');
   await page.getByRole('textbox', { name: 'Author or pen name (optional)' }).fill('A. Artist');
   await page.getByRole('textbox', { name: 'Subject (optional)' }).fill('Nature');
-  await page.getByRole('radio', { name: 'Cream paper' }).check();
+  await page.getByRole('radio', { name: '8.5 × 11 in, cream paper' }).check();
   await check(page, 'create');
   await page.getByRole('button', { name: 'Create book' }).click();
   await expect(page).toHaveURL(/\/books\/meadow-coloring\/artwork$/);
@@ -129,7 +129,7 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await expect(page.getByText(/placed 75%/)).toBeVisible();
 
   await page.goto('/books/meadow-coloring/settings');
-  await expect(page.getByRole('radio', { name: /Cream paper/ })).toBeChecked();
+  await expect(page.getByRole('radio', { name: '8.5 × 11 in, cream paper' })).toBeChecked();
   await page.getByRole('textbox', { name: 'Collection (optional)' }).fill('Meadow series');
   await check(page, 'settings');
   await page.getByRole('button', { name: 'Save changes' }).click();

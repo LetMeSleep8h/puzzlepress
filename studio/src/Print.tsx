@@ -126,7 +126,12 @@ function Sheet({
   const preview = status.preview!;
   const page = preview.pages[number - 1];
   const geometry: PageGeometry | undefined = preview.geometry?.[number - 1];
-  const trim = geometry?.trim ?? { x: 0, y: 0, width: 612, height: 792 };
+  const profile = status.report?.profile;
+  const trim =
+    geometry?.trim ??
+    (profile
+      ? { x: 0, y: 0, width: profile.trim.width_in * 72, height: profile.trim.height_in * 72 }
+      : { x: 0, y: 0, width: 612, height: 792 });
   const height = (width * trim.height) / trim.width;
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   const size = width * dpr <= trim.width * preview.scales.page ? 'page' : 'detail';
@@ -535,18 +540,33 @@ function Viewer({ status }: { status: InteriorStatus }) {
   }, [page, spread, total, status.key, preview.pdf_sha256]);
   const columns = spread ? 2 : 1;
   const gap = spread ? 2 : 0;
+  // The built PDF's own trim (points): pages are sized from it, never from 8.5 x 11.
+  const pageTrim =
+    preview.geometry?.[0]?.trim ??
+    (report.profile
+      ? { width: report.profile.trim.width_in * 72, height: report.profile.trim.height_in * 72 }
+      : { width: 612, height: 792 });
   // Fit inside the canvas: its 16px padding, the page outline, and (by height) the
   // canvas's viewport-relative maximum less the caption under each page.
   const viewport = typeof window === 'undefined' ? 900 : window.innerHeight;
   const fitWidth = Math.max(
     160,
-    Math.floor(Math.min((stageWidth - 34 - gap) / columns, (viewport - 240) * (612 / 792))),
+    Math.floor(
+      Math.min(
+        (stageWidth - 34 - gap) / columns,
+        (viewport - 240) * (pageTrim.width / pageTrim.height),
+      ),
+    ),
   );
   const widthFit = Math.max(160, Math.floor((stageWidth - 34 - gap) / columns));
   const width =
-    zoom === 'fit' ? fitWidth : zoom === 'width' ? widthFit : 612 * CSS_PX_PER_PT * (zoom / 100);
+    zoom === 'fit'
+      ? fitWidth
+      : zoom === 'width'
+        ? widthFit
+        : pageTrim.width * CSS_PX_PER_PT * (zoom / 100);
   // From a fitted view, zoom steps from the size it shows.
-  const percent = (width / (612 * CSS_PX_PER_PT)) * 100;
+  const percent = (width / (pageTrim.width * CSS_PX_PER_PT)) * 100;
   const zoomIndex = typeof zoom === 'number' ? ZOOMS.indexOf(zoom) : -1;
   const zoomBy = (direction: 1 | -1) => {
     if (typeof zoom === 'number') {
@@ -931,7 +951,7 @@ export function Print({ project, dirty }: { project: Project; dirty: boolean }) 
                 >
                   {status.profiles.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.paper === 'cream' ? 'Cream' : 'White'} paper, black ink
+                      {p.description}
                     </option>
                   ))}
                 </select>

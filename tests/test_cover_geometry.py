@@ -99,10 +99,10 @@ def test_barcode_region_sits_in_the_back_covers_lower_right_corner():
 
 
 def test_invalid_inputs_fail_in_the_geometry_stage():
-    for call in (lambda: wrap(0), lambda: cover_geometry(10, inches(6), inches(9), Paper.WHITE)):
+    for call in (lambda: wrap(0), lambda: cover_geometry(10, inches(7), inches(10), Paper.WHITE)):
         with pytest.raises(CoverError) as error:
             call()
         assert error.value.stage == "geometry"
     with pytest.raises(CoverError) as error:
-        cover_geometry(10, inches(6), inches(9), Paper.WHITE)
+        cover_geometry(10, inches(7), inches(10), Paper.WHITE)
     assert error.value.issues[0].code == "unsupported_trim_size"

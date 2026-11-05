@@ -88,7 +88,7 @@ test('choosing a type, naming the book and creating opens it', async () => {
   expect(screen.getByRole('button', { name: 'Create book' })).toBeDisabled();
   await user.type(screen.getByRole('textbox', { name: 'Book title' }), 'Woodland Coloring');
   await user.type(screen.getByRole('textbox', { name: 'Subject (optional)' }), 'Nature');
-  await user.click(screen.getByRole('radio', { name: 'Cream paper' }));
+  await user.click(screen.getByRole('radio', { name: '8.5 × 11 in, cream paper' }));
   await user.click(screen.getByRole('radio', { name: /Title, instructions and notes/ }));
   await user.click(screen.getByRole('button', { name: 'Create book' }));
   await waitFor(() => expect(window.location.pathname).toBe('/books/coloring-pages/artwork'));

@@ -14,7 +14,16 @@ from .errors import ValidationIssue
 
 # The built-in profile identifiers (`interior.spec.PROFILES`; a test keeps the two
 # equal). Listed here so validating a source never imports the PDF toolchain.
-PROFILE_IDS = ("paperback-8.5x11", "paperback-8.5x11-cream")
+PROFILE_IDS = (
+    "paperback-8.5x11",
+    "paperback-8.5x11-cream",
+    "paperback-6x9",
+    "paperback-6x9-cream",
+    "paperback-8x10",
+    "paperback-8x10-cream",
+    "paperback-8.5x8.5",
+    "paperback-8.5x8.5-cream",
+)
 
 
 @dataclass(frozen=True)

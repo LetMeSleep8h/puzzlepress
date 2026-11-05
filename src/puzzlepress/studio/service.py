@@ -212,8 +212,9 @@ class StudioService:
 
 def coloring_page_geometry(project: Project) -> dict[str, object]:
     """Trim, live area and art box (PDF points, origin bottom-left) of a recto and a verso
-    coloring page under the default print profile: what the composer outlines on its
-    page previews. Python's layout geometry; the browser only draws it."""
+    coloring page under the book's print profile (the default when it has none): what
+    the composer outlines on its page previews. Python's layout geometry; the browser
+    only draws it."""
     from puzzlepress.coloring_config import Border
     from puzzlepress.interior import DEFAULT_PROFILE, print_profile
     from puzzlepress.interior.coloring import art_box
@@ -222,7 +223,7 @@ def coloring_page_geometry(project: Project) -> dict[str, object]:
     from puzzlepress.interior.model import Box
     from puzzlepress.interior.spec import PrintSpecification
 
-    spec = print_profile(DEFAULT_PROFILE)
+    spec = print_profile(project.printing.profile if project.printing else DEFAULT_PROFILE)
     assert isinstance(spec, PrintSpecification)
     border = project.coloring.layout.border if project.coloring else Border.NONE
 

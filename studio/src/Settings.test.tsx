@@ -74,7 +74,7 @@ test('coloring settings edit book details, catalog and paper in one save', async
   await user.clear(author);
   await user.type(author, 'A. Artist');
   await user.type(screen.getByRole('textbox', { name: 'Collection (optional)' }), 'Shapes');
-  await user.click(await screen.findByRole('radio', { name: /Cream paper/ }));
+  await user.click(await screen.findByRole('radio', { name: '8.5 × 11 in, cream paper' }));
   expect(screen.getByText(/This change is not saved yet/)).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(saves).toHaveLength(1));

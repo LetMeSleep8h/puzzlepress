@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { request } from './api';
 import { DraftToolbar, type Draft } from './draft';
 import { Field, FieldErrors, matchIssues, type Source } from './editor-fields';
+import { profileLabel } from './print-profiles';
 import type { ProjectTypes } from './types';
 
 // Book settings: what the book is (project details), how the author files it
@@ -136,17 +137,11 @@ export function Settings({ d }: { d: Draft }) {
 
         <section aria-labelledby="settings-print">
           <h3 id="settings-print">Print settings</h3>
-          <dl className="facts">
-            <div>
-              <dt>Trim size</dt>
-              <dd>8.5 × 11 in (the only trim PuzzlePress supports), no bleed</dd>
-            </div>
-          </dl>
           <fieldset className="choice-group" aria-describedby="paper-note">
-            <legend>Paper</legend>
+            <legend>Trim and paper</legend>
             <label>
               <input type="radio" name="paper" checked={chosen === ''} onChange={() => paper('')} />
-              <span>Not chosen here: Print proof builds with the paper chosen there</span>
+              <span>Not chosen here: Print proof builds with the trim and paper chosen there</span>
             </label>
             {(profiles ?? []).map((p) => (
               <label key={p.id}>
@@ -156,18 +151,17 @@ export function Settings({ d }: { d: Draft }) {
                   checked={chosen === p.id}
                   onChange={() => paper(p.id)}
                 />
-                <span>
-                  {p.paper === 'cream' ? 'Cream paper' : 'White paper'}{' '}
-                  <small className="muted">{p.description}</small>
-                </span>
+                <span>{profileLabel(p)}</span>
               </label>
             ))}
             {profiles === undefined && <p className="small muted">Reading print profiles…</p>}
           </fieldset>
           <FieldErrors id="print.profile" issues={matchIssues(issues, 'print')} />
           <p className="small muted" id="paper-note">
-            Paper sets the spine width. Saving a different paper makes the built interior and the
-            cover out of date; Print proof and Cover then rebuild with it.
+            Trim is the page size; paper sets the spine width. Every choice is black ink with no
+            bleed, from KDP's standard paperback sizes. Saving a different choice makes the built
+            interior and the cover out of date; Print proof and Cover then rebuild with it. A
+            smaller page can make a word-search grid too small to print; the build then says so.
             {chosen !== saved && ' This change is not saved yet.'}
           </p>
         </section>
