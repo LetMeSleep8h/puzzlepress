@@ -97,15 +97,21 @@ def run_job(client: object, library: Path, key: str, cancel_at: str | None = Non
     job_id = started["run"]["job_id"]
     asked = None
     cancel_progress = None
-    timed: dict[str, list[float]] = {"status": [], "detail": []}
+    timed: dict[str, list[float]] = {"job_poll": [], "status": [], "detail": []}
+    polls = 0
     while True:
         begun = time.perf_counter()
-        status = get(f"/api/projects/{key}/produce").json()
-        timed["status"].append(time.perf_counter() - begun)
-        begun = time.perf_counter()
-        get(f"/api/projects/{key}")  # What the page shell reloads (Interval 7 timed both).
-        timed["detail"].append(time.perf_counter() - begun)
-        run = status["run"]
+        polled = get(f"/api/projects/{key}/produce/job").json()  # What the page polls.
+        timed["job_poll"].append(time.perf_counter() - begun)
+        if polls % 5 == 0:  # The verified status and project detail, now and then.
+            begun = time.perf_counter()
+            get(f"/api/projects/{key}/produce")
+            timed["status"].append(time.perf_counter() - begun)
+            begun = time.perf_counter()
+            get(f"/api/projects/{key}")
+            timed["detail"].append(time.perf_counter() - begun)
+        polls += 1
+        run = polled["run"]
         if cancel_at and asked is None and run["step"] == cancel_at:
             post(f"/api/projects/{key}/produce/cancel", json={})
             asked = time.perf_counter()
@@ -114,8 +120,13 @@ def run_job(client: object, library: Path, key: str, cancel_at: str | None = Non
             stopped = time.perf_counter()
             break
         time.sleep(0.5)
-    idle = {"status": [], "detail": []}
+    status = get(f"/api/projects/{key}/produce").json()
+    run = status["run"]
+    idle: dict[str, list[float]] = {"job_poll": [], "status": [], "detail": []}
     for _ in range(10):  # The same requests with no job running, right after it.
+        begun = time.perf_counter()
+        get(f"/api/projects/{key}/produce/job")
+        idle["job_poll"].append(time.perf_counter() - begun)
         begun = time.perf_counter()
         get(f"/api/projects/{key}/produce")
         idle["status"].append(time.perf_counter() - begun)
@@ -138,7 +149,7 @@ def run_job(client: object, library: Path, key: str, cancel_at: str | None = Non
         "package_zip_verified": package_ok(client, key, release)
         if release.get("verified")
         else None,
-        "studio_polls": len(timed["status"]),
+        "studio_polls": len(timed["job_poll"]),
         "during_job_ms": {name: _stats(values) for name, values in timed.items()},
         "idle_ms": {name: _stats(values) for name, values in idle.items()},
     }
@@ -166,6 +177,20 @@ def _release_dir(library: Path, key: str) -> Path:
     return release_directory(load_project(book).project, book)
 
 
+def _fill_every_page(book: Path) -> None:
+    """Full-bleed profile, numbers off on artwork pages, every drawing filling its page."""
+    from puzzlepress import dump_project, load_project, validate_project
+
+    data = load_project(book).project.to_dict()
+    data["print"] = {"profile": "paperback-8.5x11-bleed"}
+    data["composition"]["page_numbers"]["show_artwork"] = False
+    for page in data["coloring"]["pages"]:
+        if "artwork" in page:
+            page["placement"] = {"fit": "fill"}
+    project = validate_project(data).require_project()
+    (book / "book.yaml").write_text(dump_project(project), encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("work", type=Path)
@@ -175,7 +200,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--crash", action="store_true")
     parser.add_argument("--concurrent", action="store_true")
     parser.add_argument(
-        "--normal-priority", action="store_true", help="Run workers at normal priority."
+        "--bleed",
+        action="store_true",
+        help="Coloring books on the 8.5 x 11 full-bleed profile, every drawing filling its page",
+    )
+    parser.add_argument(
+        "--priority", choices=("normal", "low"), default="normal", help="Worker priority."
     )
     args = parser.parse_args(argv)
     from fastapi.testclient import TestClient
@@ -185,18 +215,21 @@ def main(argv: list[str] | None = None) -> None:
 
     library = args.work / "books"
     library.mkdir(parents=True, exist_ok=True)
+    prefix = "bleed" if args.bleed else "coloring"
     for count in args.drawings:
-        book = library / f"coloring-{count}"
+        book = library / f"{prefix}-{count}"
         if not book.exists():
             composed_coloring_book(book, count, size=FULL_SIZE)
             source = book / "book.yaml"
             source.write_text(
                 source.read_text(encoding="utf-8").replace(
-                    "../build/synthetic-coloring-book", f"../../build/coloring-{count}"
+                    "../build/synthetic-coloring-book", f"../../build/{prefix}-{count}"
                 ),
                 encoding="utf-8",
             )
-    keys = [f"coloring-{count}" for count in args.drawings]
+            if args.bleed:
+                _fill_every_page(book)
+    keys = [f"{prefix}-{count}" for count in args.drawings]
     if args.word_search:
         from production_book import write_production_book
 
@@ -213,18 +246,18 @@ def main(argv: list[str] | None = None) -> None:
     def jobs(service: object) -> producing.ProducingService:
         return producing.ProducingService(
             service,  # type: ignore[arg-type]
-            lower_priority=not args.normal_priority,
+            lower_priority=args.priority == "low",
         )
 
     client = TestClient(create_app(library, frontend, jobs))
     report: dict[str, object] = {
         "machine_note": "Compare on one machine and day only.",
-        "worker_priority": "normal" if args.normal_priority else "below_normal",
+        "worker_priority": args.priority,
     }
     for key in keys:
         print(f"producing {key}", file=sys.stderr, flush=True)
         report[key] = run_job(client, library, key)
-        if key.startswith("coloring-") and int(key.split("-")[1]) >= args.cancel_from:
+        if key.startswith(f"{prefix}-") and int(key.split("-")[1]) >= args.cancel_from:
             print(f"cancelling {key}", file=sys.stderr, flush=True)
             report[f"{key} cancelled"] = run_job(
                 client, library, key, cancel_at="interior_preflight"
