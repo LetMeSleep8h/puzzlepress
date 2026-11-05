@@ -793,7 +793,8 @@ _quality_rule(
     "Measured damage from preparation: fine lines thinned (under 90% kept), detail lost "
     "(under 60%), light strokes of the original erased (under 50% of gray 129-200 "
     "strokes still printed), strokes broken apart, isolated specks left (over 5 per "
-    "megapixel) or ink pushed to an image edge.",
+    "megapixel) or ink pushed to an image edge, and dark bands along an edge (a scan "
+    "frame: over 50% ink in the outermost 1%).",
     (
         "thin_lines_lost",
         "detail_lost",
@@ -801,6 +802,7 @@ _quality_rule(
         "strokes_broken",
         "specks_remaining",
         "prepared_touches_edge",
+        "dark_edge_band",
     ),
     "No measured line damage.",
 )

@@ -99,6 +99,12 @@ FAINT_ERASED = 0.50  # Share kept below which the faint strokes are reported.
 # the local paper. Whole lines erased or thinned away are still lost.
 MEASURES_VERSION = 3
 THIN_REGISTRATION = 1  # Pixels a kept stroke's rim may move.
+# Dark edge bands (Interval 10): the share of ink in the outermost EDGE_BAND of the
+# prepared drawing, per edge. A scanner's black frame (the Otis elevator scan,
+# 69-88 % on all four edges) prints as a bar; drawings that reach their edge measured
+# at most 26 % on the 17 real files (a drawn frame, Van Gogh's reed strokes).
+EDGE_BAND = 0.01
+EDGE_BAND_DARK = 0.50
 BACKGROUND_BLOCK = 4  # Pixels per side averaged into one paper sample.
 BACKGROUND_WINDOW = 5  # Blocks searched for the brightest nearby paper (20 px).
 BACKGROUND_GRID = 128  # Coarse samples along the longer side before smoothing.
@@ -213,6 +219,8 @@ class PreparationMeasures:
     mean_change: float  # Mean absolute gray change, 0..255.
     not_measured: tuple[str, ...] = ()  # Measures skipped because a scan bound was hit.
     new_edges: tuple[str, ...] = ()  # Image edges ink reaches only after preparation.
+    # Ink share in the outermost EDGE_BAND of each edge of the prepared drawing.
+    edge_bands: tuple[tuple[str, float], ...] = ()
     # Gray of the darkest tenth of the prepared line work; None with no line work.
     line_core_level: int | None = None
     # Faint strokes in the original (gray INK_LEVEL+1..FAINT_LEVEL in stroke-like
@@ -229,6 +237,7 @@ class PreparationMeasures:
             "measures_version": MEASURES_VERSION,
             "not_measured": list(self.not_measured),
             "new_edges": list(self.new_edges),
+            "edge_bands": dict(self.edge_bands),
             "pixels": list(self.pixels),
             "ink_before": self.ink_before,
             "ink_after": self.ink_after,
@@ -525,10 +534,28 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
         mean_change=round(mean_change, 2),
         not_measured=tuple(not_measured),
         new_edges=new_edges,
+        edge_bands=_edge_bands(out),
         line_core_level=core,
         faint_line_pixels=faint_pixels,
         faint_line_retention=round(faint_kept / faint_pixels, 4) if measurable else None,
         pale_strokes_without_ink=pale,
+    )
+
+
+def _edge_bands(gray: Image.Image) -> tuple[tuple[str, float], ...]:
+    """Ink share (gray at most INK_LEVEL) in the outermost EDGE_BAND of each edge."""
+    width, height = gray.size
+    band_w, band_h = max(2, round(width * EDGE_BAND)), max(2, round(height * EDGE_BAND))
+    ink = _mask(gray)
+    bands = (
+        ("left", (0, 0, band_w, height)),
+        ("right", (width - band_w, 0, width, height)),
+        ("top", (0, 0, width, band_h)),
+        ("bottom", (0, height - band_h, width, height)),
+    )
+    return tuple(
+        (name, round(_count(ink.crop(box)) / ((box[2] - box[0]) * (box[3] - box[1])), 4))
+        for name, box in bands
     )
 
 
@@ -688,9 +715,24 @@ def _findings(m: PreparationMeasures, adjustments: Adjustments) -> tuple[Artwork
         add(
             "specks_remaining",
             Severity.WARNING,
-            "Many small specks remain; despeckle can remove isolated marks.",
+            "Many small isolated marks remain: dust and scan grain, or deliberate "
+            "stippling (the real-artwork review found both). Compare with the original; "
+            "despeckle removes isolated marks of either kind.",
             f"{m.specks_per_megapixel_after:g} per megapixel",
             f"at most {SPECKS_PER_MP_WARNING:g}",
+        )
+    dark = [name for name, share in m.edge_bands if share > EDGE_BAND_DARK]
+    if dark:
+        worst = max(share for _, share in m.edge_bands)
+        add(
+            "dark_edge_band",
+            Severity.WARNING,
+            f"A dark band runs along the {', '.join(dark)} edge of the prepared drawing: "
+            "often a scanner's or photocopier's frame, which would print as a black bar. "
+            "Crop the scan to the drawing before importing it; PuzzlePress does not crop "
+            "artwork.",
+            f"{worst:.0%} ink in the outermost {EDGE_BAND:.0%}",
+            f"at most {EDGE_BAND_DARK:.0%}",
         )
     if m.new_edges:
         add(
