@@ -19,8 +19,11 @@ RULESET_ID = "puzzlepress-kdp-paperback"
 # `kdp_image_resolution` measures their effective DPI from the verified layout.
 # 4: `design_legibility` warns about cramped solution letters, light accent text,
 # low-contrast banners and heavy ink the verified layout reports.
-RULESET_VERSION = 4
-KDP_RULES_CHECKED = "2026-10-07"
+# 5: `kdp_maximum_page_count` follows the trim and the profile's paper (8.5 x 11 white
+# 590, no longer the cream 550 for both), verified on KDP's "Set Trim Size, Bleed, and
+# Margins" table; the KDP values were re-read 2026-11-05 (docs/preflight.md).
+RULESET_VERSION = 5
+KDP_RULES_CHECKED = "2026-11-05"
 
 
 class Severity(StrEnum):

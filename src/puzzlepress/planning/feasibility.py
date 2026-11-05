@@ -422,7 +422,7 @@ class Feasibility:
                 actual=span,
                 expected=f"at least {minimum}",
             )
-        maximum = KDP.max_pages_for_trim(spec.trim.name)
+        maximum = KDP.max_pages_for(spec.trim.name, spec.paper)
         if maximum is not None:
             if low > maximum:
                 add(

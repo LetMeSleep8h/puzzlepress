@@ -416,9 +416,18 @@ def test_minimum_page_count_boundary(demo, count, outcome):
     assert _evaluate("kdp_minimum_page_count", _context(demo, page_count=count))[0] is outcome
 
 
-@pytest.mark.parametrize(("count", "outcome"), [(550, Outcome.PASSED), (551, Outcome.FAILED)])
+@pytest.mark.parametrize(("count", "outcome"), [(590, Outcome.PASSED), (591, Outcome.FAILED)])
 def test_maximum_page_count_boundary(demo, count, outcome):
+    """8.5 x 11 on white paper: 590 (ruleset 5; rulesets 3-4 applied cream's 550)."""
     assert _evaluate("kdp_maximum_page_count", _context(demo, page_count=count))[0] is outcome
+
+
+@pytest.mark.parametrize(("count", "outcome"), [(550, Outcome.PASSED), (551, Outcome.FAILED)])
+def test_maximum_page_count_on_cream_paper(demo, count, outcome):
+    from puzzlepress.interior.spec import PROFILES
+
+    context = replace(_context(demo, page_count=count), spec=PROFILES["paperback-8.5x11-cream"])
+    assert _evaluate("kdp_maximum_page_count", context)[0] is outcome
 
 
 @pytest.mark.parametrize(
