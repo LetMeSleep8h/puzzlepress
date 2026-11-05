@@ -50,7 +50,7 @@
     "report_version": 1,
     "ruleset": {
       "id": "puzzlepress-kdp-coloring",
-      "version": 2,
+      "version": 3,
       "kdp_rules_checked": "2026-10-07"
     },
     "book_id": "synthetic-coloring-book",

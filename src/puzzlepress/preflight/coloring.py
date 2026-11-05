@@ -58,7 +58,9 @@ from .rules import (
 
 RULESET_ID = "puzzlepress-kdp-coloring"
 # 2: line quality also reports light strokes of the original that preparation erased.
-RULESET_VERSION = 2
+# 3: line measures read each image relative to its own paper (measures version 2), so
+#    background cleanup of tinted scans is no longer reported as fine-line loss.
+RULESET_VERSION = 3
 COLORING_CONTRACT = "PuzzlePress coloring interior contract (docs/coloring.md)"
 QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"
 
