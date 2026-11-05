@@ -108,18 +108,44 @@ test('clearing a catalog field removes it, and Python issues show beside it', as
   expect(saves[0].source.catalog).toBeUndefined();
 });
 
-test('word-search settings link to where title and title-page details are edited', async () => {
+test('word-search settings edit the title-page details in one place and keep the rest', async () => {
   const project = projectData as unknown as Project;
-  mockApi(project);
+  const saves = mockApi(project);
   history.pushState(null, '', `/books/${project.key}/settings`);
   render(<App />);
+  const user = userEvent.setup();
   const details = await screen.findByRole('region', { name: 'Project details' });
-  expect(within(details).queryByRole('textbox', { name: 'Book title' })).toBeNull();
-  expect(within(details).getAllByRole('link', { name: 'edit in Puzzles' })[0]).toHaveAttribute(
-    'href',
-    `/books/${project.key}/edit`,
+  const subtitle = within(details).getByRole('textbox', { name: 'Subtitle (optional)' });
+  await user.type(subtitle, 'Fifty puzzles');
+  await user.type(
+    within(details).getByRole('textbox', { name: 'Imprint or publisher (optional)' }),
+    'Garden Press',
   );
-  expect(
-    within(details).getByRole('textbox', { name: 'Book description (optional)' }),
-  ).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() => expect(saves).toHaveLength(1));
+  const sent = saves[0].source;
+  expect(sent.book).toEqual({
+    ...project.source!.book,
+    subtitle: 'Fifty puzzles',
+    imprint: 'Garden Press',
+  });
+  // Nothing else changes: puzzles, composition and output are sent back as they were.
+  expect({ ...sent, book: project.source!.book }).toEqual(project.source);
+  // Clearing an optional detail writes null, as Python normalizes it.
+  await user.clear(within(details).getByRole('textbox', { name: 'Subtitle (optional)' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() => expect(saves).toHaveLength(2));
+  expect(saves[1].source.book.subtitle).toBeNull();
+});
+
+test('the puzzles editor shows the book details and links to Settings', async () => {
+  const project = projectData as unknown as Project;
+  mockApi(project);
+  history.pushState(null, '', `/books/${project.key}/edit`);
+  render(<App />);
+  const link = await screen.findByRole('link', {
+    name: 'Edit the title, language and other book details in Settings',
+  });
+  expect(link).toHaveAttribute('href', `/books/${project.key}/settings`);
+  expect(screen.queryByRole('textbox', { name: 'Book title' })).toBeNull();
 });

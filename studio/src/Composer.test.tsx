@@ -72,7 +72,11 @@ test('edits matter, policies and keyboard order, then previews and saves the dra
   fireEvent.change(screen.getByLabelText('Copyright notice'), {
     target: { value: 'Copyright 2026 Example Author.' },
   });
-  fireEvent.change(screen.getByLabelText('Subtitle (optional)'), { target: { value: '' } });
+  // The title page prints the book details; they are edited in Settings, not here.
+  expect(screen.getByRole('link', { name: 'Edit book details in Settings' })).toHaveAttribute(
+    'href',
+    '/books/composition-demo/settings',
+  );
   expect(within(composer()).getByText('Unsaved changes')).toBeVisible();
   expect(screen.getByText(/Your draft changed\. Choose Preview plan/)).toBeVisible();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
@@ -103,7 +107,7 @@ test('edits matter, policies and keyboard order, then previews and saves the dra
     'rockpool',
     'dunes',
   ]);
-  expect(draft.book.subtitle).toBeNull();
+  expect(draft.book).toEqual(composed.source.book);
   expect(draft.composition).toEqual({
     ...composed.source.composition,
     front_matter: [

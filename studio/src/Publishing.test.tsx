@@ -41,6 +41,10 @@ function setup({
 const readiness = () => screen.getByRole('complementary', { name: 'Readiness' });
 const workspace = () => document.querySelector('.publishing') as HTMLElement;
 
+// The word-search editor stays mounted (hidden) in other sections, so a message
+// can be in the DOM twice; only what is shown counts.
+const VISIBLE = { ignore: '[hidden] *, script, style' };
+
 test('shows what blocks the package, as text, with the real cover', async () => {
   setup();
   await screen.findByText('AI content disclosure is not yet declared.');
@@ -126,22 +130,27 @@ test('the book details title links to its editable field and reflects the saved 
   const user = userEvent.setup();
   const details = screen.getByRole('region', { name: 'Book details' });
   expect(within(details).getByText('Harbour Light Word Searches')).toBeVisible();
-  await user.click(within(details).getByRole('link', { name: 'Puzzles' }));
-  expect(screen.getByRole('link', { name: /Puzzles/, current: 'page' })).toBeVisible();
+  await user.click(within(details).getByRole('link', { name: 'Settings' }));
+  expect(screen.getByRole('link', { name: /Settings/, current: 'page' })).toBeVisible();
   const field = screen.getByRole('textbox', { name: 'Book title' });
   expect(field).toBeVisible();
   expect(field).toHaveValue('Harbour Light Word Searches');
   await user.clear(field);
   await user.type(field, 'Harbour Light Word Search Puzzle Book for Adults');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('Saved and reloaded from source.')).toBeVisible();
+  expect(await screen.findByText('Saved and reloaded from source.', VISIBLE)).toBeVisible();
   const save = calls.find((c) => c.url.endsWith('/draft/save'))!;
   const book = (save.body.source as typeof project.source).book;
   expect(book).toEqual({
     ...project.source.book,
     title: 'Harbour Light Word Search Puzzle Book for Adults',
   });
-  await user.click(screen.getByRole('link', { name: 'Publishing' }));
+  // Settings also links to Publishing; return through the project navigation.
+  await user.click(
+    within(screen.getByRole('navigation', { name: 'Project' })).getByRole('link', {
+      name: 'Publishing',
+    }),
+  );
   const after = await screen.findByRole('region', { name: 'Book details' });
   expect(within(after).getByText('Harbour Light Word Search Puzzle Book for Adults')).toBeVisible();
   // Readiness is fetched again for the saved revision, never trusted from before.

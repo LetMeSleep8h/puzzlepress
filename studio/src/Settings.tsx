@@ -55,74 +55,46 @@ export function Settings({ d }: { d: Draft }) {
             The book itself: printed on the title page and cover and sent to KDP from Publishing.
             Changing them makes the built interior and cover out of date.
           </p>
-          {coloring ? (
-            <>
-              <div className="field-pair">
-                <Field
-                  label="Book title"
-                  path="book.title"
-                  value={source.book.title}
-                  issues={issues}
-                  onChange={(title) => book({ title })}
-                />
-                <Field
-                  label="Subtitle (optional)"
-                  path="book.subtitle"
-                  value={source.book.subtitle ?? ''}
-                  issues={issues}
-                  onChange={optional('subtitle')}
-                />
-              </div>
-              <div className="field-pair">
-                <Field
-                  label="Author or pen name (optional)"
-                  path="book.author"
-                  value={source.book.author ?? ''}
-                  issues={issues}
-                  onChange={optional('author')}
-                />
-                <Field
-                  label="Imprint or publisher (optional)"
-                  path="book.imprint"
-                  value={source.book.imprint ?? ''}
-                  issues={issues}
-                  onChange={optional('imprint')}
-                />
-              </div>
-              <Field
-                label="Language"
-                path="book.language"
-                value={source.book.language}
-                issues={issues}
-                hint="A language tag such as en or fr-CA. Publishing checks it against KDP's paperback languages."
-                onChange={(language) => book({ language })}
-              />
-            </>
-          ) : (
-            <dl className="facts">
-              <div>
-                <dt>Title</dt>
-                <dd>
-                  {source.book.title} · <a href={`${base}/edit`}>edit in Puzzles</a>
-                </dd>
-              </div>
-              <div>
-                <dt>Language</dt>
-                <dd>
-                  {source.book.language} · <a href={`${base}/edit`}>edit in Puzzles</a>
-                </dd>
-              </div>
-              <div>
-                <dt>Subtitle, author, imprint</dt>
-                <dd>
-                  {[source.book.subtitle, source.book.author, source.book.imprint]
-                    .filter(Boolean)
-                    .join(' · ') || 'None'}{' '}
-                  · <a href={`${base}/book`}>edit on the title page in Book</a>
-                </dd>
-              </div>
-            </dl>
-          )}
+          <div className="field-pair">
+            <Field
+              label="Book title"
+              path="book.title"
+              value={source.book.title}
+              issues={issues}
+              onChange={(title) => book({ title })}
+            />
+            <Field
+              label="Subtitle (optional)"
+              path="book.subtitle"
+              value={source.book.subtitle ?? ''}
+              issues={issues}
+              onChange={optional('subtitle')}
+            />
+          </div>
+          <div className="field-pair">
+            <Field
+              label="Author or pen name (optional)"
+              path="book.author"
+              value={source.book.author ?? ''}
+              issues={issues}
+              onChange={optional('author')}
+            />
+            <Field
+              label="Imprint or publisher (optional)"
+              path="book.imprint"
+              value={source.book.imprint ?? ''}
+              issues={issues}
+              onChange={optional('imprint')}
+            />
+          </div>
+          <Field
+            label="Language"
+            path="book.language"
+            value={source.book.language}
+            issues={issues}
+            hint="A language tag such as en or fr-CA. Publishing checks it against KDP's paperback languages."
+            onChange={(language) => book({ language })}
+          />
           <Field
             label="Book description (optional)"
             path="book.description"

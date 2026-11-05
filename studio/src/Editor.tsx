@@ -137,27 +137,15 @@ export function Editor({ d }: { d: Draft }) {
         <form aria-label="Project authoring" onSubmit={(event) => event.preventDefault()}>
           <fieldset className="authoring-fields" disabled={busy}>
             <legend className="sr-only">Project draft</legend>
-            {/* Publishing and Book send authors here to retitle: keep it in view on opening. */}
+            {/* Book details are edited in one place, Settings; this shows them. */}
             <section className="book-fields" aria-labelledby="book-fields-heading">
               <h3 id="book-fields-heading">Book</h3>
-              <div className="field-pair">
-                <Field
-                  label="Book title"
-                  path="book.title"
-                  value={draft.book.title}
-                  issues={issues}
-                  hint="Prints on the title page and cover and is the title KDP receives. Subtitle, author and imprint are on the title page in Book."
-                  onChange={(title) => change({ ...draft, book: { ...draft.book, title } })}
-                />
-                <Field
-                  label="Language"
-                  path="book.language"
-                  value={draft.book.language}
-                  issues={issues}
-                  hint="A language tag such as en or en-US. KDP receives the language it names."
-                  onChange={(language) => change({ ...draft, book: { ...draft.book, language } })}
-                />
-              </div>
+              <p className="small">
+                <strong>{draft.book.title}</strong> · {draft.book.language}.{' '}
+                <a href={`/books/${encodeURIComponent(d.key)}/settings`}>
+                  Edit the title, language and other book details in Settings
+                </a>
+              </p>
             </section>
             {!ws ? (
               <Empty title="No word-search content">
