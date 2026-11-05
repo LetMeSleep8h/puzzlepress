@@ -117,10 +117,6 @@ class ProducingService:
         self.service = service
         self._runs: dict[str, Run] = {}
         self._lock = threading.Lock()
-        # The release as checked when a run started, by book: while that run is active
-        # the release on disk cannot change (a run only swaps at its very end), so the
-        # browser's once-a-second polls reuse this instead of re-hashing every file.
-        self._release_at_start: dict[str, dict[str, object] | None] = {}
 
     def _locate(self, key: str) -> tuple[Project, str, Path, Path]:
         project, revision = self.service.store.snapshot(key)
@@ -137,39 +133,6 @@ class ProducingService:
         project, revision, _, directory = self._locate(key)
         with self._lock:
             run = self._runs.get(key)
-            if run is not None and run.state == "running" and key in self._release_at_start:
-                cached = self._release_at_start[key]
-                return self._presented(key, project, revision, directory, run, cached)
-        release = self._release(project, directory)
-        with self._lock:
-            if run is not None and run.state == "running":
-                self._release_at_start[key] = release
-            else:
-                self._release_at_start.pop(key, None)
-        return self._presented(key, project, revision, directory, run, release)
-
-    def _presented(
-        self,
-        key: str,
-        project: Project,
-        revision: str,
-        directory: Path,
-        run: "Run | None",
-        release: dict[str, object] | None,
-    ) -> dict[str, object]:
-        if release is not None and "build_identity" in release:
-            # Stale is about the saved source now, so it is never taken from a cache.
-            release = {**release, "stale": release["build_identity"] != build_identity(project)}
-        return {
-            "key": key,
-            "revision": revision,
-            "directory": directory.name,
-            "cancellable": project.coloring is not None,
-            "run": run.to_dict() if run else None,
-            "release": release,
-        }
-
-    def _release(self, project: Project, directory: Path) -> dict[str, object] | None:
         manifest, problem = verified_release(directory)
         release: dict[str, object] | None = None
         if manifest is not None:
@@ -191,7 +154,14 @@ class ProducingService:
             }
         elif problem is not None:
             release = {"verified": False, "problem": problem, "files": []}
-        return release
+        return {
+            "key": key,
+            "revision": revision,
+            "directory": directory.name,
+            "cancellable": project.coloring is not None,
+            "run": run.to_dict() if run else None,
+            "release": release,
+        }
 
     @staticmethod
     def _validation(directory: Path) -> dict[str, object] | None:
