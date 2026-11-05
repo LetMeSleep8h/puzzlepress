@@ -523,3 +523,9 @@ jobs:
         working-directory: studio
       - run: npm run test:browser
         working-directory: studio
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: studio/test-results
+          retention-days: 7

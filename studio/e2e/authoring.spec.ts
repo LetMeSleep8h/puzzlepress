@@ -56,8 +56,19 @@ function rows(page: Page) {
     .getByRole('listitem');
 }
 
+// Every action gives up after a minute, so a stall names its step instead of using up
+// the whole test budget (CI runners are much slower than a desktop at Python's work).
+test.use({ actionTimeout: 60000 });
+
+const started = Date.now();
+function mark(step: string) {
+  // Printed with a failure on CI: where the journey was and how long it had taken.
+  console.log(`[journey] ${((Date.now() - started) / 1000).toFixed(1)} s: ${step}`);
+}
+
 test('a coloring book from New book to a built, zoomable proof, without YAML', async ({ page }) => {
-  test.setTimeout(300000);
+  test.setTimeout(600000);
+  mark('start');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/books');
   await page.getByRole('main').getByRole('link', { name: 'New book' }).click();
@@ -70,6 +81,7 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await page.getByRole('textbox', { name: 'Subject (optional)' }).fill('Nature');
   await page.getByRole('radio', { name: 'Cream paper' }).check();
   await check(page, 'create');
+  mark('created');
   await page.getByRole('button', { name: 'Create book' }).click();
   await expect(page).toHaveURL(/\/books\/meadow-coloring\/artwork$/);
 
@@ -88,12 +100,14 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
 
   await page.goto('/books/meadow-coloring');
   await expect(page.getByText(/has no coloring pages yet/)).toBeVisible();
+  mark('import');
   await page.goto('/books/meadow-coloring/artwork');
   await page.getByLabel('Import artwork (PNG or JPEG, several at once)').setInputFiles(drawings());
   await expect(page.getByRole('img', { name: /Meadow hare/ }).first()).toBeVisible({
     timeout: 60000,
   });
 
+  mark('pages');
   await page.goto('/books/meadow-coloring/pages');
   await expect(page.getByText('Plan verified')).toBeVisible({ timeout: 90000 });
   await expect(rows(page)).toHaveCount(3);
@@ -103,12 +117,14 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await designer.getByRole('slider', { name: 'Vertical position' }).fill('1');
   await expect(designer.getByText(/DPI\./)).toBeVisible({ timeout: 60000 });
   await expect(page.getByText('Plan verified')).toBeVisible({ timeout: 90000 });
+  mark('zoom designer');
   // Zoom and pan the designed page; the view only resizes what is drawn.
   await designer.getByRole('button', { name: 'Zoom in' }).click();
   await designer.getByRole('button', { name: 'Zoom in' }).click();
   await designer.getByRole('combobox', { name: 'Zoom level' }).selectOption('width');
   await designer.getByRole('button', { name: 'Reset view' }).click();
   await expect(designer.getByRole('combobox', { name: 'Zoom level' })).toHaveValue('page');
+  mark('reorder and undo');
   // Keyboard reorder and undo/redo.
   await page.getByRole('button', { name: /^Move Meadow hare up/ }).focus();
   await page.keyboard.press('Enter');
@@ -120,6 +136,7 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await expect(rows(page).nth(1)).toContainText('Meadow hare');
   await expect(page.getByText('Plan verified')).toBeVisible({ timeout: 90000 });
   await expect(page.getByRole('main')).not.toHaveText(WORD_SEARCH_TERMS);
+  mark('pages checks');
   await check(page, 'pages');
   const saved = page.waitForResponse((r) => r.url().endsWith('/draft/save'));
   await page.getByRole('button', { name: 'Save changes' }).click();
@@ -128,6 +145,7 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await expect(page.getByText('Plan verified')).toBeVisible({ timeout: 90000 });
   await expect(page.getByText(/placed 75%/)).toBeVisible();
 
+  mark('settings');
   await page.goto('/books/meadow-coloring/settings');
   await expect(page.getByRole('radio', { name: /Cream paper/ })).toBeChecked();
   await page.getByRole('textbox', { name: 'Collection (optional)' }).fill('Meadow series');
@@ -135,11 +153,14 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByText('Saved and reloaded from source.')).toBeVisible();
 
+  mark('print');
   await page.goto('/books/meadow-coloring/print');
   await expect(page.getByText(/from this book.s/)).toBeVisible({ timeout: 60000 });
+  mark('build');
   await page.getByRole('button', { name: 'Build interior' }).click();
   const zoom = page.getByRole('combobox', { name: 'Zoom level' });
   await expect(zoom).toBeVisible({ timeout: 120000 });
+  mark('zoom proof');
   await zoom.selectOption('width');
   await page.getByRole('button', { name: 'Zoom in' }).click();
   const canvas = page.locator('.print-canvas');
@@ -151,5 +172,6 @@ test('a coloring book from New book to a built, zoomable proof, without YAML', a
   expect(await canvas.evaluate((e) => e.scrollTop + e.scrollLeft)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Reset view' }).click();
   await expect(zoom).toHaveValue('fit');
+  mark('print checks');
   await check(page, 'print', [1440, 390]);
 });
