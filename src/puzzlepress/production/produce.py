@@ -101,6 +101,7 @@ class ProductionResult:
     directory: Path
     validation: Validation
     files: tuple[tuple[str, str, int], ...] = field(default=())  # (name, sha256, bytes)
+    notes: tuple[str, ...] = ()  # What this run recovered from an interrupted earlier one.
 
     @property
     def ready(self) -> bool:
@@ -351,111 +352,121 @@ def produce(
         # The photo archive is protected; the manifest file itself is only read.
         protected.append(Path(manifest.base_directory) if manifest.base_directory else folder)
     directory = check_disjoint(Path(output), protected)
-    directory.mkdir(parents=True, exist_ok=True)
-    _owned(directory, project.book.id)
+    directory.parent.mkdir(parents=True, exist_ok=True)
+    from .lock import production_lock
 
-    from ..print_config import ProfileConflict, chosen_profile
+    # One writer per output: a second run is refused while this one is active.
+    with production_lock(directory.parent / f".{directory.name}.produce.lock") as lock:
+        notes = (
+            (f"Reclaimed an abandoned production lock ({lock.recovered.describe()}).",)
+            if lock.recovered
+            else ()
+        )
+        directory.mkdir(exist_ok=True)
+        _owned(directory, project.book.id)
 
-    try:
-        chosen = chosen_profile(project.printing, profile)
-    except ProfileConflict as conflict:
-        raise InteriorError(
-            "print_spec",
-            (LayoutIssue("profile_conflict", str(conflict), region="print.profile"),),
-        ) from conflict
-    spec = print_profile(chosen or DEFAULT_PROFILE)
-    if isinstance(spec, LayoutIssue):
-        raise InteriorError("print_spec", (spec,))
-    build = build_interior(project, spec, source)
-    written = write_interior(build, directory, source)
-    interior = preflight_interior(
-        project, read_interior_artifacts(directory), build, source_directory=source
-    )
-    write_preflight_report(report_bytes(interior.report), project.book.id, directory, source)
-    answer_key = check_answer_key(written.pdf)
+        from ..print_config import ProfileConflict, chosen_profile
 
-    cover_report = None
-    cover_error: str | None = None
-    if project.cover is not None:
         try:
-            cover = build_cover(project, source, directory)
-            write_cover(cover, directory, source)
-        except CoverError as error:
-            cover_error = "; ".join(f"{i.code}: {i.message}" for i in error.issues)
-        cover_report = preflight_cover(project, source, directory)
-        if cover_report.context.artifacts.manifest is not None:
-            write_cover_preflight(
-                cover_report_bytes(cover_report), project.book.id, directory, source
+            chosen = chosen_profile(project.printing, profile)
+        except ProfileConflict as conflict:
+            raise InteriorError(
+                "print_spec",
+                (LayoutIssue("profile_conflict", str(conflict), region="print.profile"),),
+            ) from conflict
+        spec = print_profile(chosen or DEFAULT_PROFILE)
+        if isinstance(spec, LayoutIssue):
+            raise InteriorError("print_spec", (spec,))
+        build = build_interior(project, spec, source)
+        written = write_interior(build, directory, source)
+        interior = preflight_interior(
+            project, read_interior_artifacts(directory), build, source_directory=source
+        )
+        write_preflight_report(report_bytes(interior.report), project.book.id, directory, source)
+        answer_key = check_answer_key(written.pdf)
+
+        cover_report = None
+        cover_error: str | None = None
+        if project.cover is not None:
+            try:
+                cover = build_cover(project, source, directory)
+                write_cover(cover, directory, source)
+            except CoverError as error:
+                cover_error = "; ".join(f"{i.code}: {i.message}" for i in error.issues)
+            cover_report = preflight_cover(project, source, directory)
+            if cover_report.context.artifacts.manifest is not None:
+                write_cover_preflight(
+                    cover_report_bytes(cover_report), project.book.id, directory, source
+                )
+
+        duplicates = None
+        if previous:
+            new = inventory_from_project(loaded.source_path)
+            others = [load_inventory(p, expected_puzzles) for p in previous]
+            duplicates = compare_inventories(
+                new,
+                others,
+                thresholds if isinstance(thresholds, Thresholds) else None,
+                replacement_candidates(project, others),
             )
+            write_file(directory, "duplicate-report.json", report_json(duplicates).encode())
+            write_file(directory, "duplicate-report.md", report_markdown(duplicates).encode())
 
-    duplicates = None
-    if previous:
-        new = inventory_from_project(loaded.source_path)
-        others = [load_inventory(p, expected_puzzles) for p in previous]
-        duplicates = compare_inventories(
-            new,
-            others,
-            thresholds if isinstance(thresholds, Thresholds) else None,
-            replacement_candidates(project, others),
+        photos = None
+        if manifest is not None:
+            photos = check_photos(manifest, folder)
+            write_file(directory, "photo-check.json", _json_bytes(photos.to_dict()))
+
+        validation = classify(
+            interior.report, cover_report, project.cover is not None, duplicates, photos, answer_key
         )
-        write_file(directory, "duplicate-report.json", report_json(duplicates).encode())
-        write_file(directory, "duplicate-report.md", report_markdown(duplicates).encode())
+        if cover_error:
+            validation = Validation(
+                (Item("cover", "cover_build_failed", cover_error), *validation.blocking),
+                validation.warnings,
+                validation.manual,
+                validation.verified,
+            )
+        write_file(directory, "publishing-validation.json", _json_bytes(validation.to_dict()))
+        write_file(directory, "publishing-validation.md", validation_markdown(validation).encode())
 
-    photos = None
-    if manifest is not None:
-        photos = check_photos(manifest, folder)
-        write_file(directory, "photo-check.json", _json_bytes(photos.to_dict()))
-
-    validation = classify(
-        interior.report, cover_report, project.cover is not None, duplicates, photos, answer_key
-    )
-    if cover_error:
-        validation = Validation(
-            (Item("cover", "cover_build_failed", cover_error), *validation.blocking),
-            validation.warnings,
-            validation.manual,
-            validation.verified,
+        names = sorted(
+            p.name
+            for p in directory.iterdir()
+            if p.is_file() and not p.name.startswith(".") and p.name != MANIFEST_NAME
         )
-    write_file(directory, "publishing-validation.json", _json_bytes(validation.to_dict()))
-    write_file(directory, "publishing-validation.md", validation_markdown(validation).encode())
+        files = tuple(
+            (name, hashlib.sha256(data).hexdigest(), len(data))
+            for name in names
+            for data in ((directory / name).read_bytes(),)
+        )
+        from ..identity import build_identity
+        from ..interior.build import toolchain
 
-    names = sorted(
-        p.name
-        for p in directory.iterdir()
-        if p.is_file() and not p.name.startswith(".") and p.name != MANIFEST_NAME
-    )
-    files = tuple(
-        (name, hashlib.sha256(data).hexdigest(), len(data))
-        for name in names
-        for data in ((directory / name).read_bytes(),)
-    )
-    from ..identity import build_identity
-    from ..interior.build import toolchain
-
-    manifest_data = {
-        "kind": KIND,
-        "version": VERSION,
-        "book_id": project.book.id,
-        "engine_version": __version__,
-        "build_identity": build_identity(project),
-        "seed": str(project.build.seed),
-        "profile": spec.profile_id,
-        "toolchain": toolchain(),
-        "inputs": {
-            "previous": [
-                {"label": o.label, "kind": o.source_kind, "sha256": o.source_sha256}
-                for o in (duplicates.previous if duplicates else ())
-            ],
-            "expected_puzzles": expected_puzzles,
-            "thresholds": (duplicates.thresholds.to_dict() if duplicates else None),
-            "photo_manifest": photos is not None,
-        },
-        "result": {
-            "blocking": len(validation.blocking),
-            "warnings": len(validation.warnings),
-            "manual_review": len(validation.manual),
-        },
-        "files": [{"name": n, "sha256": h, "bytes": b} for n, h, b in files],
-    }
-    write_file(directory, MANIFEST_NAME, _json_bytes(manifest_data))
-    return ProductionResult(directory, validation, files)
+        manifest_data = {
+            "kind": KIND,
+            "version": VERSION,
+            "book_id": project.book.id,
+            "engine_version": __version__,
+            "build_identity": build_identity(project),
+            "seed": str(project.build.seed),
+            "profile": spec.profile_id,
+            "toolchain": toolchain(),
+            "inputs": {
+                "previous": [
+                    {"label": o.label, "kind": o.source_kind, "sha256": o.source_sha256}
+                    for o in (duplicates.previous if duplicates else ())
+                ],
+                "expected_puzzles": expected_puzzles,
+                "thresholds": (duplicates.thresholds.to_dict() if duplicates else None),
+                "photo_manifest": photos is not None,
+            },
+            "result": {
+                "blocking": len(validation.blocking),
+                "warnings": len(validation.warnings),
+                "manual_review": len(validation.manual),
+            },
+            "files": [{"name": n, "sha256": h, "bytes": b} for n, h, b in files],
+        }
+        write_file(directory, MANIFEST_NAME, _json_bytes(manifest_data))
+        return ProductionResult(directory, validation, files, notes)
