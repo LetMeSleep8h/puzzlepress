@@ -102,7 +102,7 @@ test('starting a job shows Python steps and counted progress, then the verified 
   expect(await screen.findByText('Nothing has been produced yet.')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Produce' }));
   expect(sent.find((c) => c.body)?.body).toEqual({ revision: 'sha256-r1' });
-  expect(await screen.findByText(/12 of 40 pages drawn/)).toBeVisible();
+  expect(await screen.findByText(/12 of 40 pages drawn/, {}, { timeout: 5000 })).toBeVisible();
   expect(screen.getByRole('progressbar')).toHaveAttribute('max', '40');
   expect(screen.getByRole('button', { name: 'Producing…' })).toBeDisabled();
   await waitFor(() => expect(screen.getByText('Every file verified')).toBeVisible(), {
@@ -221,7 +221,9 @@ test('a slow answer about an older view never replaces a newer one', async () =>
   expect(await screen.findByText(/Checking the interior/)).toBeVisible();
   await act(async () => vi.advanceTimersByTime(1100)); // Poll 2: slow.
   await act(async () => vi.advanceTimersByTime(1000)); // Poll 3: newer, answered first.
-  expect(await screen.findByText(/Writing the upload package/)).toBeVisible();
+  expect(
+    await screen.findByText(/Writing the upload package/, {}, { timeout: 5000 }),
+  ).toBeVisible();
   await act(async () =>
     resolveSlow(json(running({ seq: 4, step_label: 'Checking the interior' }))),
   );

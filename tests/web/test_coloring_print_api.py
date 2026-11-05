@@ -57,7 +57,7 @@ def test_build_preflight_and_page_meanings(client):
     assert status["build"] == {"success": True}
     report = status["report"]
     assert report["ruleset"]["id"] == "puzzlepress-kdp-coloring"
-    assert status["ruleset"] == 2  # 2: erased light strokes (Interval 5)
+    assert status["ruleset"] == 3  # 3: paper-relative line measures (Interval 8)
     assert report["structural"]["status"] == "valid"
     pages = status["preview"]["pages"]
     assert [(p["physical_page"], p["side"], p["kind"], p["folio"]) for p in pages] == [

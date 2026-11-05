@@ -177,8 +177,8 @@ def test_word_search_reports_keep_their_ruleset_and_severities():
     data = preflight_interior(project, artifacts, build).report.to_dict()
     assert data["ruleset"] == {
         "id": "puzzlepress-kdp-paperback",
-        "version": 4,
-        "kdp_rules_checked": "2026-10-07",
+        "version": 5,  # 5: page maximum by trim and paper (Interval 8)
+        "kdp_rules_checked": "2026-11-05",
     }
     assert set(data["counts"]["severity"]) == {"error", "warning", "info"}
     assert not any(r["code"].startswith("coloring_") for r in data["rules"])

@@ -2,9 +2,55 @@
 
 ## Completed scope
 
-Multi-engine Interval 7 (real-world print validation and production readiness) on
-branch `feat/print-validation-production`, cut from main `34efd48` after PR #20;
-committed locally, not pushed. Evidence: docs/artwork-validation/.
+Multi-engine Interval 8 (production engine hardening, print accuracy, bleed
+assessment) on branch `feat/production-hardening-bleed`, cut from main `f7168ac`
+(PR #21 and #22 merged); committed locally, not pushed. Guide:
+docs/production-jobs.md.
+
+- Production worker (`production/worker.py`, `jobs.py`, `release.py`, `limits.py`,
+  `studio/producing.py`): Studio runs each job as `python -m
+  puzzlepress.production.worker JOB` in its own process (below-normal priority by
+  default, 4096 MB cap via a Windows Job Object / `RLIMIT_AS`, both reported as
+  applied or not). Job records beside the release (`.<release>.jobs/<id>/`: job.json,
+  append-only events.jsonl, cancel, worker.log) survive restarts. States queued,
+  starting, running, cancelling, completed (ready|blocked), failed, cancelled,
+  interrupted (`worker_exited`, `worker_lost`, `studio_stopped`). One job per release
+  (plus the shared OS production lock, so the CLI is refused too); different books
+  run side by side up to min(3, CPUs / 2) workers, others queue. The worker checks the
+  requested revision and the manifest's build identity, produces into a private
+  staging directory, verifies it against production.json, swaps it in and verifies
+  again; the next job recovers what a killed one left (staging, backup) and says so.
+  Word-search jobs are staged too, so they can be cancelled.
+- Cooperative cancellation (`cancellation.py`): checkpoints inside puzzle
+  generation, artwork preparation, page drawing, PDF inspection and image
+  verification, artwork measuring and comparison, answer-key read-back and package
+  writing, also reporting counted work units. No watcher (CLI, tests): no effect,
+  byte-identical outputs. `Cancelled` is a BaseException. Boundaries: one drawing's
+  preparation, ReportLab's save, pypdf's parse, a cover render, the final swap.
+- Studio Produce: state, step, counted progress (bar only for counted units),
+  elapsed time, job ID, peak memory, confirmed cancel, failure code and whether the
+  previous release is unchanged, Retry, recent jobs; responses ordered by job ID and
+  event sequence (`produce-state.ts`), so a slow older answer never wins.
+- Line measures version 2 (`coloring/prepare.py`): fine lines, line work, strokes,
+  light strokes and dust are read relative to each image's local paper level
+  (`paper_background`, `paper_relative`); light strokes exclude a 2 px rim around ink.
+  Cleanup of tinted scans is no longer fine-line loss; thinning, erasing and
+  lightening still are. White pages measure as before (lower-bound check first, no
+  extra cost). Prepared pixels and `PREPARATION_VERSION` unchanged; coloring
+  preflight ruleset 3. Synthetic evidence only (`aged_scan`); the 17 originals were
+  not on this machine.
+- KDP print accuracy: official pages re-read 2026-11-05. `kdp_maximum_page_count`
+  follows trim and paper (8.5 x 11 / 8.5 x 8.5: 590 white, 550 cream; 6 x 9 / 8 x 10:
+  828 / 776), interior preflight ruleset 5, `kdp_rules_checked` 2026-11-05. Golden
+  baseline v3 kept; `tests/fixtures/golden/migrations.json` pins the 18 report values
+  this changes (before and after); every PDF and identity is unchanged.
+- Full bleed: assessed against KDP's rules, not built; every profile is no-bleed and
+  the refusal says why. docs/print-interior.md lists the verified rules and the slice.
+- Physical proof: not ordered, not inspected; questions only print answers are in
+  docs/artwork-validation/proof-checklist.md.
+
+Earlier: multi-engine Interval 7 (real-world print validation and production
+readiness), merged as PR #22. Evidence: docs/artwork-validation/.
 
 - Real artwork: 17 drawings approved by the author (pre-1931 US patent drawings
   from NARA scans, Van Gogh drawings, Meyer ornament, Britton & Brown botany, Doré,
@@ -494,15 +540,15 @@ identities (compared against main).
   (`pdf_matches_layout`), else `not_evaluated`. Stale = source/plan/profile/
   toolchain rule failed; mismatched PDF/manifest = invalid.
 - KDP rules (values in `spec.KdpConstraints`, read on official KDP help
-  2026-10-07): min 24 pages, max 550 (8.5x11; official table omits the row,
-  indexed copy 590 white/550 cream: ambiguous), trim range, single trim pages,
+  2026-10-07, page maximum and bleed rules re-read 2026-11-05): min 24 pages, max by
+  trim and paper (8.5x11 590 white / 550 cream; ruleset 5), trim range, single trim pages,
   no bleed, gutter table, 0.25 in outside, 7 pt, 0.75 pt, embedded fonts, full
   embedding (warning, ambiguous), no annotations/bookmarks/forms, not encrypted,
   flattened, no slug area (`kdp_no_printer_marks`), 300 DPI images (n/a without
   images), blank runs
   4/10, even folios on verso, descriptive metadata (warning). Margins measured
   from element ink bounds. Structural `content_in_live_area` checks painted extents
-  against the profile live area. Ruleset 4; identities unaffected by rulesets.
+  against the profile live area. Ruleset 5; identities unaffected by rulesets.
 - composition-demo: structurally valid, NOT KDP ready (only error
   `kdp_minimum_page_count`, warning `kdp_full_font_embedding`). 16-puzzle
   variant (29 pages) is ready (tested).
@@ -728,6 +774,47 @@ reload. Canonical YAML loses comments/formatting. One Studio process per library
 small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
+
+Production hardening (Interval 8), 2026-11-05 (Windows, Python 3.13; other projects'
+benchmarks and test runs shared the machine throughout, so times vary run to run):
+
+- Baseline on clean main `f7168ac`: 2234 passed, 10 skipped. Branch, full suite:
+  2280 passed, 3 failed, 10 skipped; the 3 were pinned ruleset versions (word search
+  4 -> 5, coloring 2 -> 3), updated and rerun green. Golden test passes with PDF bytes
+  compared, against baseline v3 plus the recorded ruleset-5 migration (18 report
+  values; no PDF or identity changed). Ruff lint and format, strict mypy (165 files;
+  `limits.py` also with `--platform linux`), pip check, `git diff --check`. AGENTS
+  CLI commands exit as on main (both `publish` commands exit 1 there too).
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build; Vitest **135/135**
+  (twice). Playwright **40/41**: both produce journeys (verified download; reload
+  mid-job, keyboard-confirmed cancel, axe, 1440/1024/768/390) pass;
+  `templates.spec.ts` rich text fails at line 300 as on main. Rewritten captures
+  restored.
+- `tests/production_benchmark.py` (worker below normal unless stated; synthetic
+  2175 x 2925 drawings):
+
+  | Workload | Total | Interior / preflight step | Worker peak | PDF |
+  | --- | --- | --- | --- | --- |
+  | 10 drawings | 15.1 s | 1.9 / 11.4 s | 162 MB | 0.36 MB |
+  | 50 drawings | 124.7 s | 13.2 / 106.8 s | 173 MB | 1.49 MB |
+  | 150 drawings | 286.4 s (normal priority 211.8 s; main in-process 204.3 s, same session) | 71.8 / 205.4 s | 188 MB | 4.28 MB |
+  | 300 drawings (before the white-page fix) | 811.5 s | 66.5 / 716.6 s | 206 MB | 8.56 MB |
+  | composition-demo / publishing-demo / 60-puzzle book | 1.1 / 4.8 / 11.9 s | | 47 / 402 / 70 MB | |
+
+  Request to worker `starting` 0.29-0.6 s, to `running` 0.32-0.81 s. Cancel during
+  `interior_preflight` to stopped: 0.75-1.0 s (inside `measure_artwork`), against
+  16.8-21.3 s for main the same day and 12.5-12.7 s in Interval 7; previous release
+  unchanged every time. A worker killed at `duplicates`: `interrupted`
+  (`worker_exited`), release unchanged; the next job reclaimed the lock, removed the
+  staging folder and completed in 12.6 s. Two books ran at once (12.3 s wall); a third
+  request for one of them got `production_in_progress`. Status request median:
+  134-277 ms idle and 197-371 ms during a job for 150-300 drawings (the request
+  re-hashes the release); main's in-process run 296-335 ms (status plus detail).
+  The 300-drawing run's preflight was slowed by the measure's full-size filter on
+  white pages (fixed, 10-drawing book 10.7 s vs main 10.8 s) and by machine load; it
+  was not re-run after the fix. Interval 7 (one process, different load): 300
+  drawings first preflight 193.1 s. No performance improvement is claimed for
+  throughput or median latency; cancellation and isolation are measured gains.
 
 Print validation and production readiness (Interval 7), 2026-11-05 (Windows,
 Python 3.13):
@@ -1020,6 +1107,22 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
 
 ## Limits and decisions for review
 
+Production hardening (Interval 8): the Produce status request re-hashes every
+release file on each poll, which dominates Studio latency (idle 134-277 ms for
+150-300 drawings) more than the running worker does; medians were not improved over
+the in-process run, only isolation, cancellation and recovery. Below-normal worker
+priority cost about 35 % on this machine while other projects ran (286 s vs 212 s
+for 150 drawings); `ProducingService(lower_priority=False)` restores normal priority.
+A worker keeps running if Studio stops and is followed after a restart. The lock
+probe for a job Studio did not start can, in a narrow window, refuse a run starting
+at that instant. Memory cap: 4096 MB, not exercised by a real book here. Cancellation
+is not immediate inside one drawing's preparation, ReportLab's save or pypdf's parse.
+Line measures version 2 are validated on synthetic scans only: re-download the 17
+approved files (approval needed) and rerun `tests/artwork_review.py`; a tinted wash
+wider than 20 px reads as paper. Full bleed is not available (docs/print-interior.md).
+Studio fixtures recorded before ruleset 5 still show the old page maximum (UI
+snapshots, not compared with the engine).
+
 Coloring publishing (Interval 5): no genuine coloring artwork was available; every
 threshold (including light strokes) is calibrated on synthetic drawings and needs
 the human review procedure in docs/coloring-publishing.md. Light-stroke detection
@@ -1028,7 +1131,7 @@ measures every drawing; the memo helps only repeated work in one process and is
 never on disk. The composer preview draws Python's plan with thumbnails, not built
 pages. No project-creation API or type picker, no generic undo/redo hook, no zoom
 or pan, no illustration editor. KDP's AI form wording, prices and markets are not
-modeled. A stale `.produce.lock` after a crash must be deleted by hand.
+modeled. (Since Interval 6 the OS releases a crashed run's `.produce.lock`.)
 
 Coloring interior (Interval 4): 8.5 x 11 in, no bleed, one art box for every page
 (no auto-crop, captions, per-page placement or scale). Coloring PDFs are
