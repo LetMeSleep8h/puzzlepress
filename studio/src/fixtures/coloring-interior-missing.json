@@ -1,7 +1,7 @@
 {
   "key": "coloring-print",
   "revision": "sha256-673417835b37aaaba54cdcf9f0fde3b4a5def9af93a0e61e954b8d9e886f5728",
-  "ruleset": 4,
+  "ruleset": 5,
   "profiles": [
     {
       "id": "paperback-8.5x11",

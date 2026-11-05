@@ -92,7 +92,13 @@ FAINT_ERASED = 0.50  # Share kept below which the faint strokes are reported.
 # read absolute levels, so cleanup that whitened tinted paper counted every stroke edge
 # lighter than 128 after the stretch as lost (47-89 % "kept" on scans whose ink still
 # printed at 99.3-100 %). Prepared pixels and PREPARATION_VERSION are unchanged.
-MEASURES_VERSION = 2
+# Version 3 (Interval 10): fine-line retention allows a 1 px registration tolerance.
+# On the real tinted scans (Libbey, Lose) version 2 still reported 86-88 % kept with
+# every line visibly intact: single rim pixels flipped across the ink level, because
+# cleanup stretches by the page's 95th-percentile paper while the measure divides by
+# the local paper. Whole lines erased or thinned away are still lost.
+MEASURES_VERSION = 3
+THIN_REGISTRATION = 1  # Pixels a kept stroke's rim may move.
 BACKGROUND_BLOCK = 4  # Pixels per side averaged into one paper sample.
 BACKGROUND_WINDOW = 5  # Blocks searched for the brightest nearby paper (20 px).
 BACKGROUND_GRID = 128  # Coarse samples along the longer side before smoothing.
@@ -451,7 +457,16 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     opened = lines.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
     thin = ImageChops.subtract(before, _mask(opened))
     thin_pixels = _count(thin)
-    thin_kept = _count(ImageChops.darker(thin, after))
+    # A fine-line pixel is kept while the prepared page still has ink within
+    # THIN_REGISTRATION pixels of it (measures version 3): the stroke survives even if
+    # its rim moved by a pixel. Erasing or thinning a one- or two-pixel line away
+    # leaves no ink nearby and still counts as lost.
+    near = (
+        after.filter(ImageFilter.MaxFilter(2 * THIN_REGISTRATION + 1))
+        if THIN_REGISTRATION
+        else after
+    )
+    thin_kept = _count(ImageChops.darker(thin, near))
     detail_kept = _count(ImageChops.darker(before, after))
     # Strokes are counted on the ink both images share, so growing marks (thickening)
     # can never look like breaks; cutting lines (thinning, a low threshold) can.

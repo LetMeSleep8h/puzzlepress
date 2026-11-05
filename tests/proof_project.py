@@ -4,7 +4,8 @@
 
 APPROVED_JSON lists each approved file with its provenance and how the proof uses it
 (docs/artwork-validation/approved.json). ORIGINALS_DIR holds the downloaded files,
-each in a folder named after the file's stem; they are read, checked against the
+directly (as tests/artwork_fetch.py saves them) or each in a folder named after the
+file's stem; they are read, checked against the
 SHA-256 recorded in the manifest, copied into a new book and never written.
 
 OUTPUT_DIR receives:
@@ -46,7 +47,9 @@ SUBTITLE = "Not for sale: public-domain test drawings"
 
 
 def _original(originals: Path, entry: dict) -> bytes:
-    path = originals / Path(entry["file"]).stem / entry["file"]
+    # Flat (as tests/artwork_fetch.py saves them) or one folder per file (Interval 7).
+    flat = originals / entry["file"]
+    path = flat if flat.is_file() else originals / Path(entry["file"]).stem / entry["file"]
     data = path.read_bytes()
     digest = hashlib.sha256(data).hexdigest()
     if digest != entry["sha256"]:

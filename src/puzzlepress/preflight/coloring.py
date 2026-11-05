@@ -67,7 +67,8 @@ RULESET_ID = "puzzlepress-kdp-coloring"
 #    background cleanup of tinted scans is no longer reported as fine-line loss.
 # 4: full bleed (Interval 9): `coloring_bleed_art`, and the shared page-box, page-size,
 #    margin, live-area and printer-mark rules judge full-bleed pages by their own boxes.
-RULESET_VERSION = 4
+# 5: fine-line retention tolerates a 1 px rim shift (measures version 3, Interval 10).
+RULESET_VERSION = 5
 BLEED_INK_NOTICE = 0.001  # Share of a drawing's ink worth a trimming note.
 COLORING_CONTRACT = "PuzzlePress coloring interior contract (docs/coloring.md)"
 QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"

@@ -144,4 +144,25 @@ def test_difference_view_does_not_paint_cleanup_as_removal(aged_226: bytes) -> N
 
 def test_measures_carry_their_version(aged_226: bytes) -> None:
     data = prepare_artwork(aged_226, CLEANUP).measures.to_dict()
-    assert data["measures_version"] == MEASURES_VERSION == 2
+    assert data["measures_version"] == MEASURES_VERSION == 3
+
+
+def test_rim_flicker_is_not_line_loss_but_thinning_still_is(monkeypatch) -> None:
+    """Measures version 3 (Interval 10). On the real tinted patent scans, version 2
+    reported 86-88 % of fine lines kept after cleanup with every line visibly intact:
+    single rim pixels flipped across the ink level. This JPEG-compressed scan-like page
+    reproduces the mechanism (strokes inked near the ink level): the 1 px registration
+    tolerance removes most of that loss, and thinning still loses every fine line."""
+    from puzzlepress.coloring import prepare as module
+
+    data = encode(aged_scan(226, ink=105, blur=0.7, grain=12), "JPEG", quality=60)
+    cleanup = Adjustments(background_cleanup=0.6, despeckle=2)
+    monkeypatch.setattr(module, "THIN_REGISTRATION", 0)  # Version 2's pixel-exact rule.
+    exact = prepare_artwork(data, cleanup).measures.thin_line_retention
+    monkeypatch.undo()
+    tolerant = prepare_artwork(data, cleanup).measures.thin_line_retention
+    assert exact is not None and tolerant is not None
+    assert (1 - tolerant) < (1 - exact) / 2  # Most rim flicker is no longer counted.
+    thinned = prepare_artwork(data, Adjustments(background_cleanup=0.6, line_weight=-1))
+    assert thinned.measures.thin_line_retention == 0.0
+    assert "thin_lines_destroyed" in codes(thinned)
