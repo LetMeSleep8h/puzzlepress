@@ -1,7 +1,12 @@
 """Repeatable review of line art against the preparation and coloring preflight checks.
 
     python tests/artwork_review.py INPUT_DIR OUTPUT_DIR [--set key=value ...]
+        [--manifest docs/artwork-validation/approved.json]
     python tests/artwork_review.py --synthetic OUTPUT_DIR
+
+With `--manifest`, INPUT_DIR must hold exactly the manifest's files, each with its
+recorded byte count and SHA-256: a missing, extra or changed file stops the review
+before anything is measured, so no other image is ever reviewed in its place.
 
 For every PNG or JPEG directly in INPUT_DIR (read only; never written, moved or
 renamed) it writes, under OUTPUT_DIR:
@@ -93,11 +98,35 @@ def _ratio(value: object) -> str:
     return "n/a" if value is None else f"{float(value):.1%}"  # type: ignore[arg-type]
 
 
-def review(inputs: Path, output: Path, settings: dict[str, object]) -> Path:
+def verify_against(manifest: Path, inputs: Path) -> list[Path]:
+    """The manifest's files in INPUT_DIR, each matching its recorded bytes and SHA-256.
+    Raises SystemExit naming every missing, extra or changed file."""
+    entries = json.loads(manifest.read_text(encoding="utf-8"))["artworks"]
+    expected = {str(e["file"]): (int(e["bytes"]), str(e["sha256"])) for e in entries}
+    present = {p.name for p in inputs.iterdir() if p.is_file() and p.suffix.lower() in SUFFIXES}
+    problems = [f"missing: {name}" for name in sorted(set(expected) - present)]
+    problems += [f"not in the manifest: {name}" for name in sorted(present - set(expected))]
+    for name in sorted(set(expected) & present):
+        data = (inputs / name).read_bytes()
+        size, digest = expected[name]
+        if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
+            problems.append(f"changed: {name} (bytes or SHA-256 differ from the manifest)")
+    if problems:
+        raise SystemExit("The originals do not match the manifest:\n  " + "\n  ".join(problems))
+    return sorted(inputs / name for name in expected)
+
+
+def review(
+    inputs: Path, output: Path, settings: dict[str, object], manifest: Path | None = None
+) -> Path:
     inputs, output = inputs.resolve(), output.resolve()
     if output.is_relative_to(inputs) or inputs.is_relative_to(output):
         raise SystemExit("OUTPUT_DIR must be outside INPUT_DIR (and not contain it).")
-    files = sorted(p for p in inputs.iterdir() if p.is_file() and p.suffix.lower() in SUFFIXES)
+    files = (
+        verify_against(manifest, inputs)
+        if manifest is not None
+        else sorted(p for p in inputs.iterdir() if p.is_file() and p.suffix.lower() in SUFFIXES)
+    )
     if not files:
         raise SystemExit(f"No PNG or JPEG files directly in {inputs}.")
     adjustments, issues = validate_adjustments(settings)
@@ -229,6 +258,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
+    parser.add_argument("--manifest", type=Path, help="approved.json: verify every original first")
     args = parser.parse_args(argv)
     if args.synthetic:
         (output,) = (Path(p) for p in args.paths)
@@ -237,7 +267,7 @@ def main(argv: list[str] | None = None) -> None:
         output = output / "review"
     else:
         inputs, output = (Path(p) for p in args.paths)
-    print(review(inputs, output, _settings(args.set)))
+    print(review(inputs, output, _settings(args.set), args.manifest))
 
 
 if __name__ == "__main__":

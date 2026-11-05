@@ -211,6 +211,8 @@ def contract_issues(facts: PdfFacts, layout: InteriorLayout) -> tuple[LayoutIssu
         ):
             if not same_box(actual, expected):
                 fail("pdf_page_size", f"{name} differs from the layout.", number)
+        if layout.spec.bleed and not same_box(page.bleed, planned.frame.media):
+            fail("pdf_page_size", "/BleedBox differs from the layout's bleed page.", number)
         if any(not font.embedded for font in page.fonts):
             fail("font_not_embedded", "A font on the page is not embedded.", number)
         placed = sum(isinstance(e, ImageBlock) for e in planned.elements)

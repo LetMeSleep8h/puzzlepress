@@ -81,7 +81,7 @@ changing page templates. Specs are validated before layout.
 | --- | --- |
 | Ink and paper | black ink; white paper (default) or cream paper |
 | Trim | 8.5 x 11 in (612 x 792 pt); media box = trim box |
-| Bleed | none (bleed specs are rejected) |
+| Bleed | none (no-bleed profiles); see Full bleed for the `-bleed` profiles |
 | Margins | inside 0.75 in, outside 0.5 in, top 0.625 in, bottom 0.625 in |
 | Live area | 7.25 x 9.75 in, mirrored between recto and verso |
 | Ink | DeviceGray only, no transparency |
@@ -111,40 +111,56 @@ are authored on 8.5 x 11 and scaled to the trim; a cover element pushed outside 
 media is reported, not moved. Not offered: other KDP trims, groundwood and color
 papers, hardcover.
 
-### Full bleed (not available)
+### Full bleed (coloring books, Interval 9)
 
-Full-bleed interiors are refused (`unsupported_bleed_configuration`); every profile
-is no-bleed and Studio offers none. Interval 8 verified KDP's rules and assessed the
-work, and kept bleed unavailable rather than ship a partial publishing option.
-
-KDP rules, read 2026-11-05 ("Set Trim Size, Bleed, and Margins"; "Paperback
-Submission Guidelines"):
+KDP rules, read 2026-11-05 on the official help pages "Set Trim Size, Bleed, and
+Margins" and "Paperback Submission Guidelines":
 
 - Bleed is 0.125 in beyond the trim at the top, bottom and outside edge; the inside
   (gutter) edge has none. The PDF page is 0.125 in wider and 0.25 in taller than the
-  trim (8.625 x 11.25 in for 8.5 x 11). Bleed needs a PDF upload, and one bleed page
-  makes the whole file a bleed file.
+  trim. Bleed needs a PDF upload, and one bleed page makes the whole file bleed.
 - With bleed, outside, top and bottom margins are at least 0.375 in (0.25 in
   without); the gutter table is the same. No crop or trim marks.
 
-What a bleed slice needs (recommended for Interval 9, coloring first):
+Profiles: every no-bleed profile has a `-bleed` twin (`paperback-8.5x11-bleed`,
+`paperback-6x9-cream-bleed`, ...; 16 profiles in all) with the same trim, paper and
+margins (all at least 0.375 in). They are for coloring books only: a word-search book
+choosing one is invalid (`bleed_not_for_engine`) and its build refuses the profile
+(`unsupported_bleed_configuration`); word-search pages print nothing past the trim.
 
-1. Bleed profiles (`paperback-<trim>-bleed`, white and cream) with 0.375 in or larger
-   outside/top/bottom margins, in `spec.py` beside the no-bleed ones.
-2. `geometry.page_frame`: media = trim + bleed; the trim box sits at the media's
-   inside edge (left on rectos, right on versos) and 0.125 in up; content boxes follow
-   the trim. Renderer: MediaBox, BleedBox = media, TrimBox per page.
-3. Coloring placement: an explicit per-page `fit: bleed` that cover-fits the drawing to
-   the bleed box, records the crop as configuration (the original is untouched) and
-   reports the ink share that falls outside the trim and outside the safe area.
-4. Preflight: bleed variants of `kdp_no_bleed`, `kdp_page_size`, `kdp_outside_margins`,
-   `content_in_live_area` and `kdp_no_printer_marks` (art past the trim is bleed, not a
-   slug), plus a parity check of alternating trim boxes; unevaluated rules block.
-5. Publishing: the upload checklist and metadata state "Bleed (PDF only)"; package
-   identity already includes the print configuration. Cover geometry is unchanged
-   (trim and page count).
-6. Studio: bleed profiles in Settings, trim/bleed/safe overlays in Pages and Print, a
-   "will be trimmed" view, and the profile shown in Cover, Publishing and Produce.
+| Trim | Bleed page (MediaBox = BleedBox) | TrimBox, recto | TrimBox, verso |
+| --- | --- | --- | --- |
+| 8.5 x 11 | 8.625 x 11.25 in | x 0..8.5, y 0.125..11.125 | x 0.125..8.625, y 0.125..11.125 |
+| 6 x 9 | 6.125 x 9.25 in | x 0..6 | x 0.125..6.125 |
+| 8 x 10 | 8.125 x 10.25 in | x 0..8 | x 0.125..8.125 |
+| 8.5 x 8.5 | 8.625 x 8.75 in | x 0..8.5 | x 0.125..8.625 |
+
+The trim sits against the inside edge of every page (left on rectos, right on
+versos), so the bleed is only on the outside, top and bottom; margins, the live area,
+folios, matter pages, dividers, borders and contained drawings are measured from each
+page's trim box (`geometry.page_frame`), and move with it unchanged. Blank backs and
+section starts follow the plan exactly as without bleed.
+
+Drawings: `coloring.pages[].placement.fit` is `contain` (default: the whole drawing in
+the art box, never cropped) or `fill`: the drawing covers the bleed edge at the top,
+bottom and outside and stops at the inside margin (nothing in the gutter), scaled to
+cover that area times a zoom of 1..3, with `x`/`y` choosing what shows. It is drawn
+whole, clipped to the fill area, never resampled; its effective DPI drops as it is
+enlarged and `kdp_image_resolution` reports it. Fill on a profile without bleed is
+refused (`fill_needs_bleed`), never converted; so is a page number on a filled page
+(`folio_over_bleed_art`); a filled page has no border.
+
+Preflight: `page_boxes` checks MediaBox, BleedBox and the parity-dependent TrimBox;
+`kdp_page_size` expects the trim plus bleed; `kdp_outside_margins` uses 0.375 in;
+margins and the live area exclude only the fill art (flagged `bleed` in the layout),
+which `coloring_art_placement` and `coloring_bleed_art` check: line work cropped off the
+page, printed only in the bleed (cut at trimming) or inside the trim but outside KDP's
+safe area, each above 0.1 % of the drawing's ink, is reported (warning) and never moved.
+The cover depends on trim, page count and paper only, so a bleed interior has the same
+cover geometry as its no-bleed twin; the cover's stored interior profile makes it out of
+date when the profile changes. The KDP checklist says "Bleed (PDF only)", and the
+package's print configuration records `interior_bleed`. Not modeled: bleed on
+word-search pages, color interiors, and art that should bleed into the gutter.
 
 Paper is stated by the profile, never inferred: it does not change interior page
 geometry or PDF bytes, but it is part of the interior identity and sets the cover's

@@ -1,0 +1,25 @@
+{
+  "record_version": 1,
+  "source": "docs/artwork-validation/findings.md, Interval 7 table (measures version 1)",
+  "settings": {
+    "background_cleanup": 0.6,
+    "despeckle": 2
+  },
+  "note": "Fine-line retention ('thin kept') and light strokes kept under cleanup, as Interval 7 measured them on the approved originals. null: not measured or not applicable. For comparison with a later review of the same SHA-256-verified files.",
+  "drawings": {
+    "01-libbey-automobile.jpg": {"thin_kept": 0.74, "light_kept": 0.93},
+    "02-lose-one-wheel.jpg": {"thin_kept": 0.70, "light_kept": 0.87},
+    "03-knight-bag-machine.jpg": {"thin_kept": 0.58, "light_kept": 0.89},
+    "04-deere-plow.jpg": {"thin_kept": 0.50, "light_kept": 0.44},
+    "05-edison-lamp.jpg": {"thin_kept": 0.66, "light_kept": 0.58},
+    "06-otis-elevator.jpg": {"thin_kept": 0.47, "light_kept": 0.49},
+    "09-van-gogh-cypresses.jpg": {"thin_kept": 0.03, "light_kept": 0.07},
+    "10-van-gogh-montmajour.jpg": {"thin_kept": 0.74, "light_kept": 1.0},
+    "11-van-gogh-pollard-willows.jpg": {"thin_kept": 0.006, "light_kept": 0.65},
+    "12-meyer-ornament-1900.jpg": {"thin_kept": 0.73, "light_kept": null},
+    "13-meyer-kreis.png": {"thin_kept": 0.89, "light_kept": null},
+    "14-juncus-gerardii.png": {"thin_kept": 1.0, "light_kept": null},
+    "15-vitis-labrusca.png": {"thin_kept": 1.0, "light_kept": null},
+    "17-tenniel-alice.png": {"thin_kept": 1.0, "light_kept": null}
+  }
+}

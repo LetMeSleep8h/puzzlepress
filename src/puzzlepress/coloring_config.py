@@ -94,25 +94,47 @@ class ColoringDivider:
 
 
 MIN_PLACEMENT_SCALE = 0.5
+MAX_FILL_SCALE = 3.0  # Zoom beyond the bleed-filling size (Interval 9).
+
+
+class Fit(StrEnum):
+    """How a page sizes its drawing (Interval 9).
+
+    contain: the whole drawing inside the art box (inside the margins), never cropped.
+    fill: the drawing covers the page's bleed area (full-bleed profiles only): top,
+    bottom and outside edge to the bleed edge, the binding side to the inside margin;
+    what falls outside is cropped, as configuration, and reported. Pixels are never
+    resampled; the original is untouched.
+    """
+
+    CONTAIN = "contain"
+    FILL = "fill"
 
 
 @dataclass(frozen=True)
 class Placement:
-    """Where one page prints its drawing inside the art box, losslessly.
+    """Where one page prints its drawing, losslessly.
 
-    `scale` is a fraction of the whole-drawing fit (1 fills the box on one axis);
-    `x` and `y` place the drawing within the space that leaves, from -1 (left,
-    bottom) through 0 (centred) to 1 (right, top). The drawing always stays whole
-    and inside the art box; its pixels are never resampled or cropped, only drawn
-    smaller, which raises the effective DPI.
+    contain (default): `scale` is a fraction of the whole-drawing fit (1 fills the art
+    box on one axis); `x` and `y` place the drawing within the space that leaves, from
+    -1 (left, bottom) through 0 (centred) to 1 (right, top). The drawing stays whole and
+    inside the art box; it is only drawn smaller, which raises the effective DPI.
+
+    fill: `scale` is a zoom of 1..MAX_FILL_SCALE beyond the smallest size that covers
+    the fill area; `x` and `y` choose which part shows, from -1 (left or bottom edge of
+    the drawing kept) to 1 (right or top edge kept). The rest is clipped at the page.
     """
 
-    scale: float = 1.0  # MIN_PLACEMENT_SCALE..1
+    scale: float = 1.0  # contain: MIN_PLACEMENT_SCALE..1; fill: 1..MAX_FILL_SCALE
     x: float = 0.0  # -1..1
     y: float = 0.0  # -1..1
+    fit: Fit = Fit.CONTAIN
 
     def to_dict(self) -> dict[str, object]:
-        return {"scale": self.scale, "x": self.x, "y": self.y}
+        data: dict[str, object] = {"scale": self.scale, "x": self.x, "y": self.y}
+        if self.fit is Fit.FILL:  # Written only when set, so earlier books keep their bytes.
+            data["fit"] = self.fit.value
+        return data
 
 
 CENTRED = Placement()

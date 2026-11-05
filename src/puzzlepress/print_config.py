@@ -23,7 +23,17 @@ PROFILE_IDS = (
     "paperback-8x10-cream",
     "paperback-8.5x8.5",
     "paperback-8.5x8.5-cream",
+    "paperback-8.5x11-bleed",
+    "paperback-8.5x11-cream-bleed",
+    "paperback-6x9-bleed",
+    "paperback-6x9-cream-bleed",
+    "paperback-8x10-bleed",
+    "paperback-8x10-cream-bleed",
+    "paperback-8.5x8.5-bleed",
+    "paperback-8.5x8.5-cream-bleed",
 )
+# Full-bleed profiles print past the trim; only coloring books have such pages.
+BLEED_PROFILE_IDS = tuple(p for p in PROFILE_IDS if p.endswith("-bleed"))
 
 
 @dataclass(frozen=True)

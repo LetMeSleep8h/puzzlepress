@@ -92,6 +92,16 @@ export interface Placement {
   scale: number;
   x: number;
   y: number;
+  /** contain (default, written only as absent) or fill (full-bleed profiles only). */
+  fit?: 'contain' | 'fill';
+}
+/** What trimming does to a drawing that fills a full-bleed page (Python's measure). */
+export interface BleedCrop {
+  ink_pixels: number;
+  hidden: number;
+  trimmed: number;
+  unsafe: number;
+  visible_area: number;
 }
 /** What a new book can be created as (GET /api/project-types). */
 export interface ProjectTypes {
@@ -106,6 +116,8 @@ export interface ProjectTypes {
     description: string;
     paper: string;
     trim: { width: number; height: number };
+    /** Full bleed: coloring books only (Python refuses it for word search). */
+    bleed?: boolean;
   }[];
 }
 /** The authored coloring section, as Python normalized it. */
@@ -355,6 +367,8 @@ export interface PreviewPage {
 }
 export interface PageGeometry {
   physical_page: number;
+  /** The rendered page: the trim plus bleed on a full-bleed interior, else the trim. */
+  media?: PtBox;
   trim: PtBox;
   live: PtBox;
   kdp_safe: PtBox | null;
@@ -1484,19 +1498,39 @@ export interface ColoringPlanResult {
   artwork: { failures: { id: string; code: string; message: string }[] };
   geometry: {
     profile: string;
+    bleed?: boolean;
     trim: { width: number; height: number };
+    /** The PDF page: the trim plus bleed on a full-bleed profile, else the trim. */
+    media?: { width: number; height: number };
     border: string;
-    sides: Record<'recto' | 'verso', { live: PtRect; art: PtRect }>;
+    sides: Record<
+      'recto' | 'verso',
+      {
+        live: PtRect;
+        art: PtRect;
+        media?: PtRect;
+        trim_box?: PtRect;
+        fill?: PtRect | null;
+        safe?: PtRect | null;
+      }
+    >;
   };
   /** By physical page: where Python places each drawing and its effective DPI. */
   placements?: Record<
     string,
     {
       entry: number;
-      box: PtRect;
-      effective_dpi: number;
+      fit?: 'contain' | 'fill';
+      /** The printed area: the drawing itself, or the fill area it is clipped to. */
+      box?: PtRect;
+      /** A filling drawing's whole extent, beyond what prints. */
+      drawing?: PtRect;
+      effective_dpi?: number;
       pixels: { width: number; height: number };
       placement: Placement;
+      crop?: BleedCrop | null;
+      /** fill_needs_bleed: the build refuses this page; nothing is drawn as printed. */
+      error?: string;
     }
   >;
 }

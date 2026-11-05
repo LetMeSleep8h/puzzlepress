@@ -14,6 +14,7 @@ from .coloring_config import (
     COLORING_VERSION,
     MAX_ARTWORK,
     MAX_DIVIDER_TEXT,
+    MAX_FILL_SCALE,
     MAX_PAGES,
     MAX_TITLE,
     MIN_PLACEMENT_SCALE,
@@ -24,6 +25,7 @@ from .coloring_config import (
     ColoringDivider,
     ColoringLayout,
     ColoringPage,
+    Fit,
     Placement,
 )
 from .content_validation import _Reader
@@ -112,11 +114,19 @@ def _adjustments(reader: _Reader, raw: object, path: str) -> Adjustments:
 def _placement(reader: _Reader, raw: object, path: str) -> Placement | None:
     if raw is None:
         return None
-    data = reader.mapping(raw, path, {"scale", "x", "y"})
+    data = reader.mapping(raw, path, {"scale", "x", "y", "fit"})
+    fit = Fit.CONTAIN
+    if "fit" in data:
+        try:
+            fit = Fit(str(data["fit"]))
+        except ValueError:
+            reader.issue(f"{path}.fit", "enum", "Expected contain or fill.")
+    low, high = (1.0, MAX_FILL_SCALE) if fit is Fit.FILL else (MIN_PLACEMENT_SCALE, 1.0)
     placement = Placement(
-        _number(reader, data.get("scale"), f"{path}.scale", MIN_PLACEMENT_SCALE, 1.0, 1.0),
+        _number(reader, data.get("scale"), f"{path}.scale", low, high, 1.0),
         _number(reader, data.get("x"), f"{path}.x", -1.0, 1.0, 0.0),
         _number(reader, data.get("y"), f"{path}.y", -1.0, 1.0, 0.0),
+        fit,
     )
     return None if placement == CENTRED else placement
 

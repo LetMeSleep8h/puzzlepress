@@ -35,14 +35,16 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 import PIL
+from PIL import Image
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 from pypdf.generic import ArrayObject, NameObject
 
 from ..cancellation import checkpoint
 from ..coloring.content import ColoringContent, PreparedArt
+from ..coloring.inspection import INK_LEVEL
 from ..coloring.prepare import PREPARATION_VERSION, pixel_digest
-from ..coloring_config import CENTRED, Border, Placement
+from ..coloring_config import CENTRED, Border, Fit, Placement
 from ..publication import PageKind, PublicationPlan
 from .design import CLASSIC
 from .engine import (
@@ -58,7 +60,7 @@ from .engine import (
 )
 from .geometry import page_frame
 from .issues import InteriorError, LayoutIssue
-from .model import Box, ImageBlock, ImageEncoding, InteriorLayout, Panel, PhysicalPage
+from .model import Box, ImageBlock, ImageEncoding, InteriorLayout, PageFrame, Panel, PhysicalPage
 from .render import LosslessImage
 from .spec import PrintSpecification, validate_print_spec
 from .validation import EPSILON, validate_layout
@@ -163,6 +165,103 @@ def place_art(
     ), 72.0 / scale
 
 
+def fill_box(frame: PageFrame, spec: PrintSpecification) -> Box:
+    """The area a fill drawing covers on a full-bleed page: the bleed edge at the top,
+    bottom and outside, and the inside margin on the binding side, so nothing is lost
+    in the gutter (KDP's interior bleed has no inside edge)."""
+    media, trim = frame.media, frame.trim
+    inside = spec.margins.inside
+    left, right = (trim.x + inside, media.right) if frame.recto else (media.x, trim.right - inside)
+    return Box(left, media.y, right - left, media.height)
+
+
+def place_fill(box: Box, width: int, height: int, placement: Placement) -> tuple[Box, float]:
+    """(placement, effective DPI): the drawing uniformly scaled to cover `box`, times the
+    page's zoom, shifted so `x`/`y` choose which part shows (-1 keeps the left or bottom
+    edge, 1 the right or top). The part outside `box` is clipped, never resampled."""
+    scale = max(box.width / width, box.height / height) * placement.scale
+    placed_w, placed_h = width * scale, height * scale
+    over_w, over_h = placed_w - box.width, placed_h - box.height
+    return Box(
+        box.x - over_w * (1 + placement.x) / 2,
+        box.y - over_h * (1 + placement.y) / 2,
+        placed_w,
+        placed_h,
+    ), 72.0 / scale
+
+
+@dataclass(frozen=True)
+class BleedCrop:
+    """Where a filling drawing's line work prints, as shares of all its ink (gray at or
+    below INK_LEVEL in the prepared pixels), measured on the exact placement.
+
+    - hidden: outside the fill area, so never printed (clipped by the page);
+    - trimmed: inside the fill area but beyond the trim, printed in the bleed and cut off;
+    - unsafe: inside the trim but outside KDP's safe area (0.375 in from the outside,
+      top and bottom trim, the page count's gutter on the binding side), where trimming
+      and binding can cut or hide it.
+    """
+
+    ink_pixels: int
+    hidden: float
+    trimmed: float
+    unsafe: float
+    visible_area: float  # Share of the drawing's area inside the fill area.
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "ink_pixels": self.ink_pixels,
+            "hidden": self.hidden,
+            "trimmed": self.trimmed,
+            "unsafe": self.unsafe,
+            "visible_area": self.visible_area,
+        }
+
+
+def _pixel_window(placement: Box, box: Box, width: int, height: int) -> tuple[int, int, int, int]:
+    """The image pixels a page box covers (rows counted from the top), clamped."""
+    sx, sy = width / placement.width, height / placement.height
+    left = round((box.x - placement.x) * sx)
+    right = round((box.right - placement.x) * sx)
+    top = round((placement.top - box.top) * sy)
+    bottom = round((placement.top - box.y) * sy)
+    return (
+        max(0, min(width, left)),
+        max(0, min(height, top)),
+        max(0, min(width, right)),
+        max(0, min(height, bottom)),
+    )
+
+
+def bleed_crop(image: Image.Image, block: ImageBlock, trim: Box, safe: Box) -> BleedCrop:
+    """Measure what trimming does to one filling drawing (`image`: prepared, mode L)."""
+    width, height = image.size
+    ink = image.point(lambda v: 255 if v <= INK_LEVEL else 0)
+
+    def count(box: Box | None) -> int:
+        if box is None:
+            return 0
+        x0, y0, x1, y1 = _pixel_window(block.placement, box, width, height)
+        if x1 <= x0 or y1 <= y0:
+            return 0
+        return int(ink.crop((x0, y0, x1, y1)).histogram()[255])
+
+    total = int(ink.histogram()[255])
+    shown = count(block.box)
+    in_trim = count(block.box.intersection(trim))
+    in_safe = count(safe.intersection(block.box))
+    x0, y0, x1, y1 = _pixel_window(block.placement, block.box, width, height)
+    visible = (x1 - x0) * (y1 - y0) / (width * height)
+    share = (lambda n: round(n / total, 4)) if total else (lambda n: 0.0)
+    return BleedCrop(
+        total,
+        share(total - shown),
+        share(shown - in_trim),
+        share(in_trim - in_safe),
+        round(visible, 4),
+    )
+
+
 def _coloring_page(
     page: _Page,
     art: Mapping[str, PreparedArt],
@@ -172,12 +271,45 @@ def _coloring_page(
     ref = page.plan_page.artwork
     assert ref is not None
     prepared = art[ref.id]
+    authored = placements.get(ref.entry, CENTRED)
+    if authored.fit is Fit.FILL:
+        if not page.spec.bleed:
+            page.issue(
+                "fill_needs_bleed",
+                "A drawing that fills the page needs a full-bleed print profile; choose the "
+                "-bleed profile of this trim, or fit the drawing inside the page.",
+                subject=ref.id,
+            )
+            return
+        if page.plan_page.number.displayed:
+            page.issue(
+                "folio_over_bleed_art",
+                "This page's number would print over a drawing that fills the page; hide "
+                "page numbers on artwork pages, or fit the drawing inside the page.",
+                subject=ref.id,
+            )
+            return
+        # A filling drawing has no border: it runs to the bleed edge.
+        clip = fill_box(page.frame, page.spec)
+        placement, dpi = place_fill(clip, prepared.width, prepared.height, authored)
+        page.elements.append(
+            ImageBlock(
+                ART_ROLE,
+                clip,
+                prepared.digest,
+                placement,
+                (0, 0, prepared.width, prepared.height),
+                dpi,
+                dpi,
+                ImageEncoding.LOSSLESS,
+                bleed=True,
+            )
+        )
+        return
     if border is not Border.NONE:
         _border(page, border)
     region = art_box(page.body, border)
-    placement, dpi = place_art(
-        region, prepared.width, prepared.height, placements.get(ref.entry, CENTRED)
-    )
+    placement, dpi = place_art(region, prepared.width, prepared.height, authored)
     page.elements.append(
         ImageBlock(
             ART_ROLE,
@@ -323,6 +455,10 @@ def validate_coloring_layout(
         region = art_box(_body(page), border)
         width, height = prepared.width, prepared.height
         placement = image.placement
+        authored = (placements or {}).get(ref.entry, CENTRED)
+        if authored.fit is Fit.FILL:
+            issues.extend(_check_fill(layout.spec, page, image, width, height, authored, frames))
+            continue
         if (
             image.role != ART_ROLE
             or image.encoding is not ImageEncoding.LOSSLESS
@@ -338,7 +474,6 @@ def validate_coloring_layout(
             fail("artwork_distorted", "The drawing is not uniformly scaled.")
         if abs(image.effective_dpi - width * 72.0 / placement.width) > 1e-6:
             fail("artwork_dpi", "The recorded effective DPI does not match the placement.")
-        authored = (placements or {}).get(ref.entry, CENTRED)
         expected, _ = place_art(region, width, height, authored)
         if any(
             abs(getattr(placement, k) - getattr(expected, k)) > EPSILON
@@ -354,6 +489,59 @@ def validate_coloring_layout(
         ):
             fail("border_mismatch", "The page border differs from the book's border setting.")
     return tuple(issues)
+
+
+def _check_fill(
+    spec: PrintSpecification,
+    page: PhysicalPage,
+    image: ImageBlock,
+    width: int,
+    height: int,
+    authored: Placement,
+    frames: list[Panel],
+) -> list[LayoutIssue]:
+    """A filling drawing: clipped to exactly its fill box, covering it, uniformly scaled
+    at its recorded DPI, where its page places it, with no border."""
+    found: list[LayoutIssue] = []
+
+    def fail(code: str, message: str) -> None:
+        found.append(
+            LayoutIssue(
+                code, message, page=page.plan_index, physical_page=page.number, kind=page.kind
+            )
+        )
+
+    placement = image.placement
+    if not spec.bleed:
+        fail("fill_needs_bleed", "A filling drawing on a page without bleed.")
+        return found
+    clip = fill_box(page.frame, spec)
+    if (
+        image.role != ART_ROLE
+        or image.encoding is not ImageEncoding.LOSSLESS
+        or image.pixels != (0, 0, width, height)
+    ):
+        fail("artwork_content", "The drawing is not the prepared pixels, whole and lossless.")
+    if any(
+        abs(getattr(image.box, k) - getattr(clip, k)) > EPSILON
+        for k in ("x", "y", "width", "height")
+    ):
+        fail("artwork_clipped", "The filling drawing is not clipped to its fill area.")
+    if not placement.contains(clip, EPSILON):
+        fail("artwork_gap", "The filling drawing leaves part of its fill area blank.")
+    if abs(placement.width * height - placement.height * width) > EPSILON * max(width, height):
+        fail("artwork_distorted", "The drawing is not uniformly scaled.")
+    if abs(image.effective_dpi - width * 72.0 / placement.width) > 1e-6:
+        fail("artwork_dpi", "The recorded effective DPI does not match the placement.")
+    expected, _ = place_fill(clip, width, height, authored)
+    if any(
+        abs(getattr(placement, k) - getattr(expected, k)) > EPSILON
+        for k in ("x", "y", "width", "height")
+    ):
+        fail("artwork_placement", "The filling drawing is not where its page places it.")
+    if frames:
+        fail("border_mismatch", "A drawing that fills the page carries no border.")
+    return found
 
 
 def _body(page: PhysicalPage) -> Box:

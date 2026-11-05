@@ -75,6 +75,20 @@ const done: ProduceStatus = {
   release: verified,
 };
 
+// The cheap poll answers with the job record only, never release files.
+const asPoll = (value: ProduceStatus) => ({
+  key: value.key,
+  revision: value.revision,
+  directory: value.directory,
+  run: value.run,
+  release_manifest_sha256: value.release?.manifest_sha256 ?? null,
+  release_checked: false,
+  recovery_pending: false,
+  workers: { running: 1, limit: 2 },
+});
+const answer = (url: string, value: ProduceStatus) =>
+  json(url.endsWith('/produce/job') ? asPoll(value) : value);
+
 afterEach(() => vi.restoreAllMocks());
 
 test('starting a job shows Python steps and counted progress, then the verified release', async () => {
@@ -85,17 +99,23 @@ test('starting a job shows Python steps and counted progress, then the verified 
     sent.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (url === '/api/projects/meadow/produce' && init?.method === 'POST')
       return json(running({ seq: 1, state: 'starting', step: null, steps: [] }));
-    polls += 1;
-    return json(
-      polls === 1
-        ? base
-        : polls < 3
+    if (url.endsWith('/produce/job')) {
+      polls += 1;
+      return answer(
+        url,
+        polls < 2
           ? running({
               seq: 5,
               progress: { stage: 'render_pages', done: 12, total: 40, label: 'pages drawn' },
             })
           : done,
-    );
+      );
+    }
+    // The full, verified status: nothing produced at first, the release once it ends,
+    // answered late, after polling has stopped (it must not be cancelled with it).
+    if (sent.filter((c) => c.url === url && !c.body).length === 1) return json(base);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return json(done);
   });
   render(<Produce project={project} dirty={false} />);
   const user = userEvent.setup();
@@ -110,6 +130,8 @@ test('starting a job shows Python steps and counted progress, then the verified 
   });
   expect(screen.getAllByText('Finished with blocking findings')[0]).toBeVisible();
   expect(screen.getByText('180.5 MB')).toBeVisible();
+  // Files came from the verified status, fetched once the poll reported the end.
+  expect(sent.filter((c) => c.url === '/api/projects/meadow/produce/job').length).toBe(2);
   expect(screen.getByText(/content_rights_declared/)).toBeVisible();
   expect(screen.getByRole('link', { name: 'Download upload package (ZIP)' })).toHaveAttribute(
     'href',
@@ -147,7 +169,7 @@ test('cancelling asks first, then shows Python stopping the job', async () => {
         running({ seq: 4, state: 'cancelling', cancel_requested: true, cancellable: false }),
       );
     }
-    return json({
+    return answer(String(input), {
       ...running(),
       release: {
         verified: false,
@@ -182,7 +204,7 @@ test('a failed job explains itself, says the release is unchanged and offers a r
         running({ job_id: '20261105T130000000000Z-bbbbbbbb', seq: 1, state: 'starting' }),
       );
     }
-    return json({
+    return answer(String(_input), {
       ...base,
       run: job({
         state: 'interrupted',
@@ -211,11 +233,12 @@ test('a slow answer about an older view never replaces a newer one', async () =>
   vi.useFakeTimers({ shouldAdvanceTime: true });
   let resolveSlow: (value: Response) => void = () => {};
   let calls = 0;
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     calls += 1;
-    if (calls === 1) return json(running({ seq: 3, step_label: 'Checking the interior' }));
+    const url = String(input);
+    if (calls === 1) return answer(url, running({ seq: 3, step_label: 'Checking the interior' }));
     if (calls === 2) return new Promise<Response>((resolve) => (resolveSlow = resolve));
-    return json(running({ seq: 7, step_label: 'Writing the upload package' }));
+    return answer(url, running({ seq: 7, step_label: 'Writing the upload package' }));
   });
   render(<Produce project={project} dirty={false} />);
   expect(await screen.findByText(/Checking the interior/)).toBeVisible();
@@ -238,3 +261,30 @@ test('unsaved changes block production of the saved source', async () => {
   expect(await screen.findByRole('button', { name: 'Produce' })).toBeDisabled();
   expect(screen.getByText(/Save your changes first/)).toBeVisible();
 });
+
+test('polling never offers files; a changed production.json triggers verification', async () => {
+  const urls: string[] = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const url = String(input);
+    urls.push(url);
+    if (url.endsWith('/produce/job'))
+      // Another writer replaced the release while this job runs.
+      return json({
+        ...asPoll(running({ seq: 6 })),
+        release_manifest_sha256: 'c'.repeat(64),
+      });
+    return json(
+      urls.filter((u) => u === url).length === 1
+        ? { ...running(), release: { ...verified!, manifest_sha256: 'a'.repeat(64) } }
+        : { ...running({ seq: 6 }), release: { verified: false, problem: 'tampered', files: [] } },
+    );
+  });
+  render(<Produce project={project} dirty={false} />);
+  expect(await screen.findByText('Every file verified')).toBeVisible();
+  // The poll's digest differs from the verified one: the page reads every file again.
+  expect(
+    await screen.findByText(/does not match its manifest: tampered/, {}, { timeout: 5000 }),
+  ).toBeVisible();
+  expect(screen.queryByRole('link', { name: /Download/ })).toBeNull();
+  expect(urls.filter((u) => u.endsWith('/produce/job')).length).toBeGreaterThan(0);
+}, 15000);

@@ -52,6 +52,7 @@ from .service import StudioError, StudioService
 LOGGER = logging.getLogger(__name__)
 MANIFEST = "production.json"
 STARTING_GRACE = 30.0  # Seconds a worker not started by this Studio may take to lock.
+LOG_LIMIT = 1024 * 1024  # worker.log keeps at most its last megabyte.
 STEP_LABELS = {
     "interior": "Building the interior PDF",
     "interior_preflight": "Checking the interior",
@@ -121,6 +122,23 @@ def verified_release(directory: Path) -> tuple[dict[str, object] | None, str | N
     return manifest, None
 
 
+def _bound_log(path: Path) -> None:
+    """Keep only the last LOG_LIMIT bytes of a finished worker's log (marked as cut)."""
+    try:
+        size = path.stat().st_size
+        if size <= LOG_LIMIT:
+            return
+        with open(path, "rb") as stream:
+            stream.seek(size - LOG_LIMIT)
+            tail = stream.read()
+        note = f"[worker.log: the first {size - LOG_LIMIT} bytes were removed]\n".encode()
+        staged = path.with_name(path.name + ".tmp")
+        staged.write_bytes(note + tail)
+        os.replace(staged, path)
+    except OSError:
+        LOGGER.warning("Could not bound %s", path)
+
+
 def _manifest_digest(release: Path) -> str | None:
     try:
         return hashlib.sha256((release / MANIFEST).read_bytes()).hexdigest()
@@ -151,7 +169,7 @@ class ProducingService:
         service: StudioService,
         max_workers: int | None = None,
         memory_limit_mb: int | None = DEFAULT_MEMORY_MB,
-        lower_priority: bool = True,
+        lower_priority: bool = False,
     ) -> None:
         self.service = service
         self.max_workers = max_workers or default_workers()
@@ -160,12 +178,34 @@ class ProducingService:
         self._lock = threading.Lock()
         self._jobs: dict[str, _Worker] = {}  # By release directory; queued or running.
         self._queue: list[str] = []  # Release directories waiting for a worker.
+        # Parsed sources by key: (revision, project, build identity), reused only for
+        # the identical bytes.
+        self._parsed: dict[str, tuple[str, Project, str]] = {}
+        self._parsed_lock = threading.Lock()
 
     # ------------------------------------------------------------- locating
 
     def _locate(self, key: str) -> tuple[Project, str, Path, Path]:
-        project, revision = self.service.store.snapshot(key)
+        """(project, revision, book.yaml, release directory) for the saved source.
+
+        The library's boundary checks and the output folder's resolution run on every
+        call; only parsing is skipped when book.yaml holds exactly the bytes last parsed
+        (the revision is their SHA-256), so polling stays cheap and never serves a
+        project that differs from the file."""
         source = self.service.store.source(key)
+        try:
+            raw = source.read_bytes()
+        except OSError:
+            raw = None
+        revision = "sha256-" + hashlib.sha256(raw).hexdigest() if raw is not None else None
+        with self._parsed_lock:
+            cached = self._parsed.get(key)
+        if cached is not None and revision is not None and cached[0] == revision:
+            project = cached[1]
+        else:
+            project, revision = self.service.store.snapshot(key)
+            with self._parsed_lock:
+                self._parsed[key] = (revision, project, build_identity(project))
         try:
             directory = release_directory(project, source.parent)
         except ProjectError as error:
@@ -174,12 +214,21 @@ class ProducingService:
             ) from error
         return project, revision, source, directory
 
+    def _identity(self, key: str, revision: str, project: Project) -> str:
+        with self._parsed_lock:
+            cached = self._parsed.get(key)
+        return (
+            cached[2] if cached is not None and cached[0] == revision else build_identity(project)
+        )
+
     # ------------------------------------------------------------- jobs
 
     def _reconcile(self, release: Path, view: jobs.JobView) -> jobs.JobView:
         """Record the end of a job whose worker is provably gone (caller holds _lock)."""
         if view.terminal or str(release) in self._jobs:
             return view
+        if view.state == "queued" and (_seconds(view.spec.created, None) or 0) < STARTING_GRACE:
+            return view  # Another Studio process may be starting its worker right now.
         if view.state == "queued":
             error = {
                 "code": "studio_stopped",
@@ -286,6 +335,7 @@ class ProducingService:
             log.close()  # type: ignore[attr-defined]
         except OSError:
             pass
+        _bound_log(worker.directory / jobs.LOG_NAME)
         with self._lock:
             try:
                 view = jobs.read_job(worker.directory)
@@ -326,6 +376,29 @@ class ProducingService:
 
     # ------------------------------------------------------------- API
 
+    def job(self, key: str) -> dict[str, object]:
+        """The cheap poll: the latest job as its record says, and production.json's
+        digest so a client can tell the release changed. Nothing here verifies the
+        release; files are offered only from `status`, which reads every one back."""
+        _, revision, _, directory = self._locate(key)
+        with self._lock:
+            view = self._latest(directory)
+            queued = str(directory) in self._queue
+            position = self._queue.index(str(directory)) + 1 if queued else None
+            worker = self._jobs.get(str(directory))
+            launched = worker is not None and worker.process is not None
+            running = sum(1 for w in self._jobs.values() if w.process is not None)
+        return {
+            "key": key,
+            "revision": revision,
+            "directory": directory.name,
+            "run": self._run(view, directory, position, launched) if view else None,
+            "release_manifest_sha256": _manifest_digest(directory),
+            "release_checked": False,
+            "recovery_pending": pending_recovery(directory, jobs.backup_prefix(directory)),
+            "workers": {"running": running, "limit": self.max_workers},
+        }
+
     def status(self, key: str) -> dict[str, object]:
         project, revision, _, directory = self._locate(key)
         with self._lock:
@@ -344,9 +417,10 @@ class ProducingService:
                 "verified": problem is None,
                 "problem": problem,
                 "engine": manifest.get("engine", "word_search"),
+                "profile": manifest.get("profile"),
                 "result": result,
                 "build_identity": recorded,
-                "stale": recorded != build_identity(project),
+                "stale": recorded != self._identity(key, revision, project),
                 "manifest_sha256": _manifest_digest(directory),
                 "files": [
                     {"name": f["name"], "bytes": f["bytes"], "sha256": f["sha256"]}

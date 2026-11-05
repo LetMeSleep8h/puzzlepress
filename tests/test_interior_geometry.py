@@ -67,9 +67,10 @@ def test_profiles_state_ink_and_paper_explicitly():
     assert (cream.trim, cream.margins, cream.bleed) == (SPEC.trim, SPEC.margins, SPEC.bleed)
     assert validate_print_spec(cream) == ()
     assert sorted(PROFILES) == sorted(
-        f"paperback-{trim}{paper}"
+        f"paperback-{trim}{paper}{bleed}"
         for trim in ("8.5x11", "6x9", "8x10", "8.5x8.5")
         for paper in ("", "-cream")
+        for bleed in ("", "-bleed")  # Full-bleed profiles (Interval 9).
     )
 
 
@@ -105,7 +106,7 @@ def test_gutter_and_page_count_are_checked_against_physical_count():
         ({"margins": Margins(54, 36, 10, 45)}, "margin_too_small"),
         ({"margins": Margins(54, 36, 45, 17.9)}, "margin_too_small"),
         ({"margins": Margins(300, 200, 45, 45)}, "invalid_page_geometry"),
-        ({"bleed": True}, "unsupported_bleed_configuration"),
+        ({"bleed": True, "margins": Margins(54, 26, 45, 45)}, "margin_too_small"),
         ({"trim": TrimSize("7x10", inches(7), inches(10))}, "unsupported_trim_size"),
         ({"typography": Typography(body=6.5)}, "font_too_small"),
         ({"typography": Typography(solution_letter_min=6.9)}, "font_too_small"),
@@ -120,12 +121,15 @@ def test_invalid_print_specifications_are_rejected(change, code):
     assert all(issue.region and issue.region.startswith("print.") for issue in issues)
 
 
-def test_bleed_raises_outside_margin_minimum_and_is_unsupported():
+def test_bleed_raises_the_outside_margin_minimum():
+    """Interval 9: full bleed is a valid specification; KDP's 0.375 in minimum for
+    outside, top and bottom margins applies (0.25 in without bleed)."""
     spec = replace(SPEC, bleed=True, margins=Margins(54, inches(0.3), 45, 45))
     issues = validate_print_spec(spec)
-    assert codes(issues) == ["unsupported_bleed_configuration", "margin_too_small"]
-    assert issues[1].required == "0.375 in"
+    assert codes(issues) == ["margin_too_small"]
+    assert issues[0].required == "0.375 in"
     assert codes(validate_print_spec(replace(SPEC, margins=spec.margins))) == []
+    assert validate_print_spec(replace(SPEC, bleed=True)) == ()
 
 
 def test_recto_and_verso_mirror_inside_and_outside_margins():

@@ -5,6 +5,7 @@ import { DraftToolbar, type Draft } from './draft';
 import { Field, FieldErrors, SelectField, matchIssues, type Source } from './editor-fields';
 import { useHistory, useUndoShortcuts } from './history';
 import type {
+  BleedCrop,
   ColoringPlanPage,
   ColoringPlanResult,
   ColoringSource,
@@ -82,16 +83,39 @@ function describe(page: ColoringPlanPage): string {
   return MATTER_NAMES[page.kind] ?? page.kind;
 }
 
-/** A placement equal to the centred default is written as no placement at all. */
+/** A placement equal to the centred default is written as no placement at all; fill
+ * is written only when chosen (Python normalizes the same way). */
 function withPlacement(entry: { artwork: string }, placement: Placement): Entry {
-  const rounded = {
+  const fill = placement.fit === 'fill';
+  const rounded: Placement = {
     scale: Math.round(placement.scale * 100) / 100,
     x: Math.round(placement.x * 100) / 100,
     y: Math.round(placement.y * 100) / 100,
+    ...(fill ? { fit: 'fill' as const } : {}),
   };
-  return rounded.scale === 1 && rounded.x === 0 && rounded.y === 0
+  return !fill && rounded.scale === 1 && rounded.x === 0 && rounded.y === 0
     ? { artwork: entry.artwork }
     : { artwork: entry.artwork, placement: rounded };
+}
+
+type Geometry = ColoringPlanResult['geometry'];
+type Side = Geometry['sides']['recto'];
+
+/** The PDF page's size: the trim plus bleed on a full-bleed profile, else the trim. */
+function mediaOf(g: Geometry) {
+  return g.media ?? g.trim;
+}
+
+/** The side's trim box in page coordinates (at the origin without bleed). */
+function trimOf(g: Geometry, side: Side) {
+  return side.trim_box ?? { x: 0, y: 0, width: g.trim.width, height: g.trim.height };
+}
+
+/** Python's crop measure, as a sentence; numbers only from Python. */
+function cropSummary(crop: BleedCrop | null | undefined) {
+  if (!crop) return null;
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  return `Of the drawing's line work, ${pct(crop.hidden)} is cut off the page, ${pct(crop.trimmed)} prints only in the bleed (cut at trimming) and ${pct(crop.unsafe)} lies outside the safe area.`;
 }
 
 export function ColoringPages({ d }: { d: Draft }) {
@@ -735,6 +759,8 @@ function PageDesigner({
     'artwork' in entry &&
     onReplace(withPlacement(entry, { ...placement, ...patch }), undefined, group);
   const g = plan?.geometry;
+  const fill = placement.fit === 'fill';
+  const media = g ? mediaOf(g) : undefined;
   return (
     <section className="page-designer" aria-labelledby="designer-heading">
       <h4 id="designer-heading">
@@ -751,63 +777,131 @@ function PageDesigner({
           'Not planned yet.'
         )}
       </p>
-      {g && page && (
+      {g && page && media && (
         <PageViewport
           label="Selected page"
-          page={{ width: g.trim.width * CSS_PX_PER_PT, height: g.trim.height * CSS_PX_PER_PT }}
+          page={{ width: media.width * CSS_PX_PER_PT, height: media.height * CSS_PX_PER_PT }}
         >
-          {(scale) => (
-            <svg
-              width={g.trim.width * CSS_PX_PER_PT * scale}
-              height={g.trim.height * CSS_PX_PER_PT * scale}
-              viewBox={`0 0 ${g.trim.width} ${g.trim.height}`}
-              role="img"
-              aria-label={`${describe(page)}, with the live area${placed ? ', art box and drawing' : ''} outlined`}
-              className={`designer-page ${page.side}`}
-            >
-              <rect className="trim" x="0" y="0" width={g.trim.width} height={g.trim.height} />
-              <rect className="live" {...svgRect(g.sides[page.side].live, g.trim.height)} />
-              {page.kind === 'coloring' && (
-                <rect className="art" {...svgRect(g.sides[page.side].art, g.trim.height)} />
-              )}
-              {page.kind === 'coloring' && placed && page.artwork && (
-                <>
-                  <line
-                    className="guide"
-                    x1={g.trim.width / 2}
-                    x2={g.trim.width / 2}
-                    y1="0"
-                    y2={g.trim.height}
-                  />
-                  <image
-                    href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
-                    {...svgRect(placed.box, g.trim.height)}
-                    preserveAspectRatio="none"
-                  />
-                  <rect className="placed" {...svgRect(placed.box, g.trim.height)} />
-                </>
-              )}
-              {page.kind === 'divider' && (
-                <text
-                  x={g.trim.width / 2}
-                  y={g.trim.height / 2}
-                  textAnchor="middle"
-                  className="label"
-                >
-                  {page.divider?.title}
-                </text>
-              )}
-              <text
-                x={page.side === 'recto' ? g.trim.width - 18 : 18}
-                y="24"
-                textAnchor={page.side === 'recto' ? 'end' : 'start'}
-                className="side-label"
+          {(scale) => {
+            const side = g.sides[page.side];
+            const trim = trimOf(g, side);
+            const r = (b: { x: number; y: number; width: number; height: number }) =>
+              svgRect(b, media.height);
+            const drawing = placed?.fit === 'fill' ? placed.drawing : placed?.box;
+            // The gutter: from the binding edge of the trim to the fill area (bleed only).
+            const gutter =
+              g.bleed && side.fill
+                ? page.side === 'recto'
+                  ? { x: trim.x, y: trim.y, width: side.fill.x - trim.x, height: trim.height }
+                  : {
+                      x: side.fill.x + side.fill.width,
+                      y: trim.y,
+                      width: trim.x + trim.width - side.fill.x - side.fill.width,
+                      height: trim.height,
+                    }
+                : null;
+            return (
+              <svg
+                width={media.width * CSS_PX_PER_PT * scale}
+                height={media.height * CSS_PX_PER_PT * scale}
+                viewBox={`0 0 ${media.width} ${media.height}`}
+                role="img"
+                aria-label={`${describe(page)}, with the ${g.bleed ? 'bleed, trim, safe area, gutter, ' : ''}live area${placed ? ', art box and drawing' : ''} outlined`}
+                className={`designer-page ${page.side}`}
               >
-                {page.side === 'recto' ? 'Recto (right)' : 'Verso (left)'}
-              </text>
-            </svg>
-          )}
+                {g.bleed && (
+                  <rect
+                    className="bleed-area"
+                    x="0"
+                    y="0"
+                    width={media.width}
+                    height={media.height}
+                  />
+                )}
+                <rect className="trim" {...r(trim)} />
+                {gutter && <rect className="gutter" {...r(gutter)} />}
+                <rect className="live" {...r(side.live)} />
+                {g.bleed && side.safe && <rect className="safe" {...r(side.safe)} />}
+                {page.kind === 'coloring' && !fill && <rect className="art" {...r(side.art)} />}
+                {page.kind === 'coloring' && placed && page.artwork && drawing && (
+                  <>
+                    <line
+                      className="guide"
+                      x1={trim.x + trim.width / 2}
+                      x2={trim.x + trim.width / 2}
+                      y1="0"
+                      y2={media.height}
+                    />
+                    {placed.fit === 'fill' && placed.box && (
+                      <>
+                        <clipPath id="designer-fill-clip">
+                          <rect {...r(placed.box)} />
+                        </clipPath>
+                        {/* The whole drawing, faint: what the page crops off. */}
+                        <image
+                          className="crop-ghost"
+                          href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
+                          {...r(drawing)}
+                          preserveAspectRatio="none"
+                        />
+                      </>
+                    )}
+                    <image
+                      href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
+                      {...r(drawing)}
+                      preserveAspectRatio="none"
+                      clipPath={placed.fit === 'fill' ? 'url(#designer-fill-clip)' : undefined}
+                    />
+                    {g.bleed && placed.fit === 'fill' && (
+                      // Hatch what trimming cuts away: the page beyond the trim.
+                      <path
+                        className="trimmed-band"
+                        fillRule="evenodd"
+                        d={`M0 0h${media.width}v${media.height}h${-media.width}z M${trim.x} ${media.height - trim.y - trim.height}h${trim.width}v${trim.height}h${-trim.width}z`}
+                      />
+                    )}
+                    <rect className="placed" {...r(placed.box ?? drawing)} />
+                  </>
+                )}
+                {page.kind === 'divider' && (
+                  <text
+                    x={trim.x + trim.width / 2}
+                    y={media.height / 2}
+                    textAnchor="middle"
+                    className="label"
+                  >
+                    {page.divider?.title}
+                  </text>
+                )}
+                <text
+                  x={page.side === 'recto' ? media.width - 18 : 18}
+                  y="24"
+                  textAnchor={page.side === 'recto' ? 'end' : 'start'}
+                  className="side-label"
+                >
+                  {page.side === 'recto' ? 'Recto (right)' : 'Verso (left)'}
+                </text>
+              </svg>
+            );
+          }}
         </PageViewport>
+      )}
+      {g?.bleed && page && (
+        <ul className="designer-legend small" aria-label="What the outlines show">
+          <li>
+            <span className="key bleed" aria-hidden="true" /> Bleed: printed, then cut away
+          </li>
+          <li>
+            <span className="key trim" aria-hidden="true" /> Trim: the finished page edge
+          </li>
+          <li>
+            <span className="key safe" aria-hidden="true" /> Safe area: KDP margins for this page
+            count
+          </li>
+          <li>
+            <span className="key gutter" aria-hidden="true" /> Gutter: the binding side, kept clear
+          </li>
+        </ul>
       )}
       {'artwork' in entry && (
         <div className="designer-controls">
@@ -824,14 +918,56 @@ function PageDesigner({
               )
             }
           />
+          <fieldset className="placement-fit">
+            <legend>How the drawing sits on the page</legend>
+            <label>
+              <input
+                type="radio"
+                name={`fit-${index}`}
+                checked={!fill}
+                onChange={() =>
+                  onReplace(
+                    { artwork: entry.artwork },
+                    'Fit inside the page: whole drawing, centred.',
+                  )
+                }
+              />{' '}
+              Fit inside the page (the whole drawing, never cropped)
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`fit-${index}`}
+                checked={fill}
+                disabled={!g?.bleed}
+                aria-describedby={`fill-note-${index}`}
+                onChange={() =>
+                  onReplace(
+                    withPlacement(entry, { scale: 1, x: 0, y: 0, fit: 'fill' }),
+                    'Fill the bleed area: the drawing runs past the trim; what falls outside is cropped.',
+                  )
+                }
+              />{' '}
+              Fill the bleed area (runs past the trim; the crop is shown)
+            </label>
+            <p className="small muted" id={`fill-note-${index}`}>
+              {g?.bleed
+                ? 'Filling covers the page to the bleed edge on the top, bottom and outside, and stops at the inside margin so nothing disappears into the binding.'
+                : 'Filling needs a full-bleed print profile: choose one in Settings (Print). This profile has no bleed.'}
+            </p>
+          </fieldset>
           <fieldset className="placement-fields">
-            <legend>Placement in the art box</legend>
+            <legend>{fill ? 'Crop and zoom' : 'Placement in the art box'}</legend>
             <Slider
-              label="Size"
+              label={fill ? 'Zoom' : 'Size'}
               value={placement.scale}
-              min={0.5}
-              max={1}
-              format={(v) => `${Math.round(v * 100)}% of the full fit`}
+              min={fill ? 1 : 0.5}
+              max={fill ? 3 : 1}
+              format={(v) =>
+                fill
+                  ? `${Math.round(v * 100)}% of the size that covers the page`
+                  : `${Math.round(v * 100)}% of the full fit`
+              }
               onChange={(scale) => set({ scale }, `placement.scale.${index}`)}
             />
             <Slider
@@ -839,7 +975,17 @@ function PageDesigner({
               value={placement.x}
               min={-1}
               max={1}
-              format={(v) => (v === 0 ? 'centred' : v < 0 ? 'toward the left' : 'toward the right')}
+              format={(v) =>
+                v === 0
+                  ? 'centred'
+                  : fill
+                    ? v < 0
+                      ? 'keeps the left edge'
+                      : 'keeps the right edge'
+                    : v < 0
+                      ? 'toward the left'
+                      : 'toward the right'
+              }
               onChange={(x) => set({ x }, `placement.x.${index}`)}
             />
             <Slider
@@ -847,7 +993,17 @@ function PageDesigner({
               value={placement.y}
               min={-1}
               max={1}
-              format={(v) => (v === 0 ? 'centred' : v < 0 ? 'toward the bottom' : 'toward the top')}
+              format={(v) =>
+                v === 0
+                  ? 'centred'
+                  : fill
+                    ? v < 0
+                      ? 'keeps the bottom edge'
+                      : 'keeps the top edge'
+                    : v < 0
+                      ? 'toward the bottom'
+                      : 'toward the top'
+              }
               onChange={(y) => set({ y }, `placement.y.${index}`)}
             />
             <div className="button-row">
@@ -862,7 +1018,10 @@ function PageDesigner({
                 type="button"
                 disabled={placement === CENTRED}
                 onClick={() =>
-                  onReplace({ artwork: entry.artwork }, 'Placement reset: whole fit, centred.')
+                  onReplace(
+                    { artwork: entry.artwork },
+                    'Placement reset: fit inside, whole, centred.',
+                  )
                 }
               >
                 Reset placement
@@ -871,11 +1030,16 @@ function PageDesigner({
             <p className="small muted" aria-live="polite">
               {checking
                 ? 'Python is placing the drawing…'
-                : placed
-                  ? `Prints ${(placed.box.width / 72).toFixed(2)} × ${(placed.box.height / 72).toFixed(2)} in from ${placed.pixels.width} × ${placed.pixels.height} pixels: ${placed.effective_dpi} DPI.`
-                  : 'Placement appears once Python plans this page.'}{' '}
-              The drawing always prints whole, inside the art box, with its own pixels: making it
-              smaller never crops or resamples it.
+                : placed?.error
+                  ? 'This page cannot be built: filling needs a full-bleed print profile.'
+                  : placed?.fit === 'fill' && placed.drawing
+                    ? `The drawing is ${(placed.drawing.width / 72).toFixed(2)} × ${(placed.drawing.height / 72).toFixed(2)} in from ${placed.pixels.width} × ${placed.pixels.height} pixels: ${placed.effective_dpi} DPI. ${cropSummary(placed.crop) ?? ''}`
+                    : placed?.box
+                      ? `Prints ${(placed.box.width / 72).toFixed(2)} × ${(placed.box.height / 72).toFixed(2)} in from ${placed.pixels.width} × ${placed.pixels.height} pixels: ${placed.effective_dpi} DPI.`
+                      : 'Placement appears once Python plans this page.'}{' '}
+              {fill
+                ? 'Its own pixels, never resampled: the faint part outside the page and the hatched bleed are cut away; zooming or moving changes only what is cropped.'
+                : 'The drawing always prints whole, inside the art box, with its own pixels: making it smaller never crops or resamples it.'}
             </p>
           </fieldset>
         </div>
@@ -1011,33 +1175,52 @@ function PageCard({
   const blank = page.kind === 'blank';
   const reason = page.blank ? (BLANK_REASONS[page.blank.reason] ?? page.blank.reason) : null;
   const placed = plan.placements?.[String(page.index)];
+  const media = mediaOf(g);
+  const trim = trimOf(g, side);
   const rect = (b: { x: number; y: number; width: number; height: number }) =>
-    svgRect(b, g.trim.height);
+    svgRect(b, media.height);
   const selectable = page.section === 'artwork' && !blank;
+  const clip = `card-clip-${page.index}`;
+  const filled = placed?.fit === 'fill' && placed.box && placed.drawing;
   return (
     <figure
       className={`page-card ${page.side}${blank ? ' automatic' : ''}${selected ? ' selected' : ''}`}
     >
-      <svg viewBox={`0 0 ${g.trim.width} ${g.trim.height}`} role="img" aria-label={describe(page)}>
-        <rect className="trim" x="0" y="0" width={g.trim.width} height={g.trim.height} />
+      <svg viewBox={`0 0 ${media.width} ${media.height}`} role="img" aria-label={describe(page)}>
+        {g.bleed && (
+          <rect className="bleed-area" x="0" y="0" width={media.width} height={media.height} />
+        )}
+        <rect className="trim" {...rect(trim)} />
         <rect className="live" {...rect(side.live)} />
         {page.kind === 'coloring' && page.artwork && (
           <>
-            <rect className="art" {...rect(side.art)} />
-            <image
-              href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
-              {...rect(placed?.box ?? side.art)}
-              preserveAspectRatio={placed ? 'none' : 'xMidYMid meet'}
-            />
+            {!filled && <rect className="art" {...rect(side.art)} />}
+            {filled && (
+              <clipPath id={clip}>
+                <rect {...rect(placed.box!)} />
+              </clipPath>
+            )}
+            {placed?.error ? (
+              <text x={media.width / 2} y={media.height / 2} textAnchor="middle" className="label">
+                Needs bleed
+              </text>
+            ) : (
+              <image
+                href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
+                {...rect(filled ? placed.drawing! : (placed?.box ?? side.art))}
+                preserveAspectRatio={placed ? 'none' : 'xMidYMid meet'}
+                clipPath={filled ? `url(#${clip})` : undefined}
+              />
+            )}
           </>
         )}
         {page.kind === 'divider' && (
-          <text x={g.trim.width / 2} y={g.trim.height / 2} textAnchor="middle" className="label">
+          <text x={media.width / 2} y={media.height / 2} textAnchor="middle" className="label">
             {page.divider?.title}
           </text>
         )}
         {page.matter && page.kind !== 'blank' && (
-          <text x={g.trim.width / 2} y={g.trim.height / 3} textAnchor="middle" className="label">
+          <text x={media.width / 2} y={media.height / 3} textAnchor="middle" className="label">
             {MATTER_NAMES[page.kind] ?? page.kind}
           </text>
         )}

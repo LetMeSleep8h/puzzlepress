@@ -163,6 +163,19 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
         .replace("../build/synthetic-coloring-book", "../../build/coloring-produce"),
         encoding="utf-8",
     )
+    # Full bleed (Interval 9): a SYNTHETIC coloring book on the 8.5 x 11 bleed profile,
+    # page numbers off on artwork pages so drawings may fill the page.
+    composed_coloring_book(books / "coloring-bleed", 2, border="thin")
+    from puzzlepress import dump_project, load_project, validate_project
+
+    bleed_source = load_project(books / "coloring-bleed").project.to_dict()
+    bleed_source["book"]["id"] = "coloring-bleed-acceptance"
+    bleed_source["output"] = {"directory": "../../build/coloring-bleed"}
+    bleed_source["print"] = {"profile": "paperback-8.5x11-bleed"}
+    bleed_source["composition"]["page_numbers"]["show_artwork"] = False
+    (books / "coloring-bleed" / "book.yaml").write_text(
+        dump_project(validate_project(bleed_source).require_project()), encoding="utf-8"
+    )
     # Produce, cancelled and reloaded mid-job: the same SYNTHETIC book, run by the real
     # worker with a slow step (tests/worker_harness.py) so the browser can catch it.
     composed_coloring_book(books / "coloring-produce-slow", 2)

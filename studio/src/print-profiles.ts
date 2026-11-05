@@ -9,6 +9,12 @@ export function trimLabel(trim: { width: number; height: number }): string {
 export function profileLabel(profile: {
   paper: string;
   trim: { width: number; height: number };
+  bleed?: boolean;
 }): string {
-  return `${trimLabel(profile.trim)}, ${profile.paper} paper`;
+  return `${trimLabel(profile.trim)}, ${profile.paper} paper${profile.bleed ? ', full bleed' : ''}`;
+}
+
+/** Whether a book of this kind may choose the profile (full bleed: coloring only). */
+export function offeredFor(profile: { bleed?: boolean }, coloring: boolean): boolean {
+  return !profile.bleed || coloring;
 }

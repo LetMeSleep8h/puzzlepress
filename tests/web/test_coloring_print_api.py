@@ -57,7 +57,7 @@ def test_build_preflight_and_page_meanings(client):
     assert status["build"] == {"success": True}
     report = status["report"]
     assert report["ruleset"]["id"] == "puzzlepress-kdp-coloring"
-    assert status["ruleset"] == 3  # 3: paper-relative line measures (Interval 8)
+    assert status["ruleset"] == 4  # 4: full bleed (Interval 9)
     assert report["structural"]["status"] == "valid"
     pages = status["preview"]["pages"]
     assert [(p["physical_page"], p["side"], p["kind"], p["folio"]) for p in pages] == [
@@ -200,3 +200,46 @@ def test_composer_gets_an_incomplete_plan_with_its_reasons(client):
 
 def test_pages_route_serves_the_shell(client):
     assert client.get("/books/coloring-print/pages").status_code == 200
+
+
+# ---------------------------------------------------------------- full bleed (Interval 9)
+
+
+def test_the_plan_preview_carries_bleed_geometry_and_the_crop(client) -> None:
+    source = client.get("/api/projects/coloring-print").json()["source"]
+    source["print"] = {"profile": "paperback-8.5x11-bleed"}
+    source.setdefault("composition", {}).setdefault("page_numbers", {})["show_artwork"] = False
+    art = [p for p in source["coloring"]["pages"] if "artwork" in p]
+    art[0]["placement"] = {"fit": "fill", "scale": 1.5, "x": -1, "y": 0}
+    data = client.post("/api/projects/coloring-print/draft/plan", json={"source": source}).json()
+    g = data["geometry"]
+    assert g["bleed"] is True and g["media"] == {"width": 621.0, "height": 810.0}
+    assert g["sides"]["recto"]["trim_box"] == {"x": 0.0, "y": 9.0, "width": 612, "height": 792}
+    assert g["sides"]["verso"]["trim_box"]["x"] == 9.0
+    assert g["sides"]["recto"]["fill"]["x"] == 54.0  # The inside margin: no art in the gutter.
+    assert g["sides"]["recto"]["safe"]["y"] == 9.0 + 27.0  # 0.375 in above the trim.
+    filled = [p for p in data["placements"].values() if p["fit"] == "fill"]
+    assert len(filled) == 1
+    placed = filled[0]
+    box, drawing = placed["box"], placed["drawing"]
+    assert drawing["width"] >= box["width"] and drawing["height"] >= box["height"]
+    assert abs(drawing["x"] - box["x"]) < 0.01  # x = -1 keeps the drawing's left edge.
+    crop = placed["crop"]
+    assert crop["hidden"] > 0 and set(crop) == {
+        "ink_pixels",
+        "hidden",
+        "trimmed",
+        "unsafe",
+        "visible_area",
+    }
+
+
+def test_fill_without_bleed_is_shown_as_unbuildable(client) -> None:
+    source = client.get("/api/projects/coloring-print").json()["source"]
+    art = [p for p in source["coloring"]["pages"] if "artwork" in p]
+    art[0]["placement"] = {"fit": "fill"}
+    data = client.post("/api/projects/coloring-print/draft/plan", json={"source": source}).json()
+    assert data["geometry"]["bleed"] is False
+    assert data["geometry"]["media"] == {"width": 612, "height": 792}
+    errors = [p for p in data["placements"].values() if p.get("error")]
+    assert [e["error"] for e in errors] == ["fill_needs_bleed"] and "box" not in errors[0]

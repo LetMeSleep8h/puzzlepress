@@ -81,7 +81,7 @@ class JobSpec:
     created: str
     memory_limit_mb: int | None = None
     previous_release: str | None = None  # SHA-256 of the release's production.json then.
-    lower_priority: bool = True  # Run below normal priority (the default).
+    lower_priority: bool = False  # Run below normal priority (Studio --worker-priority low).
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -116,7 +116,8 @@ class JobSpec:
             str(data["created"]),
             int(limit) if isinstance(limit, int) else None,
             str(previous) if isinstance(previous, str) else None,
-            data.get("lower_priority") is not False,
+            # Interval 8 records lack the field; their workers ran below normal.
+            data.get("lower_priority", True) is True,
         )
 
 

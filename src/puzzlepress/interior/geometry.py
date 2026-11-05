@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from .model import Box, PageFrame
-from .spec import PrintSpecification
+from .spec import KDP, PrintSpecification
 
 # Frame padding around the cell area, as a fraction of one cell on each side.
 GRID_PADDING = 0.35
@@ -16,19 +16,29 @@ SOLUTION_TEMPLATES = {1: (1, 1), 2: (1, 2), 4: (2, 2), 6: (2, 3), 8: (2, 4)}
 def page_frame(spec: PrintSpecification, physical_page: int) -> PageFrame:
     """Odd physical pages are recto (binding on the left); even pages are verso.
 
-    Without bleed the media box equals the trim box.
+    Without bleed the media box equals the trim box. With bleed (KDP: 0.125 in at the
+    top, bottom and outside edge, none at the binding edge) the media box is 0.125 in
+    wider and 0.25 in taller, and the trim box sits against its inside edge: at x = 0
+    on rectos, x = 0.125 in on versos, and 0.125 in up. Margins and the live area are
+    measured from the trim box, never from the media box.
     """
     recto = physical_page % 2 == 1
-    trim = Box(0.0, 0.0, spec.trim.width, spec.trim.height)
+    width, height = spec.trim.width, spec.trim.height
+    if spec.bleed:
+        bleed = KDP.interior_bleed
+        media = Box(0.0, 0.0, width + bleed, height + 2 * bleed)
+        trim = Box(0.0 if recto else bleed, bleed, width, height)
+    else:
+        media = trim = Box(0.0, 0.0, width, height)
     margins = spec.margins
     left = margins.inside if recto else margins.outside
     content = Box(
-        left,
-        margins.bottom,
-        spec.trim.width - margins.inside - margins.outside,
-        spec.trim.height - margins.top - margins.bottom,
+        trim.x + left,
+        trim.y + margins.bottom,
+        width - margins.inside - margins.outside,
+        height - margins.top - margins.bottom,
     )
-    return PageFrame(media=trim, trim=trim, content=content, recto=recto)
+    return PageFrame(media=media, trim=trim, content=content, recto=recto)
 
 
 @dataclass(frozen=True)

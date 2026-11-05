@@ -9,6 +9,33 @@ by software.
 Proof details: order date ______  received ______  paper (white/cream) ______
 printer/marketplace ______  interior.pdf SHA-256 (first 12) ______
 
+## Printing and inspection guide (Interval 9)
+
+Status 2026-11-05: the 41-page NOT FOR SALE proof (`tests/proof_project.py`) has not
+been ordered or inspected; nothing here is filled in. To print it, upload its
+`interior.pdf` and `cover.pdf` to a KDP draft yourself and order a printed proof (KDP
+charges for it; PuzzlePress never orders). With the copy in hand, in daylight, beside
+the PDF at 100 %:
+
+- **Faint lines:** pencil-weight and 1 px strokes (pages for drawings 4, 5, 9): continuous,
+  or broken into dots? Compare with the difference images.
+- **Tinted backgrounds:** pages for drawings 1-6 and 10-12 after cleanup: is any gray
+  paper tone or grain printed (11 kept gray 201)?
+- **Dense engraving detail:** Doré (16) and Tenniel (17): do hatched areas fill in or stay
+  open enough to color?
+- **Border clipping:** thin-bordered pages: is the border whole and evenly inside the
+  trim on every page, rectos and versos?
+- **Margins and gutter:** nothing within 0.25 in of the cut edges; open the book flat:
+  does any drawing disappear into the binding?
+- **Reverse pages:** every drawing on a right-hand page with a blank back; how much
+  shows through the back when held to the light?
+- **Paper appearance:** white or cream as ordered; do markers bleed through?
+- **Full bleed (if a bleed proof is ordered):** the cut edge runs where Print proof's
+  Trim line shows it (within KDP's tolerance), no white sliver at the outside, top or
+  bottom; the inside margin stays clear.
+
+Record answers below. Until then every conclusion in findings.md is digital evidence.
+
 ## Per page
 
 Use `sources.json` to find each drawing's physical page and source.

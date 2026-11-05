@@ -11,10 +11,12 @@ from itertools import combinations
 from ..batch import BatchReport
 from ..publication import PageKind, PublicationPlan
 from .engine import page_count_checks
+from .geometry import page_frame
 from .issues import LayoutIssue
 from .model import (
     Box,
     Element,
+    ImageBlock,
     InteriorLayout,
     LetterGrid,
     Panel,
@@ -66,19 +68,28 @@ def validate_layout(
         if (page.number, page.plan_index, page.kind) != (position + 1, entry.index, entry.kind):
             fail("page_order", "Physical page does not match its plan entry.")
         frame = page.frame
-        if frame.media != trim or frame.trim != trim:
+        expected_frame = page_frame(spec, page.number)
+        if spec.bleed:
+            if frame.media != expected_frame.media or frame.trim != expected_frame.trim:
+                fail(
+                    "invalid_page_geometry",
+                    "Media and trim boxes must be the trim plus bleed, with the trim at the "
+                    "binding edge.",
+                )
+        elif frame.media != trim or frame.trim != trim:
             fail("invalid_page_geometry", "Media and trim boxes must equal the trim size.")
         recto = page.number % 2 == 1
         content = frame.content
-        left, right = content.x, trim.width - content.right
+        own = frame.trim
+        left, right = content.x - own.x, own.right - content.right
         inside, outside = (left, right) if recto else (right, left)
         if frame.recto != recto or any(
             abs(actual - expected) > EPSILON
             for actual, expected in (
                 (inside, margins.inside),
                 (outside, margins.outside),
-                (content.y, margins.bottom),
-                (trim.height - content.top, margins.top),
+                (content.y - own.y, margins.bottom),
+                (own.top - content.top, margins.top),
             )
         ):
             fail("margin_mismatch", "Live area is not mirrored from the specification.")
@@ -157,9 +168,14 @@ def _bounds(element: Element) -> Box:
     return element.bounds
 
 
+def bleeds(element: Element) -> bool:
+    """A drawing that fills a full-bleed page (checked by the coloring rules)."""
+    return isinstance(element, ImageBlock) and element.bleed
+
+
 def _element_checks(element: Element, content: Box) -> Iterator[tuple[str, str]]:
     # Bounds are painted extents: text ink boxes, rule and frame strokes included.
-    if not content.contains(element.bounds, EPSILON):
+    if not bleeds(element) and not content.contains(element.bounds, EPSILON):
         yield "outside_live_area", f"Element {element.role} extends beyond the margins."
     if isinstance(element, TextLine) and element.size < KDP.min_font_size:
         yield "font_too_small", f"Text {element.role} is below the minimum size."

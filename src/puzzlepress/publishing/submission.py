@@ -88,6 +88,16 @@ def kdp_metadata(report: PublishingReadinessReport) -> dict[str, object]:
     return data
 
 
+def bleed_setting(printing: dict[str, object]) -> str:
+    """What to choose for KDP's bleed setting, from the built interior's profile."""
+    if printing.get("interior_bleed"):
+        return (
+            "Bleed settings: Bleed (PDF only). The interior is 0.125 in wider and 0.25 in "
+            "taller than the trim; KDP trims the top, bottom and outside edges"
+        )
+    return "Bleed settings: No bleed (the interior has none; the cover has its own)"
+
+
 def _box(text: str) -> str:
     return f"- [ ] {text}"
 
@@ -252,7 +262,7 @@ def checklist_markdown(report: PublishingReadinessReport) -> str:
         lines += [
             _box(f"Ink and paper: {printing['ink']} ink on {printing['paper']} paper"),
             _box(f"Trim size: {trim[0]:g} x {trim[1]:g} in"),
-            _box("Bleed settings: No bleed (the interior has none; the cover has its own)"),
+            _box(bleed_setting(printing)),
             _box("Paperback cover finish: choose matte or glossy (not modeled by PuzzlePress)"),
         ]
     if interior:

@@ -73,6 +73,8 @@ def render_pdf(layout: InteriorLayout, images: EncodedImages | None = None) -> b
         media, trim = page.frame.media, page.frame.trim
         canvas.setPageSize((media.width, media.height))
         canvas.setTrimBox((trim.x, trim.y, trim.right, trim.top))
+        if layout.spec.bleed:  # The whole page is bleed area beyond the trim.
+            canvas.setBleedBox((media.x, media.y, media.right, media.top))
         for element in page.elements:
             if isinstance(element, TextLine):
                 _text(canvas, element)
@@ -181,7 +183,7 @@ def _image(canvas: Canvas, block: ImageBlock, jpeg: bytes, size: tuple[int, int]
 def _lossless(canvas: Canvas, block: ImageBlock, art: LosslessImage) -> None:
     """Embed exact samples as one FlateDecode DeviceGray XObject at its placement.
 
-    No clip, smoothing or interpolation: the placement is the printed box itself.
+    No smoothing or interpolation; clipped only to a fill area (full bleed).
     """
     if art.bits not in (1, 8):
         raise ValueError("Line art is embedded at 1 or 8 bits per pixel")
@@ -202,8 +204,14 @@ def _lossless(canvas: Canvas, block: ImageBlock, art: LosslessImage) -> None:
         raw._doc.Reference(image, registered)
         raw._doc.addForm(name, image)
     registered = raw._doc.getXObjectName(name)
-    placement = block.placement
+    placement, box = block.placement, block.box
     canvas.saveState()
+    if box != placement:
+        # A drawing that fills a full-bleed page is clipped to its fill area; drawings
+        # placed inside the page are not clipped (their content streams are unchanged).
+        path = canvas.beginPath()
+        path.rect(box.x, box.y, box.width, box.height)
+        canvas.clipPath(path, stroke=0, fill=0)
     canvas.translate(placement.x, placement.y)
     canvas.scale(placement.width, placement.height)
     raw._code.append(f"/{registered} Do")

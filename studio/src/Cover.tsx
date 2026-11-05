@@ -670,6 +670,8 @@ export function Cover({ d }: { d: Draft }) {
                 {stageLayout.geometry.width_in.toFixed(3)} ×{' '}
                 {stageLayout.geometry.height_in.toFixed(3)} in · spine{' '}
                 {stageLayout.geometry.spine_width_in.toFixed(4)} in
+                {d.draft.print?.profile.endsWith('-bleed') &&
+                  ' · the interior is full bleed; the cover keeps its own 0.125 in bleed and the same size'}
               </span>
             )}
           </div>

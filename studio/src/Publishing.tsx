@@ -1074,7 +1074,10 @@ function Summary({ status, d }: { status: PublishingStatus; d: Draft }) {
           <div>
             <dt>Format</dt>
             <dd>
-              Paperback{print ? `, ${print.trim_in[0]} x ${print.trim_in[1]} in, no bleed` : ''}
+              Paperback
+              {print
+                ? `, ${print.trim_in[0]} x ${print.trim_in[1]} in, ${print.interior_bleed ? 'full bleed (choose Bleed in KDP)' : 'no bleed'}`
+                : ''}
             </dd>
           </div>
           <div>

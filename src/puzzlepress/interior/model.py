@@ -33,6 +33,14 @@ class Box:
             self.x - margin, self.y - margin, self.width + 2 * margin, self.height + 2 * margin
         )
 
+    def intersection(self, other: "Box") -> "Box | None":
+        """The overlap of two boxes, or None when they do not overlap."""
+        left, bottom = max(self.x, other.x), max(self.y, other.y)
+        right, top = min(self.right, other.right), min(self.top, other.top)
+        if right <= left or top <= bottom:
+            return None
+        return Box(left, bottom, right - left, top - bottom)
+
     def contains(self, other: "Box", tolerance: float) -> bool:
         return (
             other.x >= self.x - tolerance
@@ -184,6 +192,10 @@ class ImageBlock:
     effective_dpi: float
     max_dpi: float
     encoding: ImageEncoding = ImageEncoding.JPEG
+    # True only for a coloring drawing that fills a full-bleed page: its box is the
+    # fill area, which extends past the trim on purpose. Margin and live-area rules
+    # skip it; the coloring validator and bleed preflight rules check it instead.
+    bleed: bool = False
 
     @property
     def bounds(self) -> Box:

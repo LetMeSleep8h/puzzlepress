@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { request } from './api';
 import { DraftToolbar, type Draft } from './draft';
 import { Field, FieldErrors, matchIssues, type Source } from './editor-fields';
-import { profileLabel } from './print-profiles';
+import { offeredFor, profileLabel } from './print-profiles';
 import type { ProjectTypes } from './types';
 
 // Book settings: what the book is (project details), how the author files it
@@ -143,25 +143,30 @@ export function Settings({ d }: { d: Draft }) {
               <input type="radio" name="paper" checked={chosen === ''} onChange={() => paper('')} />
               <span>Not chosen here: Print proof builds with the trim and paper chosen there</span>
             </label>
-            {(profiles ?? []).map((p) => (
-              <label key={p.id}>
-                <input
-                  type="radio"
-                  name="paper"
-                  checked={chosen === p.id}
-                  onChange={() => paper(p.id)}
-                />
-                <span>{profileLabel(p)}</span>
-              </label>
-            ))}
+            {(profiles ?? [])
+              .filter((p) => offeredFor(p, coloring))
+              .map((p) => (
+                <label key={p.id}>
+                  <input
+                    type="radio"
+                    name="paper"
+                    checked={chosen === p.id}
+                    onChange={() => paper(p.id)}
+                  />
+                  <span>{profileLabel(p)}</span>
+                </label>
+              ))}
             {profiles === undefined && <p className="small muted">Reading print profiles…</p>}
           </fieldset>
           <FieldErrors id="print.profile" issues={matchIssues(issues, 'print')} />
           <p className="small muted" id="paper-note">
-            Trim is the page size; paper sets the spine width. Every choice is black ink with no
-            bleed, from KDP's standard paperback sizes. Saving a different choice makes the built
-            interior and the cover out of date; Print proof and Cover then rebuild with it. A
-            smaller page can make a word-search grid too small to print; the build then says so.
+            Trim is the page size; paper sets the spine width. Every choice is black ink, from KDP's
+            standard paperback sizes, with no bleed unless it says full bleed.
+            {coloring &&
+              ' Full bleed (coloring books) makes every page 0.125 in wider and 0.25 in taller; drawings may then fill the page in Pages.'}{' '}
+            Saving a different choice makes the built interior and the cover out of date; Print
+            proof and Cover then rebuild with it. A smaller page can make a word-search grid too
+            small to print; the build then says so.
             {chosen !== saved && ' This change is not saved yet.'}
           </p>
         </section>
