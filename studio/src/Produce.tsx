@@ -126,6 +126,13 @@ export function Produce({ project, dirty }: { project: Project; dirty: boolean }
   const heading = useRef<HTMLHeadingElement>(null);
   // What is on screen, for the poll to compare against (state updates run later).
   const shown = useRef<ProduceStatus | undefined>(undefined);
+  // Verified-status requests the poll starts; aborted only when the page goes away.
+  const verifying = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    verifying.current = controller;
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     shown.current = status;
   }, [status]);
@@ -171,7 +178,9 @@ export function Produce({ project, dirty }: { project: Project; dirty: boolean }
             recovery_pending: next.recovery_pending,
             workers: next.workers,
           });
-          if (refresh) void load(signal);
+          // The verified status outlives this poll: polling stops as soon as the job
+          // has ended, which must not cancel the request that shows its release.
+          if (refresh) void load(verifying.current.signal);
         })
         .catch((err: Error) => !signal.aborted && setError(err)),
     [api, load, accept],

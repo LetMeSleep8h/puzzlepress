@@ -2,10 +2,40 @@
 
 ## Completed scope
 
-Multi-engine Interval 8 (production engine hardening, print accuracy, bleed
-assessment) on branch `feat/production-hardening-bleed`, cut from main `f7168ac`
-(PR #21 and #22 merged); committed locally, not pushed. Guide:
+Multi-engine Interval 9 (full-bleed coloring, production performance, real-artwork
+procedure) on branch `feat/coloring-full-bleed-performance`, cut from main `e88a581`
+(Interval 8 merged as PR #23); committed locally, not pushed. Guides:
+docs/full-bleed-walkthrough.md, docs/print-interior.md (Full bleed),
 docs/production-jobs.md.
+
+- Interval 8 finalization: PR #23 was merged (2026-11-05 14:06, while its matrix was
+  still running); merged main ran the full suite green locally (2283 passed, 10
+  skipped); the 18 golden migrations re-checked as report-only changes.
+- Cheap production polling: Studio reuses a parsed book.yaml only for identical bytes;
+  `GET /produce/job` returns the job record and production.json's digest without
+  reading release files; the Produce page polls it and fetches the verified status
+  (sole source of files) when the job ends or that digest changes.
+- Worker hardening: start-up grace for queued jobs another Studio created, bounded
+  worker.log, `--worker-priority normal|low` (default normal), tests for kills at five
+  steps and inside the swap, racing workers, a second Studio, memory caps (1 GB job,
+  4 GB default refusing 5 GiB).
+- Full bleed for coloring books: 8 `-bleed` profiles; bleed page boxes by parity (trim
+  at the binding edge); `placement.fit: fill` (cover the bleed and inside margin, zoom
+  1-3, x/y, clipped, never resampled; needs bleed, no folio, no border); shared
+  preflight rules bleed-aware with unchanged no-bleed output (golden passes);
+  coloring ruleset 4 adds `coloring_bleed_art` (`bleed_crop`); KDP checklist and
+  print configuration state bleed; word-search books refuse bleed profiles. Studio:
+  Settings/New book (coloring only), Pages (media-coordinate preview with bleed, trim,
+  safe area, gutter, crop ghost, Fit/Fill, zoom, position, Python crop summary),
+  Print (media-sized sheets, Trim line and Bleed overlays), Publishing, Cover, Produce.
+- Real artwork: originals unavailable; `artwork_fetch.py`, `artwork_review.py
+  --manifest`, `artwork_compare.py` and `interval7-cleanup-measures.json` make the
+  revalidation repeatable and integrity-checked. Not run; no result claimed.
+- KDP: page limits, margins, gutter, bleed geometry, cover wrap and spine re-read
+  2026-11-05 on the official pages; no further policy change beyond Interval 8's.
+
+Earlier: multi-engine Interval 8 (production engine hardening, print accuracy, bleed
+assessment), merged as PR #23. Guide: docs/production-jobs.md.
 
 - Production worker (`production/worker.py`, `jobs.py`, `release.py`, `limits.py`,
   `studio/producing.py`): Studio runs each job as `python -m
@@ -775,6 +805,50 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Full bleed and production performance (Interval 9), 2026-11-05 (Windows, Python
+3.13; quieter machine than Interval 8's runs):
+
+- Python full suite: **2332 passed, 1 failed, 10 skipped** (17.4 min); the failure was
+  Interval 8's restart test expecting a queued job to be called stopped at once, which
+  the new start-up grace changes; updated to assert both the grace and the outcome
+  after it, rerun green. Golden test passes with PDF bytes compared (baseline v3 plus
+  the Interval 8 migration; no new migration). Ruff lint and format, strict mypy (165
+  files; also `--platform linux`), pip check, `git diff --check`.
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build; Vitest **137/137**
+  (twice). Playwright first run 39/42: `authoring.spec.ts` (its trim-and-paper radio
+  name now also matched the coloring-only "full bleed" twin; made exact),
+  `produce.spec.ts` (a real bug: the verified-status request the poll starts was
+  aborted with the poll when the job ended, so the release never refreshed; fixed, and
+  the Vitest now answers that request late so it fails on the old code), and
+  `templates.spec.ts` rich text at line 300 (inherited, as on main). After the fixes
+  **41/42**, only that inherited failure. New `bleed.spec.ts` passes. Rewritten
+  captures restored.
+- `tests/production_benchmark.py` (normal priority unless stated; synthetic 2175 x
+  2925 drawings; worker peak memory from the worker):
+
+  | Workload | Total | Interior / preflight | Worker peak | PDF | Job poll median (p95) |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 drawing | 1.8 s | 0.3 / 0.7 s | 99 MB | 0.08 MB | 6.6 (11.4) ms |
+  | 10 drawings | 10.0 s | 1.5 / 7.3 s | 164 MB | 0.36 MB | 11.4 (13.0) ms |
+  | 50 drawings | 46.6 s | 6.7 / 36.9 s | 176 MB | 1.49 MB | 11.7 (13.3) ms |
+  | 150 drawings | 137.8 s (low priority 138.0 s) | 19.7 / 111.0 s | 188 MB | 4.28 MB | 12.7 (14.4) ms |
+  | 300 drawings (602 pages, above the 590 white maximum: reported) | 275.2 s | 38.5 / 222.0 s | 208 MB | 8.56 MB | 13.3 (16.0) ms |
+  | 10 / 150 drawings, full bleed, every page filled | 11.1 / 144.4 s | 1.6 / 117.4 s (150) | 164 / 190 MB | 0.36 / 4.28 MB | 11.6 / 12.8 ms |
+  | composition-demo / publishing-demo / 60-puzzle book | 1.1 / 4.4 / 9.2 s | | 48 / 402 / 70 MB | | 10.5-12.0 ms |
+
+  Worker running 0.31-0.77 s after the request. Verified status during a job 6-35 ms
+  (Interval 8: 197-371 ms per status poll). Project detail (`GET /api/projects/{key}`,
+  not polled by Produce) 111-216 ms for 150-300 drawings: YAML parsing and
+  validation. Cancel to stop 0.51-1.15 s (Interval 8 0.75-1.0 s; Interval 7 12.5-12.7
+  s), release unchanged. A worker killed at `duplicates`: interrupted, release
+  unchanged; the next job reclaimed the lock, removed the staging folder, completed in
+  2.4 s. Two books at once 9.7 s wall; a competing request `production_in_progress`.
+  In one process (`coloring_benchmark.py`): 150 / 300 drawings build 19.4 / 38.4 s,
+  first preflight 115.1 / 232.7 s, repeated preflight 14.0 / 27.9 s, produce 20.2 /
+  40.7 s; that process's peak 1004 / 1925 MB includes every in-process cache (Interval
+  7, same script: 300 drawings build 38.3 s, first preflight 193.1 s, produce 40.5 s).
+  Low priority cost nothing on this quieter run and 35 % under Interval 8's contention.
+
 Production hardening (Interval 8), 2026-11-05 (Windows, Python 3.13; other projects'
 benchmarks and test runs shared the machine throughout, so times vary run to run):
 
@@ -1106,6 +1180,18 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
   status and 15 recorded file digests were identical before and after.
 
 ## Limits and decisions for review
+
+Interval 9: the 17 real originals were not re-measured (not on this machine; a
+download needs the author's go-ahead); measures version 2 still has only synthetic
+evidence, and the procedure is in findings.md. No physical proof has been ordered or
+inspected. Full bleed: coloring books only; a filled drawing stops at the inside
+margin (no gutter art), has no border and no page number; contained drawings on a
+bleed page do not reach the bleed; bleed on color interiors and word-search pages is
+not modeled. The crop measure counts ink pixels (gray at most 128), not meaning: a
+person decides whether cut detail matters. The PDF raster preview is the whole bleed
+page; KDP's trim tolerance is not modeled. `GET /api/projects/{key}` still parses the
+source each time (111-216 ms at 150-300 drawings; the Produce page no longer polls
+it). Studio fixtures recorded before ruleset 5 keep the old word-search page maximum.
 
 Production hardening (Interval 8): the Produce status request re-hashes every
 release file on each poll, which dominates Studio latency (idle 134-277 ms for

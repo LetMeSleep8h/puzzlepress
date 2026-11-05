@@ -410,7 +410,7 @@ def test_jobs_survive_a_studio_restart(
 
 
 def test_a_job_whose_worker_is_gone_is_interrupted_after_a_restart(
-    library: Path, tmp_path: Path
+    library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from puzzlepress.project import load_project
 
@@ -432,6 +432,10 @@ def test_a_job_whose_worker_is_gone_is_interrupted_after_a_restart(
     run = client.get("/api/projects/colors/produce").json()["run"]
     assert run["state"] == "interrupted" and run["error"]["code"] == "worker_lost"
     queued = jobs.create_job(jobs.JobSpec(**{**spec.__dict__, "job_id": jobs.new_job_id()}))
+    # Within the start-up grace another Studio may still be launching its worker
+    # (Interval 9); after it, a queued job nobody started is recorded as stopped.
+    assert client.get("/api/projects/colors/produce").json()["run"]["state"] == "queued"
+    monkeypatch.setattr(producing, "STARTING_GRACE", 0.0)
     run = client.get("/api/projects/colors/produce").json()["run"]
     assert run["job_id"] == queued.name and run["error"]["code"] == "studio_stopped"
     history = client.get("/api/projects/colors/produce").json()["history"]

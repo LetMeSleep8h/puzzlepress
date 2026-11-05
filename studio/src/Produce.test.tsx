@@ -111,8 +111,11 @@ test('starting a job shows Python steps and counted progress, then the verified 
           : done,
       );
     }
-    // The full, verified status: nothing produced at first, the release once it ends.
-    return json(sent.filter((c) => c.url === url && !c.body).length === 1 ? base : done);
+    // The full, verified status: nothing produced at first, the release once it ends,
+    // answered late, after polling has stopped (it must not be cancelled with it).
+    if (sent.filter((c) => c.url === url && !c.body).length === 1) return json(base);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return json(done);
   });
   render(<Produce project={project} dirty={false} />);
   const user = userEvent.setup();
