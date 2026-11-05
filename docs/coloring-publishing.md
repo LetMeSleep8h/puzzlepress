@@ -373,3 +373,9 @@ Publishing shows "full bleed (choose Bleed in KDP)". The cover's size and spine 
 the same as without bleed (trim, page count and paper decide them), but a cover built
 for the no-bleed profile reports out of date until rebuilt. See
 [full-bleed-walkthrough.md](full-bleed-walkthrough.md).
+
+## Release candidate (Interval 10)
+
+[release-readiness.md](release-readiness.md) records what the coloring engine can do,
+what was tested, the demonstration package built with `tests/release_candidate.py`, its
+rights and disclosure state (every author decision undecided) and the open blockers.

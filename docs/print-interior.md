@@ -158,7 +158,12 @@ page, printed only in the bleed (cut at trimming) or inside the trim but outside
 safe area, each above 0.1 % of the drawing's ink, is reported (warning) and never moved.
 The cover depends on trim, page count and paper only, so a bleed interior has the same
 cover geometry as its no-bleed twin; the cover's stored interior profile makes it out of
-date when the profile changes. The KDP checklist says "Bleed (PDF only)", and the
+date when the profile changes. `tests/test_bleed_raster.py` renders every bleed
+profile's filled recto and verso with PDFium and compares them with a raster built from
+Studio's crop preview alone: page boxes by parity, the best alignment within 1 px of the
+preview, nothing printed beyond the fill area on the binding side
+(`docs/images/coloring/bleed-pages.png` is a sheet for a person to inspect). The KDP
+checklist says "Bleed (PDF only)", and the
 package's print configuration records `interior_bleed`. Not modeled: bleed on
 word-search pages, color interiors, and art that should bleed into the gutter.
 

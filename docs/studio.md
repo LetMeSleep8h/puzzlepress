@@ -550,6 +550,10 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | `POST /api/projects/{key}/planning/save` | `{source, revision}`; replaces `planning.yaml` at that revision (`null`: create; 409 `source_changed` otherwise) |
 | `POST /api/projects/{key}/planning/approval` | `{revision, identity}`; approves the saved revision's reviewed identity, or withdraws with `null` (409 `identity_mismatch`, `not_ready`, `source_changed`) |
 
+Every project request reads and hashes book.yaml; a parsed project is reused only for
+byte-identical source (Interval 10), so edits from Studio, the CLI or an editor are seen on
+the next request.
+
 Revision is `sha256-<digest of exact source bytes>`. It detects cosmetic changes
 and output edits that semantic identity intentionally excludes. Identical bytes
 have the same revision, including repeated canonical saves. Draft validation has
