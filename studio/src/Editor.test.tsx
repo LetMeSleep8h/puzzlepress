@@ -86,6 +86,20 @@ function setup(fail?: string, page = 'edit') {
 // can be in the DOM twice; only what is shown counts.
 const VISIBLE = { ignore: '[hidden] *, script, style' };
 
+// Background requests (such as editorial reviews) can start at any moment, so a
+// test answers only the request it means instead of whichever fetch comes next.
+function answerOnce(suffix: string, answer: () => Promise<Response>) {
+  const fallback = vi.mocked(fetch).getMockImplementation()!;
+  let used = false;
+  vi.mocked(fetch).mockImplementation((url, options) => {
+    if (!used && String(url).endsWith(suffix)) {
+      used = true;
+      return answer();
+    }
+    return fallback(url, options);
+  });
+}
+
 test('loads, edits, validates, previews and saves authoritative returned state', async () => {
   const calls = setup();
   const user = userEvent.setup();
@@ -290,7 +304,7 @@ test.each(['unavailable', 'malformed'])('preserves edits after %s response', asy
   setup();
   const user = userEvent.setup();
   fireEvent.change(await screen.findByLabelText('Puzzle title'), { target: { value: 'Retained' } });
-  vi.mocked(fetch).mockImplementationOnce(async () => {
+  answerOnce('/save', async () => {
     if (failure === 'unavailable') throw new TypeError('Network error');
     return new Response('not json');
   });
@@ -307,7 +321,8 @@ test('pending operations disable changes and unmounted preview responses are ign
   const user = userEvent.setup();
   const title = await screen.findByLabelText('Puzzle title');
   let finish!: (response: Response) => void;
-  vi.mocked(fetch).mockImplementationOnce(
+  answerOnce(
+    '/preview',
     () =>
       new Promise<Response>((resolve) => {
         finish = resolve;
