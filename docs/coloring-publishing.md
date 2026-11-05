@@ -192,6 +192,11 @@ and KDP metadata, `publishing-validation.json`/`.md`, `production.json`, and
 beside `release/` and swapped in only after every file is read back; a failed run
 leaves the previous release untouched. Exit 0 only with no blocking item.
 
+In Studio, **Produce** runs the same thing for the saved book into
+`<output.directory>-release`, shows each step, lets you cancel a coloring run between
+steps (the previous release stays), and offers the files and the upload package as a
+ZIP only after reading every file back against `production.json`.
+
 Only one run may write an output at a time. The lock `.release.produce.lock` beside
 it is an operating-system lock that ends with its process, so:
 

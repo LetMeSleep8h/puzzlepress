@@ -2,9 +2,36 @@
 
 ## Completed scope
 
-Multi-engine Interval 6 (visual book authoring and Studio UX) on branch
-`feat/studio-visual-authoring`, cut from main `b42b5bd` after PRs #18 and #19;
-committed locally, not pushed. Walkthrough: docs/studio-coloring-walkthrough.md.
+Multi-engine Interval 7 (real-world print validation and production readiness) on
+branch `feat/print-validation-production`, cut from main `34efd48` after PR #20;
+committed locally, not pushed. Evidence: docs/artwork-validation/.
+
+- Real artwork: 17 drawings approved by the author (pre-1931 US patent drawings
+  from NARA scans, Van Gogh drawings, Meyer ornament, Britton & Brown botany, Doré,
+  Tenniel), provenance and SHA-256 in `approved.json`; reviewed under defaults,
+  cleanup 0.6 + despeckle 2, and + threshold 0.5 (`findings.md`). Finding:
+  fine-line retention (and line work kept) is biased by background cleanup on tinted
+  paper: 47-89 % measured while 99.3-100 % of the ink still prints. No threshold
+  changed; the measure fix waits for the printed proof. Faint drawings on tinted
+  paper are no longer called blank (`artwork_empty`, `prepared_blank` wording).
+- Proof package: `tests/proof_project.py` builds a NOT FOR SALE 41-page proof and
+  cover from the approved files with `sources.json` tracing every page;
+  `proof-checklist.md` for the printed copy. Nothing ordered.
+- Settings is the one editor for book details in word-search books too (Puzzles,
+  Book and Publishing link there); no schema or identity change.
+- Produce from Studio (`studio/producing.py`, `Produce.tsx`): background run of the
+  unchanged `produce()` into `<output.directory>-release` for the saved revision,
+  step progress (new optional `progress` callback; outputs unchanged), success only
+  after every listed file is re-verified, cancellation between steps for coloring
+  (`ProductionCancelled`, previous release kept), downloads and the package ZIP from
+  verified bytes, stale by build identity.
+- Print profiles `paperback-6x9`, `-8x10`, `-8.5x8.5` (+ `-cream`) from KDP's
+  standard table, black ink, no bleed, the 8.5 x 11 gutter; covers wrap every trim;
+  Studio offers trim and paper together. Bleed assessed, not built. 8.5 x 11 unchanged.
+- PR #21 (separate, from main): the journey spec's CI timeout diagnostics.
+
+Earlier: multi-engine Interval 6 (visual book authoring and Studio UX), merged as
+PR #20. Walkthrough: docs/studio-coloring-walkthrough.md.
 
 - Creation (`creation.py`, `creation_cli.py`, `studio/creating.py`): `puzzlepress
   book new FOLDER --type word_search|coloring --title ...` and Studio **New book**

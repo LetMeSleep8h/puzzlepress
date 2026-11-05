@@ -47,10 +47,11 @@ are grouped in workflow order; every earlier URL is unchanged:
 | Review | Solutions (saved puzzles, grids and solutions) | `/books/{key}/puzzles`, `/books/{key}/puzzles/{id}` |
 | Review | Quality | `/books/{key}/quality` |
 | Publish | Publishing | `/books/{key}/publishing` |
+| Publish | Produce | `/books/{key}/produce` |
 
 A coloring book has its own navigation: Overview, Settings, Artwork, Pages, Cover,
-Print proof and Publishing (routes `/settings`, `/artwork`, `/pages`, `/cover`,
-`/print`, `/publishing`); no puzzle, solution or word wording appears in it.
+Print proof, Publishing and Produce (routes `/settings`, `/artwork`, `/pages`,
+`/cover`, `/print`, `/publishing`, `/produce`); no puzzle, solution or word wording appears in it.
 Settings, Pages, Cover and Publishing share one draft, as below; Artwork saves imports and preparation
 settings directly, and a clean draft reloads the saved source when you return to
 it (see [coloring-publishing.md](coloring-publishing.md)).
@@ -58,9 +59,25 @@ it (see [coloring-publishing.md](coloring-publishing.md)).
 **Settings** separates what the book is (project details), how it is filed
 (catalog: subject, collection) and how it prints (trim, paper), and links to content
 (Pages or Puzzles, Book) and KDP metadata (Publishing) rather than repeating them. A
-coloring book's title, subtitle, author, imprint and language are edited only there;
-a word-search book's title and language stay in Puzzles and its title-page details
-in Book, and Settings links to them.
+book's title, subtitle, author, imprint and language are edited only there, for
+both engines (Interval 7): Puzzles shows them with a link, the Book composer's title
+page shows what it prints, and Publishing links book-detail findings there. Trim and
+paper are one choice of print profile (see
+[print profiles](print-interior.md#print-profiles-interval-7)).
+
+**Produce** runs `book produce` for the saved source into
+`<output.directory>-release`, on a background thread, and shows each step as Python
+reports it. Success is shown only after every file `production.json` lists has been
+read back against its SHA-256 and size; a damaged release is reported and its files
+are not offered. The page lists blocking findings, warnings and items that need a
+person, recovery notes (a reclaimed lock, a restored previous release), every file
+for download, `production.json` and, when there is one, the upload package as a ZIP.
+A release is marked out of date when the saved book's build identity differs from
+the one it recorded (cover-only or metadata-only edits are not detected that way;
+Publishing and Cover show those). A coloring run can be cancelled between steps (it
+stops before anything is swapped in, so the previous release stays); a word-search
+run writes in place and runs to the end. One run per book at a time in Studio, and
+the production lock refuses any other writer to the same release.
 
 Settings, Puzzles, Book, Interior, Cover and Publishing share one draft of `book.yaml`; Plan has its
 own draft of `planning.yaml`. Switching sections keeps both drafts, the project
@@ -467,6 +484,11 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | Method and path | Request / result |
 | --- | --- |
 | `GET /api/projects` | Sorted library, including invalid projects (a folder without `book.yaml`, such as an interrupted creation, is not listed) |
+| `GET /api/projects/{key}/produce` | Current or last run (state, step, steps, seconds, error, notes) and the release on disk (verified, problem, stale, files, findings) |
+| `POST /api/projects/{key}/produce` | `{revision}`; starts a run for the saved revision (409 `source_changed`, `production_in_progress`) |
+| `POST /api/projects/{key}/produce/cancel` | `{}`; coloring only, stops at the next step (409 `not_cancellable` for word search) |
+| `GET /api/projects/{key}/produce/file?name=` | One file the verified release lists, as an attachment (404 otherwise) |
+| `GET /api/projects/{key}/produce/package.zip` | The verified `publishing/` package as a stored ZIP |
 | `GET /api/project-types` | Creatable book types with their starter templates, and the print profiles (paper, trim) |
 | `POST /api/projects` | `{kind, key, title, language, subtitle?, author?, subject?, collection?, profile?, template?}`; 201 with the new project's detail and `recovered`; 422 `project_exists`, `invalid_key`, `reserved`, `unsupported_type`, `unknown_template` or a schema issue, writing nothing |
 | `GET /api/projects/{key}` | Normalized source, validation, identity, engine version, derived `engine` {kind, label}, byte revision |

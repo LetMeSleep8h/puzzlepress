@@ -10,8 +10,11 @@ Interval 5 (cover, publishing, production, and the Studio Pages composer; guide
 (visual authoring: project creation, Settings, the Pages designer with per-page
 placement, shared undo/redo, zoom and pan, crash-safe production locks and an
 artwork review harness; walkthrough
-[studio-coloring-walkthrough.md](studio-coloring-walkthrough.md)) is on branch
-`feat/studio-visual-authoring`. Interval 6 differs from section 3.9 in three places:
+[studio-coloring-walkthrough.md](studio-coloring-walkthrough.md)) is merged (PR #20).
+Interval 7 (real-artwork review and a printed-proof package, Settings for every book,
+production from Studio, 6 x 9, 8 x 10 and 8.5 x 8.5 in profiles; evidence in
+[artwork-validation/findings.md](artwork-validation/findings.md)) is on branch
+`feat/print-validation-production`. Interval 6 differs from section 3.9 in three places:
 the creation route is `/create` (a book may be named `new`); Settings is a section
 of both engines' navigation rather than a separate Book/Interior pair for coloring;
 and catalog fields live in an optional `catalog` section (D5 option a) beside an
