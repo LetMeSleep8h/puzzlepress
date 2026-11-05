@@ -61,10 +61,16 @@ is final: later lines never change it.
   write one release at once. The kernel releases the lock when the worker dies.
 - **Different books run side by side**, up to `max(1, min(3, CPUs // 2))` workers;
   more wait as `queued` in request order.
-- **Limits.** The worker lowers its priority (Windows `BELOW_NORMAL`, POSIX `nice`
-  +10) and caps its memory at 4096 MB (Windows Job Object per-process commit limit,
-  POSIX `RLIMIT_AS`). The job records what took effect; an allocation past the cap
-  fails as `memory_limit`. The worker's peak memory is in the completed result.
+- **Limits.** The worker caps its memory at 4096 MB (Windows Job Object per-process
+  commit limit, POSIX `RLIMIT_AS`); an allocation past the cap fails as
+  `memory_limit` and the release is kept. Priority is normal by default;
+  `puzzlepress-studio --worker-priority low` runs workers below normal (Windows
+  `BELOW_NORMAL`, POSIX `nice` +10), which yields to other work but measured about
+  35 % slower while other processes competed for the CPU, with no measured benefit to
+  Studio's own latency (the server is a separate process either way). The job records
+  what took effect (Interval 8 records without the field read as below normal). The
+  worker's peak memory is in the completed result. `worker.log` keeps its last 1 MB;
+  ten finished jobs are kept per release; an event log over 4 MB is refused as damaged.
 - **Source.** The worker refuses a job whose book.yaml no longer has the requested
   revision, and checks the produced manifest's build identity and book ID.
 - **Previous release.** Replaced only by a staged release whose every file matched
@@ -77,9 +83,22 @@ is final: later lines never change it.
   lists what it did in its notes. Studio shows `recovery_pending` meanwhile.
 - **Restart.** Studio keeps no job state in memory that matters: after a restart it
   folds the latest job record, follows a worker that still holds the lock (it can be
-  cancelled), and records `interrupted` for one that is gone.
+  cancelled), and records `interrupted` for one that is gone. A queued or starting job
+  another Studio process created gets 30 s to take the lock before it is called gone,
+  so a second Studio never declares a booting worker dead; two workers racing for one
+  release are settled by the lock (one writes, the other fails
+  `production_in_progress`). There is no force-unlock: a lock held by a live process
+  is never taken.
 - **Responses.** Each status names the job and its event count (`seq`); the page
   never lets an older job, or an earlier view of the same job, replace a newer one.
+- **Polling (Interval 9).** While a job runs, the page polls `GET .../produce/job`: the
+  job record and the digest of `production.json`, with no release file read. When the
+  job ends, or that digest changes, it fetches the verified status, which reads every
+  listed file back; files and downloads come only from there, and each download
+  verifies again. Studio reuses a parsed `book.yaml` only for byte-identical source
+  (its SHA-256 is the revision). Measured median for 150 / 300 drawings: job poll
+  3.3 / 3.1 ms, verified status 23 / 30 ms (was 127 / 236 ms, dominated by parsing the
+  source on every request, not by hashing the release).
 
 ## Cancellation
 
@@ -111,6 +130,7 @@ percentage is estimated.
 | Endpoint | |
 | --- | --- |
 | `GET /api/projects/{key}/produce` | `run` (the latest job: job_id, seq, state, outcome, step, step_label, steps, progress {stage, done, total, label}, seconds, started, finished, cancellable, cancel_requested, queue_position, release_preserved, error, result, notes, limits, pid), `release` (verified, problem, stale, manifest_sha256, files, validation, package), `recovery_pending`, `history` (last five), `workers` {running, limit} |
+| `GET /api/projects/{key}/produce/job` | The cheap poll: `run` as above, `release_manifest_sha256`, `release_checked: false`, `recovery_pending`, `workers`; reads no release file and offers none |
 | `POST /api/projects/{key}/produce` | `{revision}`; records and starts (or queues) a job; 409 `source_changed`, `production_in_progress` (a job, or another writer such as the CLI, holds the release) |
 | `POST /api/projects/{key}/produce/cancel` | `{}`; requests cancellation (a queued job is cancelled at once); 409 `no_active_run`, `not_cancellable` (the release is being put in place) |
 | `GET .../produce/file?name=`, `GET .../produce/package.zip` | Verified release files only, unchanged |
@@ -120,5 +140,6 @@ percentage is estimated.
 `tests/test_production_jobs.py` (job records, lock probe, memory cap, worker in
 process, byte-identical outputs with a watcher) and `tests/web/test_produce_api.py`
 (real worker processes; `tests/worker_harness.py` injects slow steps, slow
-checkpoints, a crash, a tampered staged file or a slow start). Measurements:
+checkpoints, a crash at any step or between the swap's two renames, a tampered staged
+file, a slow start, a memory allocation, or log noise). Measurements:
 `tests/production_benchmark.py` (see CONTEXT.md).

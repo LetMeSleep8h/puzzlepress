@@ -363,3 +363,13 @@ allow up to 776 pages, but the 300 cap applies.
 - Coloring PDFs are byte-reproducible only with the same zlib and Pillow.
 - KDP's form wording for the AI question, prices and markets are not modeled.
 - Categories are saved preferences, never verified as available.
+
+## Full bleed (Interval 9)
+
+A coloring book on a `-bleed` profile publishes the same way. Readiness and the
+package record `interior_bleed: true` in the print configuration; the KDP checklist
+says "Bleed settings: Bleed (PDF only)" (KDP trims the top, bottom and outside edges);
+Publishing shows "full bleed (choose Bleed in KDP)". The cover's size and spine are
+the same as without bleed (trim, page count and paper decide them), but a cover built
+for the no-bleed profile reports out of date until rebuilt. See
+[full-bleed-walkthrough.md](full-bleed-walkthrough.md).

@@ -119,3 +119,24 @@ printed pages needs the physical proof.
 **Physical proof status (2026-11-05):** not ordered, not inspected. Nothing in this
 file is print validation. The questions only a printed copy answers are listed in
 [proof-checklist.md](proof-checklist.md#questions-only-print-answers).
+
+## Interval 9: revalidation status
+
+The 17 originals were still not on this machine (searched 2026-11-05), and downloading
+them again was not authorized in this interval, so they were **not re-measured**: no
+real-artwork result for measures version 2 exists yet, and none is claimed. The
+procedure is now repeatable and integrity-checked:
+
+```
+python tests/artwork_fetch.py docs/artwork-validation/approved.json ORIGINALS
+python tests/artwork_review.py ORIGINALS OUT --manifest docs/artwork-validation/approved.json --set background_cleanup=0.6 --set despeckle=2
+python tests/artwork_compare.py OUT
+```
+
+`artwork_fetch.py` keeps only files whose bytes and SHA-256 match `approved.json`,
+never overwrites and refuses a folder inside the repository; `--manifest` refuses to
+measure unless the folder holds exactly those files; `artwork_compare.py` prints
+Interval 7's recorded measures (`interval7-cleanup-measures.json`) beside the new ones.
+To record from the result: false positives (a loss finding where the 100 % view shows
+the lines intact), false negatives (lines visibly lost without a finding), and which
+need the printed proof. Thresholds stay unchanged unless such records justify it.

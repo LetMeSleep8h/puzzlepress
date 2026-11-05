@@ -61,7 +61,11 @@ it (see [coloring-publishing.md](coloring-publishing.md)).
 (Pages or Puzzles, Book) and KDP metadata (Publishing) rather than repeating them. A
 book's title, subtitle, author, imprint and language are edited only there, for
 both engines (Interval 7): Puzzles shows them with a link, the Book composer's title
-page shows what it prints, and Publishing links book-detail findings there. Trim and
+page shows what it prints, and Publishing links book-detail findings there. Coloring
+books may also choose a full-bleed profile ("full bleed" in the label; Interval 9); a
+filled page is then designed in Pages ("Fill the bleed area": bleed, trim, safe area,
+gutter and the cropped part outlined from Python's geometry, with Python's crop
+measure). Walkthrough: [full-bleed-walkthrough.md](full-bleed-walkthrough.md). Trim and
 paper are one choice of print profile (see
 [print profiles](print-interior.md#print-profiles-interval-7)).
 
@@ -215,7 +219,9 @@ whole design to defaults** removes the section from the draft.
 
 Choose **Print** to build the saved source's interior, run preflight and proof the
 real PDF page by page: thumbnails, single pages, facing spreads, zoom, geometry
-overlays and findings linked to their pages. Builds use the saved revision only;
+overlays and findings linked to their pages (on a full-bleed interior the page images
+are the whole bleed page, with **Trim line** and **Bleed** overlays). Builds use the
+saved revision only;
 unsaved drafts disable **Build interior**. Stale and mismatched interiors are
 labeled. A stale interior shows Python's reasons and the **Rebuild outdated
 artifacts** panel: each artifact's state, the planned steps (conditional ones say
@@ -490,6 +496,7 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | `GET /api/projects` | Sorted library, including invalid projects (a folder without `book.yaml`, such as an interrupted creation, is not listed) |
 | `GET /api/projects/{key}/produce` | The latest job (state, seq, step, progress, seconds, error, notes, release_preserved; see production-jobs.md), the release on disk (verified, problem, stale, files, findings), history and worker slots |
 | `POST /api/projects/{key}/produce` | `{revision}`; records and starts (or queues) a job for the saved revision (409 `source_changed`, `production_in_progress`) |
+| `GET /api/projects/{key}/produce/job` | The cheap poll while a job runs: the job record and production.json's digest; no release file read (see production-jobs.md) |
 | `POST /api/projects/{key}/produce/cancel` | `{}`; any engine; stops at the next checkpoint (409 `no_active_run`, `not_cancellable` while the release is swapped in) |
 | `GET /api/projects/{key}/produce/file?name=` | One file the verified release lists, as an attachment (404 otherwise) |
 | `GET /api/projects/{key}/produce/package.zip` | The verified `publishing/` package as a stored ZIP |

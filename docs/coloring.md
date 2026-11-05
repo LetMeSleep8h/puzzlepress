@@ -219,6 +219,19 @@ All thresholds are PuzzlePress conventions, not KDP values or print-quality
 guarantees. Most findings report measured damage. `large_change` is different: it
 only asks for a visual comparison.
 
+### Full bleed and filled pages (Interval 9)
+
+On a full-bleed profile (`print.profile` ending `-bleed`) a page may set
+`placement.fit: fill`: the drawing covers the bleed edges and the inside margin,
+scaled to cover times `scale` (1..3), `x`/`y` choosing what shows, clipped, never
+resampled; the original is never touched. `fit: contain` (or no `fit`) is the
+existing whole-drawing placement; `fit` is written only when it is `fill`, so other
+books keep their bytes. Fill needs a bleed profile and no page number on the page;
+a filled page has no border. `coloring_bleed_art` reports line work cut off, printed
+only in the bleed, or outside the safe area. Details:
+[print-interior.md](print-interior.md#full-bleed-coloring-books-interval-9); Studio:
+[full-bleed-walkthrough.md](full-bleed-walkthrough.md).
+
 ### Paper-relative line measures (measures version 2, Interval 8)
 
 The line measures (fine-line retention, line work kept, stroke counts, light
