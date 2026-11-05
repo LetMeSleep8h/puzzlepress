@@ -67,7 +67,8 @@ RULESET_ID = "puzzlepress-kdp-coloring"
 #    background cleanup of tinted scans is no longer reported as fine-line loss.
 # 4: full bleed (Interval 9): `coloring_bleed_art`, and the shared page-box, page-size,
 #    margin, live-area and printer-mark rules judge full-bleed pages by their own boxes.
-RULESET_VERSION = 4
+# 5: fine-line retention tolerates a 1 px rim shift (measures version 3, Interval 10).
+RULESET_VERSION = 5
 BLEED_INK_NOTICE = 0.001  # Share of a drawing's ink worth a trimming note.
 COLORING_CONTRACT = "PuzzlePress coloring interior contract (docs/coloring.md)"
 QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"
@@ -792,7 +793,8 @@ _quality_rule(
     "Measured damage from preparation: fine lines thinned (under 90% kept), detail lost "
     "(under 60%), light strokes of the original erased (under 50% of gray 129-200 "
     "strokes still printed), strokes broken apart, isolated specks left (over 5 per "
-    "megapixel) or ink pushed to an image edge.",
+    "megapixel) or ink pushed to an image edge, and dark bands along an edge (a scan "
+    "frame: over 50% ink in the outermost 1%).",
     (
         "thin_lines_lost",
         "detail_lost",
@@ -800,6 +802,7 @@ _quality_rule(
         "strokes_broken",
         "specks_remaining",
         "prepared_touches_edge",
+        "dark_edge_band",
     ),
     "No measured line damage.",
 )

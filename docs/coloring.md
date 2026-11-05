@@ -219,6 +219,18 @@ All thresholds are PuzzlePress conventions, not KDP values or print-quality
 guarantees. Most findings report measured damage. `large_change` is different: it
 only asks for a visual comparison.
 
+### Measures version 3 and dark edge bands (Interval 10)
+
+From the 17 real originals (artwork-validation/findings.md): fine-line retention
+counts a fine-line pixel as kept while the prepared page has ink within 1 px of it
+(`THIN_REGISTRATION`), so a stroke whose rim moved is not lost; erased or thinned
+lines still are. `edge_bands` measures the ink share in the outermost 1 % of each edge;
+over 50 % is `dark_edge_band` (a scan frame that would print as a bar; reported, never
+cropped). The specks message names dust, grain or stippling. Coloring preflight
+ruleset 5. Thresholds unchanged. The measures' 3 x 3 maximum and minimum passes are
+separable shifted copies, pixel-identical to Pillow's rank filters (tested) and about
+three times faster, so version 3 measures cost no more than version 2 did.
+
 ### Full bleed and filled pages (Interval 9)
 
 On a full-bleed profile (`print.profile` ending `-bleed`) a page may set

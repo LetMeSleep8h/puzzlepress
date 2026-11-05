@@ -92,7 +92,7 @@ def test_a_clean_coloring_interior_is_valid_and_ready(ready):
     assert report.findings == () or codes(report) == ["kdp_full_font_embedding"]
     data = report.to_dict()
     assert data["ruleset"]["id"] == COLORING_ID == "puzzlepress-kdp-coloring"
-    assert data["ruleset"]["version"] == 4  # 4: full bleed (Interval 9)
+    assert data["ruleset"]["version"] == 5  # 5: fine-line registration (Interval 10)
     assert set(data["counts"]["severity"]) == {"error", "warning", "info"}
     assert all(set(page["findings"]) == {"error", "warning", "info"} for page in data["pages"])
     for code in ("coloring_image_integrity", "coloring_page_parity", "coloring_art_placement"):
@@ -201,7 +201,7 @@ def test_cli_exit_codes_and_report_bytes(ready, tmp_path, capsys):
     assert (output / "preflight.json").read_bytes() == report_bytes(result.report)
     assert main(["book", "preflight", str(directory), "--output", str(output)]) == 0
     text = capsys.readouterr().out
-    assert "ruleset puzzlepress-kdp-coloring v4" in text and "Manual review: none" in text
+    assert "ruleset puzzlepress-kdp-coloring v5" in text and "Manual review: none" in text
 
 
 # --------------------------------------------------------------- stale and altered

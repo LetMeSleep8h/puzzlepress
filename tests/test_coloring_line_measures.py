@@ -144,4 +144,80 @@ def test_difference_view_does_not_paint_cleanup_as_removal(aged_226: bytes) -> N
 
 def test_measures_carry_their_version(aged_226: bytes) -> None:
     data = prepare_artwork(aged_226, CLEANUP).measures.to_dict()
-    assert data["measures_version"] == MEASURES_VERSION == 2
+    assert data["measures_version"] == MEASURES_VERSION == 3
+
+
+def test_rim_flicker_is_not_line_loss_but_thinning_still_is(monkeypatch) -> None:
+    """Measures version 3 (Interval 10). On the real tinted patent scans, version 2
+    reported 86-88 % of fine lines kept after cleanup with every line visibly intact:
+    single rim pixels flipped across the ink level. This JPEG-compressed scan-like page
+    reproduces the mechanism (strokes inked near the ink level): the 1 px registration
+    tolerance removes most of that loss, and thinning still loses every fine line."""
+    from puzzlepress.coloring import prepare as module
+
+    data = encode(aged_scan(226, ink=105, blur=0.7, grain=12), "JPEG", quality=60)
+    cleanup = Adjustments(background_cleanup=0.6, despeckle=2)
+    monkeypatch.setattr(module, "THIN_REGISTRATION", 0)  # Version 2's pixel-exact rule.
+    exact = prepare_artwork(data, cleanup).measures.thin_line_retention
+    monkeypatch.undo()
+    tolerant = prepare_artwork(data, cleanup).measures.thin_line_retention
+    assert exact is not None and tolerant is not None
+    assert (1 - tolerant) < (1 - exact) / 2  # Most rim flicker is no longer counted.
+    thinned = prepare_artwork(data, Adjustments(background_cleanup=0.6, line_weight=-1))
+    assert thinned.measures.thin_line_retention == 0.0
+    assert "thin_lines_destroyed" in codes(thinned)
+
+
+def test_a_scan_frame_is_reported_but_art_at_the_edge_is_not() -> None:
+    """Interval 10, from the real Otis elevator scan (a black scanner frame, 69-88 % ink
+    in the outermost 1 % of every edge). SYNTHETIC: the same drawing with a 30 px black
+    frame at its edges, with a thin drawn frame, and with lines that reach the edge."""
+    from PIL import ImageDraw
+
+    page = line_art(3)
+    framed = page.copy()
+    draw = ImageDraw.Draw(framed)
+    width, height = framed.size
+    for box in ((0, 0, width, 30), (0, height - 30, width, height), (0, 0, 30, height)):
+        draw.rectangle(box, fill=0)
+    flagged = prepare_artwork(encode(framed), Adjustments())
+    found = [f for f in flagged.findings if f.code == "dark_edge_band"]
+    assert found and "along the left, top, bottom edge" in found[0].message  # Not right.
+    drawn = page.copy()
+    ImageDraw.Draw(drawn).rectangle((4, 4, width - 5, height - 5), outline=0, width=6)
+    reaching = page.copy()
+    ImageDraw.Draw(reaching).line((0, height // 2, width, height // 3), fill=0, width=8)
+    for image in (page, drawn, reaching):
+        assert "dark_edge_band" not in codes(prepare_artwork(encode(image), Adjustments()))
+
+
+def test_the_specks_warning_does_not_presume_dust() -> None:
+    from puzzlepress.coloring.prepare import _findings
+
+    measures = prepare_artwork(encode(line_art(2)), Adjustments()).measures
+    from dataclasses import replace
+
+    found = _findings(replace(measures, specks_per_megapixel_after=40.0), Adjustments())
+    message = next(f.message for f in found if f.code == "specks_remaining")
+    assert "stippling" in message
+
+
+@pytest.mark.parametrize("steps", [0, 1, 2])
+@pytest.mark.parametrize("dilate", [True, False])
+def test_the_fast_rank_filter_matches_pillows(steps: int, dilate: bool) -> None:
+    # The measures use separable 3 x 3 passes for speed; they must stay pixel-identical
+    # to Pillow's MaxFilter / MinFilter (edges included), or every measure would shift.
+    import random
+
+    from PIL import ImageChops, ImageFilter
+
+    from puzzlepress.coloring.prepare import _rank3
+
+    rng = random.Random(steps * 2 + dilate)
+    for _ in range(60):
+        size = (rng.randint(1, 33), rng.randint(1, 33))
+        pixels = bytes(rng.choice((0, 255, rng.randint(0, 255))) for _ in range(size[0] * size[1]))
+        image = Image.frombytes("L", size, pixels)
+        rank = ImageFilter.MaxFilter if dilate else ImageFilter.MinFilter
+        expected = image.filter(rank(2 * steps + 1)) if steps else image
+        assert ImageChops.difference(expected, _rank3(image, steps, dilate)).getbbox() is None

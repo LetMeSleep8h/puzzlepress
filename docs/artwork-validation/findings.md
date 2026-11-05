@@ -140,3 +140,56 @@ Interval 7's recorded measures (`interval7-cleanup-measures.json`) beside the ne
 To record from the result: false positives (a loss finding where the 100 % view shows
 the lines intact), false negatives (lines visibly lost without a finding), and which
 need the printed proof. Thresholds stay unchanged unless such records justify it.
+
+## Interval 10: the 17 originals re-measured
+
+All 17 approved originals were downloaded again on 2026-11-05 with
+`tests/artwork_fetch.py` (Wikimedia rate-limited once; the script waited 600 s), each
+kept only after its bytes and SHA-256 matched `approved.json`, and stored outside the
+repository (`../puzzlepress-validation-originals`). Reviewed with
+`tests/artwork_review.py --manifest` under defaults, cleanup 0.6 + despeckle 2, and
+cleanup + threshold 0.5; compared with `tests/artwork_compare.py`; looked at with
+`tests/artwork_contact_sheet.py` and full-resolution crops of the worst regions. The
+visual review was made on screen by the coding agent, not by the author, and no
+printed page exists: everything here is digital evidence.
+
+Two measure changes came from this review (measures version 3, coloring preflight
+ruleset 5; no threshold changed):
+
+1. Fine-line retention tolerates a 1 px rim shift. With version 2, Libbey and Lose
+   still reported `thin_lines_lost` (88 %, 86 %) while full-resolution crops showed
+   every line intact: single rim pixels flipped across the ink level (cleanup
+   stretches by the page's 95th-percentile paper; the measure divides by the local
+   paper). Now 98-100 % on every patent scan; thinning one step on the same files
+   still reads 0-32 % kept with `thin_lines_destroyed` and `detail_lost`.
+2. `dark_edge_band`: the Otis scan keeps the scanner's black frame (69-88 % ink in the
+   outermost 1 % of each edge), which prints as bars; no other drawing exceeds 26 %.
+   The specks message now names dust, grain or deliberate stippling (Vitis labrusca's
+   stippled leaf raised it).
+
+| # | Source | Pixels (effective DPI full page) | Settings | Interval 7 findings | Interval 10 findings | Visual review (screen, 100 %) | Remaining uncertainty | Recommended action |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Libbey automobile, US 652,851 (NARA) | 3040 x 4515 (463) | cleanup | fine lines 74 % (lost) | none (fine lines 100 %) | every line intact, paper white | thin pale hatching on paper | proof page; keep cleanup |
+| 2 | Lose one-wheel vehicle (NARA) | 2995 x 4494 (461) | cleanup | 70 % (lost), specks | specks 6/MP (fine lines 98 %) | hatching intact; scattered grain dots | whether grain prints | despeckle 3 and compare; proof |
+| 3 | Knight bag machine (NARA) | 2976 x 4543 (466) | cleanup | 58 % (**destroyed**) | faint lines, specks 20/MP (99 %) | structure intact, fine vertical hatch lighter | how pale hatch prints | raise contrast slightly; proof page 3 |
+| 4 | Deere plow (NARA) | 4704 x 5935 (649) | cleanup | 50 % (**destroyed**), light strokes 44 % | faint lines (99 %, light strokes 100 %) | outlines intact, shading hatch present; seal stamp kept | pale shading in print | proof; threshold 0.5 erases the gray shadow wash (reported, correct) |
+| 5 | Edison lamp (NARA) | 3003 x 4494 (461) | cleanup | 66 % (lost) | none (100 %) | text and filaments intact | none digital | proof |
+| 6 | Otis elevator (NARA) | 4000 x 2703 (552) | cleanup | 47 % (**destroyed**) | `dark_edge_band`, specks 9/MP (100 %) | lines intact; black scan frame on all edges | none for lines; frame is real | crop the scan frame before import |
+| 7 | Steering gear crop | 462 x 549 (64) | any | resolution too low | resolution too low (blocking) | tiny | none | replace with a larger scan |
+| 8 | Van Gogh, Enclosed Wheatfield | 7686 x 5851 | any | refused: 45 MP over 40 MP | refused: same bound | not reviewed | none | export a smaller copy (a new file needing its own approval) |
+| 9 | Van Gogh, Cypresses | 3955 x 2898 (546) | cleanup | 3 % (destroyed), "blank" wording | `prepared_blank` (blocking), faint lines | pale chalk on dark paper: almost nothing reaches ink | none: correctly blocked | not suitable as coloring line art |
+| 10 | Van Gogh, Montmajour | 3864 x 3120 (533) | cleanup | 74 % (lost) | faint lines (100 %) | reed-pen marks intact | how dense marks print | proof |
+| 11 | Van Gogh, Pollard Willows | 1956 x 1461 (270) | cleanup | 0.6 % (destroyed), tint | background tint (201), faint lines, specks 70/MP, low resolution | lines intact; gray sky kept | tint and grain in print | stronger cleanup or a better scan |
+| 12 | Meyer ornament 1900 | 1650 x 2612 (268) | cleanup | 73 % (lost), strokes broken | specks 8/MP, low resolution (100 %) | intact drawn frame and ornaments | grain dots | proof; larger scan for 300 DPI |
+| 13 | Meyer "Kreis" | 1317 x 2026 (208) | cleanup | 89 % (lost), strokes broken | low resolution only (100 %) | intact | none for lines | larger scan for 300 DPI |
+| 14 | Juncus gerardii (Britton & Brown) | 2230 x 2788 (308) | cleanup | none | none | clean | none | ready as line art |
+| 15 | Vitis labrusca (Britton & Brown) | 1523 x 2000 (210) | cleanup | specks, low resolution | specks 44/MP (stippling), low resolution | stippled leaf is deliberate | none: wording now says so | do not despeckle; larger scan |
+| 16 | Doré, Don Quixote | 3090 x 3878 (426) | defaults | excessive ink; despeckle refused | excessive ink (blocking); despeckle refused | tonal engraving, not line art | none | not suitable as coloring art |
+| 17 | Tenniel, Alice | 2143 x 1760 (296) | cleanup | heavy ink | heavy ink, specks 6/MP, low resolution (296) | dense hatching, intact | colorable areas small | proof; author's judgement |
+
+False positives found and removed: the line-loss findings on 1-6 and 10-13 under
+cleanup (Interval 7) and on 1-2 (Interval 8). False positives remaining: the specks
+warning on stippled art (now worded neutrally, not removed). False negatives found:
+the Otis scan frame (now `dark_edge_band`). Not verifiable digitally: how pale hatch
+and gray grain print, show-through, and whether dense hatching is enjoyable to color.
+Physical proof: not started ([proof-status.md](proof-status.md)).

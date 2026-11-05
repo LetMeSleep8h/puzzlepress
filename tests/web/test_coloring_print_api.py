@@ -57,7 +57,7 @@ def test_build_preflight_and_page_meanings(client):
     assert status["build"] == {"success": True}
     report = status["report"]
     assert report["ruleset"]["id"] == "puzzlepress-kdp-coloring"
-    assert status["ruleset"] == 4  # 4: full bleed (Interval 9)
+    assert status["ruleset"] == 5  # 5: fine-line registration (Interval 10)
     assert report["structural"]["status"] == "valid"
     pages = status["preview"]["pages"]
     assert [(p["physical_page"], p["side"], p["kind"], p["folio"]) for p in pages] == [

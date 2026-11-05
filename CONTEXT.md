@@ -2,11 +2,42 @@
 
 ## Completed scope
 
-Multi-engine Interval 9 (full-bleed coloring, production performance, real-artwork
-procedure) on branch `feat/coloring-full-bleed-performance`, cut from main `e88a581`
-(Interval 8 merged as PR #23); committed locally, not pushed. Guides:
-docs/full-bleed-walkthrough.md, docs/print-interior.md (Full bleed),
-docs/production-jobs.md.
+Coloring Interval 10 (real-artwork validation and release readiness) on branch
+`feat/coloring-release-readiness`, cut from main after Interval 9 merged (PR #24);
+committed locally, not pushed. Guides: docs/release-readiness.md,
+docs/artwork-validation/findings.md (Interval 10), proof-status.md,
+bleed-proof-checklist.md.
+
+- Real artwork: the 17 approved originals were downloaded with `artwork_fetch.py` (each
+  SHA-256 matched approved.json), kept outside the repository, and reviewed with three
+  settings, difference images, side-by-side crops and contact sheets
+  (`artwork_contact_sheet.py`). Table and outcomes in findings.md.
+- Measures version 3 (coloring ruleset 5), both from that evidence, thresholds
+  unchanged: fine-line retention tolerates a 1 px rim shift (v2 called 86-88 % of
+  intact patent strokes lost; v3 98-100 %, while thinning still measures 0-32 %);
+  `dark_edge_band` reports a scan frame (Otis 69-88 % ink in the outer 1 %; every
+  other original at most 26 %). The specks message no longer presumes dust.
+- Studio project loading: the parsed project is reused for byte-identical book.yaml
+  only (bounded, invalid never kept); `GET /api/projects/{key}` warm 4.0 / 6.6 / 9.8 ms
+  for 1 / 150 / 300 drawings (cold 24 / 111 / 216 ms).
+- Release candidate: `tests/release_candidate.py` builds a NOT FOR SALE demonstration
+  (standard and full bleed) through Studio's API and worker; structurally valid,
+  release verified, blocked on author decisions, resolution and unsuitable art, as it
+  must be. No publishing package; nothing submitted.
+- Full bleed: `test_bleed_raster.py` compares PDFium rasters of all 8 bleed profiles
+  with rasters built from Studio's crop preview (within 1 px); `bleed_samples.py`
+  writes docs/images/coloring/bleed-pages.png.
+- Physical proofs: none ordered; proof-status.md records "not started" for the standard
+  interior, the bleed interior and the cover.
+- Measure speed: the measures' 3 x 3 rank filters are separable shifted copies,
+  pixel-identical to Pillow's (tested), about three times faster.
+- Worker logs: bounding worker.log retries while Windows holds it open (a real
+  intermittent failure) and never leaves a staged copy.
+- The rich-text browser test now passes on Windows (it selected the trailing space).
+
+Earlier: multi-engine Interval 9 (full-bleed coloring, production performance,
+real-artwork procedure), merged as PR #24. Guides: docs/full-bleed-walkthrough.md,
+docs/print-interior.md (Full bleed), docs/production-jobs.md.
 
 - Interval 8 finalization: PR #23 was merged (2026-11-05 14:06, while its matrix was
   still running); merged main ran the full suite green locally (2283 passed, 10
@@ -805,6 +836,51 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Real-artwork validation and release readiness (Interval 10), 2026-11-05 (Windows,
+Python 3.13):
+
+- Baseline on merged main: 2333 passed, 10 skipped. Branch, full suite: 2357 passed, 1
+  failed, 10 skipped; the failure, `test_worker_logs_are_bounded`, was a real
+  intermittent bug (1 in 3 runs in isolation): Windows refused to replace worker.log
+  while a reader had it open, and the bound gave up at once and left a staged copy.
+  Fixed (bounded retry, staged copy removed) with two tests that fail on the old
+  code; 6/6 isolated reruns pass. Final full suite: **2360 passed, 10 skipped** (20.2 min). Golden passes with
+  PDF bytes compared (baseline v3 plus the recorded migration; no new migration).
+  Ruff lint and format, strict mypy (165 files; also `--platform linux`), pip check,
+  `git diff --check`; AGENTS CLI commands exit as on main (both `publish` 1).
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build; Vitest **137/137**
+  twice on an idle machine (4 timeouts at 5 s while the Python suite ran beside it).
+  Playwright **42/42**: the inherited rich-text failure was the test, not the editor:
+  Chromium on Windows extends Ctrl+Shift+ArrowRight over the trailing space, and the
+  editor bolded exactly that selection; the test now selects by character. Rewritten
+  captures restored.
+- Real originals: 17/17 fetched, SHA-256 matching approved.json; measures recomputed
+  after the rank-filter change on 31 stored reviews (two settings): no measure or
+  finding changed.
+- `tests/production_benchmark.py` (normal priority; synthetic 2175 x 2925 drawings;
+  first run with measures v3 as first written, then 150/300 again with the separable
+  rank passes):
+
+  | Workload | Total | Interior / preflight | Worker peak | PDF | Job poll median (p95) |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 drawing | 1.9 s | 0.3 / 0.8 s | 106 MB | 0.08 MB | 7.7 (13.3) ms |
+  | 10 drawings | 11.5 s | 1.5 / 8.8 s | 164 MB | 0.36 MB | 12.6 (14.2) ms |
+  | 50 drawings | 52.6 s | 6.8 / 42.7 s | 175 MB | 1.49 MB | 12.9 (14.4) ms |
+  | 150 drawings, v3 first / final | 161.8 / 145.3 s | 19.7 / 134.8, 22.9 / 111.5 s | 186 MB | 4.28 MB | 13.6 / 15.4 ms |
+  | 300 drawings (602 pages, reported over the maximum), v3 first / final | 320.6 / 270.7 s | 40.0 / 265.8, 40.2 / 212.0 s | 207 / 205 MB | 8.56 MB | 14.1 / 15.7 ms |
+  | full bleed 10 / 150 (first) / 150 (final) / 300 (first) | 11.9 / 166.3 / 148.4 / 336.8 s | 106.9 s preflight (150 final) | 163-208 MB | 0.36-8.56 MB | 12.7-15.8 ms |
+  | composition-demo / publishing-demo / 60-puzzle book | 1.2 / 4.7 / 10.2 s | | 47 / 402 / 70 MB | 0.07 / 0.16 / 0.42 MB | 12.0-13.3 ms |
+
+  Measures v3 as first written cost 74-241 ms per full-size drawing (one more 3 x 3
+  maximum); separable passes made the measures' rank filters about three times faster,
+  so final preflight is at or below Interval 9's (111.0 / 222.0 s). Worker running
+  0.31-0.41 s after the request. Cancel to stop 0.51-1.02 s, release unchanged. A
+  worker killed mid-job: interrupted, release unchanged; the next job reclaimed the
+  lock and removed the staging folder in 2.4 s. Two books at once 11.0 s wall; a
+  competing request `production_in_progress`. Project detail (`GET
+  /api/projects/{key}`) during a job 4.3-12.6 ms median (Interval 9: 111-216 ms). The
+  final runs' p95 poll (52-65 ms) shared the machine with other work.
+
 Full bleed and production performance (Interval 9), 2026-11-05 (Windows, Python
 3.13; quieter machine than Interval 8's runs):
 
@@ -1181,17 +1257,21 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
 
 ## Limits and decisions for review
 
-Interval 9: the 17 real originals were not re-measured (not on this machine; a
-download needs the author's go-ahead); measures version 2 still has only synthetic
-evidence, and the procedure is in findings.md. No physical proof has been ordered or
-inspected. Full bleed: coloring books only; a filled drawing stops at the inside
+Interval 10: no book is ready for KDP. The only artwork with a recorded rights basis
+is approved for testing, not sale; every publishing decision in the demonstration is
+undecided on purpose. No physical proof exists, so pale hatch, grain, tint and trim
+behavior on paper are unknown. PuzzlePress reports scan frames but has no crop step.
+The 1 px rim tolerance can hide a line that moved by one pixel and was also thinned
+to nothing nearby (measured: thinning still reported on every real file).
+
+Interval 9: the 17 real originals were not re-measured then (done in Interval 10).
+Full bleed: coloring books only; a filled drawing stops at the inside
 margin (no gutter art), has no border and no page number; contained drawings on a
 bleed page do not reach the bleed; bleed on color interiors and word-search pages is
 not modeled. The crop measure counts ink pixels (gray at most 128), not meaning: a
 person decides whether cut detail matters. The PDF raster preview is the whole bleed
-page; KDP's trim tolerance is not modeled. `GET /api/projects/{key}` still parses the
-source each time (111-216 ms at 150-300 drawings; the Produce page no longer polls
-it). Studio fixtures recorded before ruleset 5 keep the old word-search page maximum.
+page; KDP's trim tolerance is not modeled. Studio fixtures recorded before ruleset 5
+keep the old word-search page maximum.
 
 Production hardening (Interval 8): the Produce status request re-hashes every
 release file on each poll, which dominates Studio latency (idle 134-277 ms for

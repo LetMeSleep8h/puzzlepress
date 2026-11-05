@@ -128,3 +128,16 @@ def test_fetching_keeps_only_verified_originals(
     assert not (folder / "bad-remote.png").exists()
     with pytest.raises(SystemExit):
         artwork_fetch.fetch(manifest, artwork_fetch.ROOT / "originals")
+
+
+def test_the_contact_sheet_shows_every_reviewed_drawing(tmp_path: Path) -> None:
+    from artwork_contact_sheet import TILE, sheet
+    from PIL import Image
+
+    inputs = tmp_path / "art"
+    inputs.mkdir()
+    for seed in (1, 2):
+        (inputs / f"d{seed}.png").write_bytes(encode(line_art(seed, (300, 400))))
+    review(inputs, tmp_path / "out", {"background_cleanup": 0.6})
+    image = Image.open(sheet(tmp_path / "out", tmp_path / "sheet.png"))
+    assert image.width == 3 * TILE + 40 and image.height >= 2 * TILE

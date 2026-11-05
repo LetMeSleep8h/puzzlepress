@@ -92,7 +92,19 @@ FAINT_ERASED = 0.50  # Share kept below which the faint strokes are reported.
 # read absolute levels, so cleanup that whitened tinted paper counted every stroke edge
 # lighter than 128 after the stretch as lost (47-89 % "kept" on scans whose ink still
 # printed at 99.3-100 %). Prepared pixels and PREPARATION_VERSION are unchanged.
-MEASURES_VERSION = 2
+# Version 3 (Interval 10): fine-line retention allows a 1 px registration tolerance.
+# On the real tinted scans (Libbey, Lose) version 2 still reported 86-88 % kept with
+# every line visibly intact: single rim pixels flipped across the ink level, because
+# cleanup stretches by the page's 95th-percentile paper while the measure divides by
+# the local paper. Whole lines erased or thinned away are still lost.
+MEASURES_VERSION = 3
+THIN_REGISTRATION = 1  # Pixels a kept stroke's rim may move.
+# Dark edge bands (Interval 10): the share of ink in the outermost EDGE_BAND of the
+# prepared drawing, per edge. A scanner's black frame (the Otis elevator scan,
+# 69-88 % on all four edges) prints as a bar; drawings that reach their edge measured
+# at most 26 % on the 17 real files (a drawn frame, Van Gogh's reed strokes).
+EDGE_BAND = 0.01
+EDGE_BAND_DARK = 0.50
 BACKGROUND_BLOCK = 4  # Pixels per side averaged into one paper sample.
 BACKGROUND_WINDOW = 5  # Blocks searched for the brightest nearby paper (20 px).
 BACKGROUND_GRID = 128  # Coarse samples along the longer side before smoothing.
@@ -171,6 +183,23 @@ def _count(mask: Image.Image) -> int:
     return mask.histogram()[255]
 
 
+def _rank3(gray: Image.Image, steps: int, dilate: bool) -> Image.Image:
+    """`steps` passes of a 3 x 3 maximum (dilate) or minimum filter, pixel-identical to
+    Pillow's MaxFilter / MinFilter(2 * steps + 1), whose edge replication equals ignoring
+    out-of-image pixels. Separable shifted copies cost a fraction of the rank filter on a
+    full-size page."""
+    pick = ImageChops.lighter if dilate else ImageChops.darker
+    pad = 0 if dilate else 255
+    out = gray
+    for _ in range(steps):
+        # max(o[x], o[x-1]) then max of that with its neighbour at x+1: a 3-wide window.
+        for offset in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            moved = Image.new("L", out.size, pad)
+            moved.paste(out, offset)
+            out = pick(out, moved)
+    return out
+
+
 def faint_mask(reference: Image.Image) -> Image.Image:
     """Faint stroke pixels of the original: lighter than ink, at most FAINT_LEVEL, with
     at least FAINT_NEIGHBORS drawn pixels (faint or ink) in their 3 x 3 block, and not
@@ -183,7 +212,7 @@ def faint_mask(reference: Image.Image) -> Image.Image:
     density = drawn.filter(ImageFilter.Kernel((3, 3), [1] * 9, scale=9))
     dense = density.point(lambda v: 255 if v * 9 >= FAINT_NEIGHBORS * 255 - 4 else 0)
     faint = reference.point(lambda v: 255 if INK_LEVEL < v <= FAINT_LEVEL else 0)
-    near_ink = _mask(reference).filter(ImageFilter.MaxFilter(2 * FAINT_RIM + 1))
+    near_ink = _rank3(_mask(reference), FAINT_RIM, dilate=True)
     return ImageChops.subtract(ImageChops.darker(faint, dense), near_ink)
 
 
@@ -207,6 +236,8 @@ class PreparationMeasures:
     mean_change: float  # Mean absolute gray change, 0..255.
     not_measured: tuple[str, ...] = ()  # Measures skipped because a scan bound was hit.
     new_edges: tuple[str, ...] = ()  # Image edges ink reaches only after preparation.
+    # Ink share in the outermost EDGE_BAND of each edge of the prepared drawing.
+    edge_bands: tuple[tuple[str, float], ...] = ()
     # Gray of the darkest tenth of the prepared line work; None with no line work.
     line_core_level: int | None = None
     # Faint strokes in the original (gray INK_LEVEL+1..FAINT_LEVEL in stroke-like
@@ -223,6 +254,7 @@ class PreparationMeasures:
             "measures_version": MEASURES_VERSION,
             "not_measured": list(self.not_measured),
             "new_edges": list(self.new_edges),
+            "edge_bands": dict(self.edge_bands),
             "pixels": list(self.pixels),
             "ink_before": self.ink_before,
             "ink_after": self.ink_after,
@@ -392,7 +424,7 @@ def paper_background(gray: Image.Image) -> Image.Image | None:
         return None
     # A 3 x 3 maximum lifts one- and two-pixel strokes to the paper beside them, so
     # fine hatching closer than a block still reads as paper.
-    local = estimate(gray.filter(ImageFilter.MaxFilter(3)))
+    local = estimate(_rank3(gray, 1, dilate=True))
     if local.getextrema()[0] >= WHITE_PAPER:  # type: ignore[operator]
         return None
     return local.resize((width, height), Image.Resampling.BILINEAR)
@@ -448,10 +480,15 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     line_ink = _count(before)
     # Fine lines: line work an opening (3 x 3 erosion, then dilation) cannot restore,
     # so strokes at most two pixels wide; edges of wider strokes come back.
-    opened = lines.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
+    opened = _rank3(_rank3(lines, 1, dilate=True), 1, dilate=False)
     thin = ImageChops.subtract(before, _mask(opened))
     thin_pixels = _count(thin)
-    thin_kept = _count(ImageChops.darker(thin, after))
+    # A fine-line pixel is kept while the prepared page still has ink within
+    # THIN_REGISTRATION pixels of it (measures version 3): the stroke survives even if
+    # its rim moved by a pixel. Erasing or thinning a one- or two-pixel line away
+    # leaves no ink nearby and still counts as lost.
+    near = _rank3(after, THIN_REGISTRATION, dilate=True)
+    thin_kept = _count(ImageChops.darker(thin, near))
     detail_kept = _count(ImageChops.darker(before, after))
     # Strokes are counted on the ink both images share, so growing marks (thickening)
     # can never look like breaks; cutting lines (thinning, a low threshold) can.
@@ -510,10 +547,28 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
         mean_change=round(mean_change, 2),
         not_measured=tuple(not_measured),
         new_edges=new_edges,
+        edge_bands=_edge_bands(out),
         line_core_level=core,
         faint_line_pixels=faint_pixels,
         faint_line_retention=round(faint_kept / faint_pixels, 4) if measurable else None,
         pale_strokes_without_ink=pale,
+    )
+
+
+def _edge_bands(gray: Image.Image) -> tuple[tuple[str, float], ...]:
+    """Ink share (gray at most INK_LEVEL) in the outermost EDGE_BAND of each edge."""
+    width, height = gray.size
+    band_w, band_h = max(2, round(width * EDGE_BAND)), max(2, round(height * EDGE_BAND))
+    ink = _mask(gray)
+    bands = (
+        ("left", (0, 0, band_w, height)),
+        ("right", (width - band_w, 0, width, height)),
+        ("top", (0, 0, width, band_h)),
+        ("bottom", (0, height - band_h, width, height)),
+    )
+    return tuple(
+        (name, round(_count(ink.crop(box)) / ((box[2] - box[0]) * (box[3] - box[1])), 4))
+        for name, box in bands
     )
 
 
@@ -673,9 +728,24 @@ def _findings(m: PreparationMeasures, adjustments: Adjustments) -> tuple[Artwork
         add(
             "specks_remaining",
             Severity.WARNING,
-            "Many small specks remain; despeckle can remove isolated marks.",
+            "Many small isolated marks remain: dust and scan grain, or deliberate "
+            "stippling (the real-artwork review found both). Compare with the original; "
+            "despeckle removes isolated marks of either kind.",
             f"{m.specks_per_megapixel_after:g} per megapixel",
             f"at most {SPECKS_PER_MP_WARNING:g}",
+        )
+    dark = [name for name, share in m.edge_bands if share > EDGE_BAND_DARK]
+    if dark:
+        worst = max(share for _, share in m.edge_bands)
+        add(
+            "dark_edge_band",
+            Severity.WARNING,
+            f"A dark band runs along the {', '.join(dark)} edge of the prepared drawing: "
+            "often a scanner's or photocopier's frame, which would print as a black bar. "
+            "Crop the scan to the drawing before importing it; PuzzlePress does not crop "
+            "artwork.",
+            f"{worst:.0%} ink in the outermost {EDGE_BAND:.0%}",
+            f"at most {EDGE_BAND_DARK:.0%}",
         )
     if m.new_edges:
         add(

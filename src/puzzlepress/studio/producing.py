@@ -32,6 +32,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -53,6 +54,10 @@ LOGGER = logging.getLogger(__name__)
 MANIFEST = "production.json"
 STARTING_GRACE = 30.0  # Seconds a worker not started by this Studio may take to lock.
 LOG_LIMIT = 1024 * 1024  # worker.log keeps at most its last megabyte.
+# Windows refuses to replace a file another process has open (a reader of the log, an
+# indexer): the bound retries briefly instead of leaving the log unbounded.
+LOG_REPLACE_ATTEMPTS = 40
+LOG_REPLACE_PAUSE = 0.05
 STEP_LABELS = {
     "interior": "Building the interior PDF",
     "interior_preflight": "Checking the interior",
@@ -134,9 +139,23 @@ def _bound_log(path: Path) -> None:
         note = f"[worker.log: the first {size - LOG_LIMIT} bytes were removed]\n".encode()
         staged = path.with_name(path.name + ".tmp")
         staged.write_bytes(note + tail)
-        os.replace(staged, path)
     except OSError:
         LOGGER.warning("Could not bound %s", path)
+        return
+    for attempt in range(LOG_REPLACE_ATTEMPTS):
+        try:
+            os.replace(staged, path)
+            return
+        except PermissionError:
+            if attempt + 1 < LOG_REPLACE_ATTEMPTS:
+                time.sleep(LOG_REPLACE_PAUSE)
+        except OSError:
+            break
+    LOGGER.warning("Could not bound %s", path)
+    try:
+        staged.unlink()
+    except OSError:
+        pass
 
 
 def _manifest_digest(release: Path) -> str | None:
@@ -188,22 +207,14 @@ class ProducingService:
     def _locate(self, key: str) -> tuple[Project, str, Path, Path]:
         """(project, revision, book.yaml, release directory) for the saved source.
 
-        The library's boundary checks and the output folder's resolution run on every
-        call; only parsing is skipped when book.yaml holds exactly the bytes last parsed
-        (the revision is their SHA-256), so polling stays cheap and never serves a
-        project that differs from the file."""
+        `ProjectStore.snapshot` reads and hashes book.yaml on every call and reuses a
+        parsed project only for byte-identical source, so polling stays cheap and
+        never serves a project that differs from the file."""
         source = self.service.store.source(key)
-        try:
-            raw = source.read_bytes()
-        except OSError:
-            raw = None
-        revision = "sha256-" + hashlib.sha256(raw).hexdigest() if raw is not None else None
+        project, revision = self.service.store.snapshot(key)
         with self._parsed_lock:
             cached = self._parsed.get(key)
-        if cached is not None and revision is not None and cached[0] == revision:
-            project = cached[1]
-        else:
-            project, revision = self.service.store.snapshot(key)
+        if cached is None or cached[0] != revision:
             with self._parsed_lock:
                 self._parsed[key] = (revision, project, build_identity(project))
         try:

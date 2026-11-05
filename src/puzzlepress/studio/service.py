@@ -5,7 +5,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -39,9 +39,18 @@ def issue_dicts(error: ProjectError) -> list[dict[str, object]]:
     ]
 
 
+# Parsed projects one Studio process keeps, by key, for unchanged book.yaml bytes.
+PARSED_ENTRIES = 8
+
+
 @dataclass(frozen=True)
 class ProjectStore:
     root: Path
+    # key -> (revision, project): the last project parsed for each key (see snapshot).
+    _parsed: OrderedDict[str, tuple[str, Project]] = field(
+        default_factory=OrderedDict, compare=False, repr=False
+    )
+    _parsed_lock: Lock = field(default_factory=Lock, compare=False, repr=False)
 
     def source(self, key: str) -> Path:
         # Keys identify immediate folders, independently of authored book IDs.
@@ -72,16 +81,42 @@ class ProjectStore:
         return self.snapshot(key)[0]
 
     def snapshot(self, key: str) -> tuple[Project, str]:
+        """(project, revision) of the saved source, read now.
+
+        The bytes are always read and hashed, and the library boundary and output
+        folder are always checked. Only parsing is reused: a project parsed from
+        exactly these bytes (same key, same SHA-256) is returned again, since parsing
+        is a pure function of the bytes and projects are immutable. Any edit, by
+        Studio, the CLI or an editor, changes the bytes and is parsed afresh. Invalid
+        sources are never remembered. Bounded to PARSED_ENTRIES projects."""
         path = self.source(key)
         try:
             raw = path.read_bytes()
-            project = parse_project(raw.decode("utf-8-sig"))
-        except (OSError, UnicodeError) as error:
+        except OSError as error:
             raise ProjectError(
                 (ValidationIssue("source", "io", "Cannot read project source."),)
             ) from error
+        revision = "sha256-" + hashlib.sha256(raw).hexdigest()
+        with self._parsed_lock:
+            cached = self._parsed.get(key)
+            if cached is not None and cached[0] == revision:
+                self._parsed.move_to_end(key)
+        if cached is not None and cached[0] == revision:
+            project = cached[1]
+        else:
+            try:
+                project = parse_project(raw.decode("utf-8-sig"))
+            except UnicodeError as error:
+                raise ProjectError(
+                    (ValidationIssue("source", "io", "Cannot read project source."),)
+                ) from error
+            with self._parsed_lock:
+                self._parsed[key] = (revision, project)
+                self._parsed.move_to_end(key)
+                while len(self._parsed) > PARSED_ENTRIES:
+                    self._parsed.popitem(last=False)
         resolve_output_directory(project, path.parent)
-        return project, "sha256-" + hashlib.sha256(raw).hexdigest()
+        return project, revision
 
     def detail(self, key: str) -> dict[str, object]:
         project, revision = self.snapshot(key)

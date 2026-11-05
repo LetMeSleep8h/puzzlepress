@@ -69,7 +69,8 @@ is final: later lines never change it.
   35 % slower while other processes competed for the CPU, with no measured benefit to
   Studio's own latency (the server is a separate process either way). The job records
   what took effect (Interval 8 records without the field read as below normal). The
-  worker's peak memory is in the completed result. `worker.log` keeps its last 1 MB;
+  worker's peak memory is in the completed result. `worker.log` keeps its last 1 MB
+  (Windows: the replacement is retried for 2 s while a reader holds the log open);
   ten finished jobs are kept per release; an event log over 4 MB is refused as damaged.
 - **Source.** The worker refuses a job whose book.yaml no longer has the requested
   revision, and checks the produced manifest's build identity and book ID.
@@ -99,6 +100,12 @@ is final: later lines never change it.
   (its SHA-256 is the revision). Measured median for 150 / 300 drawings: job poll
   3.3 / 3.1 ms, verified status 23 / 30 ms (was 127 / 236 ms, dominated by parsing the
   source on every request, not by hashing the release).
+- **Project loading (Interval 10).** `ProjectStore.snapshot` reads and hashes book.yaml
+  on every request and reuses a parsed project only for the same key's byte-identical
+  source (at most 8 projects; invalid sources never kept), so every Studio request,
+  Produce included, is cheap without ever serving a stale project. Cold / warm median
+  for `GET /api/projects/{key}`: 1 drawing 24 / 4.0 ms, 150 drawings 111 / 6.6 ms, 300
+  drawings 216 / 9.8 ms.
 
 ## Cancellation
 
