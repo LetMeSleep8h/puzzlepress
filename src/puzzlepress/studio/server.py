@@ -484,6 +484,10 @@ def create_app(
     def produce_status(key: str) -> dict[str, object]:
         return producing.status(key)
 
+    @app.get("/api/projects/{key}/produce/job")
+    def produce_job(key: str) -> dict[str, object]:
+        return producing.job(key)
+
     @app.post("/api/projects/{key}/produce")
     def produce_start(key: str, body: BuildRequest) -> dict[str, object]:
         return producing.start(key, body.revision)

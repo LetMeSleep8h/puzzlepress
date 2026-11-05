@@ -454,3 +454,46 @@ def test_studio_answers_while_a_worker_renders(
         time.sleep(0.05)
     timings.sort()
     assert timings and timings[len(timings) // 2] < 1.0, timings
+
+
+# ---------------------------------------------------------------- cheap polling (Interval 9)
+
+
+def test_the_job_poll_reads_no_release_file_and_never_vouches_for_one(
+    client: TestClient, library: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    start(client, "colors")
+    full = finish(client, "colors")
+    directory = release_folder(library / "colors")
+
+    def refuse(*args: object) -> None:
+        raise AssertionError("the job poll must not verify the release")
+
+    monkeypatch.setattr(producing, "verified_release", refuse)
+    poll = client.get("/api/projects/colors/produce/job").json()
+    monkeypatch.undo()
+    assert "release" not in poll and poll["release_checked"] is False
+    assert poll["run"]["job_id"] == full["run"]["job_id"]
+    assert poll["release_manifest_sha256"] == full["release"]["manifest_sha256"]
+    # A tampered file leaves production.json alone; only full verification sees it.
+    (directory / "interior.pdf").write_bytes(b"%PDF-1.4 changed")
+    assert (
+        client.get("/api/projects/colors/produce/job").json()["release_manifest_sha256"]
+        == (full["release"]["manifest_sha256"])
+    )
+    damaged = client.get("/api/projects/colors/produce").json()["release"]
+    assert damaged["verified"] is False and "interior.pdf" in damaged["problem"]
+    blocked = client.get("/api/projects/colors/produce/file", params={"name": "interior.pdf"})
+    assert blocked.status_code == 404
+
+
+def test_the_parse_cache_follows_the_exact_bytes_of_book_yaml(
+    client: TestClient, library: Path
+) -> None:
+    before = client.get("/api/projects/colors/produce/job").json()["revision"]
+    book = library / "colors" / "book.yaml"
+    book.write_text(book.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    after = client.get("/api/projects/colors/produce/job").json()["revision"]
+    assert after != before
+    assert after == client.get("/api/projects/colors").json()["revision"]
+    assert client.get("/api/projects/colors/produce").json()["revision"] == after

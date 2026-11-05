@@ -160,12 +160,34 @@ class ProducingService:
         self._lock = threading.Lock()
         self._jobs: dict[str, _Worker] = {}  # By release directory; queued or running.
         self._queue: list[str] = []  # Release directories waiting for a worker.
+        # Parsed sources by key: (revision, project, build identity), reused only for
+        # the identical bytes.
+        self._parsed: dict[str, tuple[str, Project, str]] = {}
+        self._parsed_lock = threading.Lock()
 
     # ------------------------------------------------------------- locating
 
     def _locate(self, key: str) -> tuple[Project, str, Path, Path]:
-        project, revision = self.service.store.snapshot(key)
+        """(project, revision, book.yaml, release directory) for the saved source.
+
+        The library's boundary checks and the output folder's resolution run on every
+        call; only parsing is skipped when book.yaml holds exactly the bytes last parsed
+        (the revision is their SHA-256), so polling stays cheap and never serves a
+        project that differs from the file."""
         source = self.service.store.source(key)
+        try:
+            raw = source.read_bytes()
+        except OSError:
+            raw = None
+        revision = "sha256-" + hashlib.sha256(raw).hexdigest() if raw is not None else None
+        with self._parsed_lock:
+            cached = self._parsed.get(key)
+        if cached is not None and revision is not None and cached[0] == revision:
+            project = cached[1]
+        else:
+            project, revision = self.service.store.snapshot(key)
+            with self._parsed_lock:
+                self._parsed[key] = (revision, project, build_identity(project))
         try:
             directory = release_directory(project, source.parent)
         except ProjectError as error:
@@ -173,6 +195,13 @@ class ProducingService:
                 503, "output_unavailable", "The output folder is unavailable."
             ) from error
         return project, revision, source, directory
+
+    def _identity(self, key: str, revision: str, project: Project) -> str:
+        with self._parsed_lock:
+            cached = self._parsed.get(key)
+        return (
+            cached[2] if cached is not None and cached[0] == revision else build_identity(project)
+        )
 
     # ------------------------------------------------------------- jobs
 
@@ -326,6 +355,29 @@ class ProducingService:
 
     # ------------------------------------------------------------- API
 
+    def job(self, key: str) -> dict[str, object]:
+        """The cheap poll: the latest job as its record says, and production.json's
+        digest so a client can tell the release changed. Nothing here verifies the
+        release; files are offered only from `status`, which reads every one back."""
+        _, revision, _, directory = self._locate(key)
+        with self._lock:
+            view = self._latest(directory)
+            queued = str(directory) in self._queue
+            position = self._queue.index(str(directory)) + 1 if queued else None
+            worker = self._jobs.get(str(directory))
+            launched = worker is not None and worker.process is not None
+            running = sum(1 for w in self._jobs.values() if w.process is not None)
+        return {
+            "key": key,
+            "revision": revision,
+            "directory": directory.name,
+            "run": self._run(view, directory, position, launched) if view else None,
+            "release_manifest_sha256": _manifest_digest(directory),
+            "release_checked": False,
+            "recovery_pending": pending_recovery(directory, jobs.backup_prefix(directory)),
+            "workers": {"running": running, "limit": self.max_workers},
+        }
+
     def status(self, key: str) -> dict[str, object]:
         project, revision, _, directory = self._locate(key)
         with self._lock:
@@ -346,7 +398,7 @@ class ProducingService:
                 "engine": manifest.get("engine", "word_search"),
                 "result": result,
                 "build_identity": recorded,
-                "stale": recorded != build_identity(project),
+                "stale": recorded != self._identity(key, revision, project),
                 "manifest_sha256": _manifest_digest(directory),
                 "files": [
                     {"name": f["name"], "bytes": f["bytes"], "sha256": f["sha256"]}

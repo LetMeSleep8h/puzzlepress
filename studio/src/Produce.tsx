@@ -91,6 +91,18 @@ export interface ProduceStatus {
   workers?: { running: number; limit: number };
 }
 
+/** The cheap poll (`GET .../produce/job`): the job record only, never release files. */
+export interface ProduceJobPoll {
+  key: string;
+  revision: string;
+  directory: string;
+  run: ProduceJob | null;
+  release_manifest_sha256: string | null;
+  release_checked: false;
+  recovery_pending: boolean;
+  workers: { running: number; limit: number };
+}
+
 function size(bytes: number) {
   return bytes > 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
 }
@@ -110,6 +122,11 @@ export function Produce({ project, dirty }: { project: Project; dirty: boolean }
   const [confirming, setConfirming] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
+  // What is on screen, for the poll to compare against (state updates run later).
+  const shown = useRef<ProduceStatus | undefined>(undefined);
+  useEffect(() => {
+    shown.current = status;
+  }, [status]);
   const confirmButton = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
 
@@ -132,16 +149,40 @@ export function Produce({ project, dirty }: { project: Project; dirty: boolean }
     return () => controller.abort();
   }, [load, attempt]);
   const active = isActive(status?.run?.state);
-  // While a job is queued or running, follow it once a second; the job is Python's.
+  // While a job is queued or running, follow its record once a second through the
+  // cheap poll (no file is read back there). The verified status, the only source
+  // of release files and downloads, is fetched again once the job ends or
+  // production.json changes.
+  const poll = useCallback(
+    (signal: AbortSignal) =>
+      request<ProduceJobPoll>(`${api}/job`, signal)
+        .then((next) => {
+          const current = shown.current;
+          if (signal.aborted || !current || !isNewer(current.run, next.run)) return;
+          const refresh =
+            !isActive(next.run?.state) ||
+            (next.release_manifest_sha256 ?? null) !== (current.release?.manifest_sha256 ?? null);
+          accept({
+            ...current,
+            revision: next.revision,
+            run: next.run,
+            recovery_pending: next.recovery_pending,
+            workers: next.workers,
+          });
+          if (refresh) void load(signal);
+        })
+        .catch((err: Error) => !signal.aborted && setError(err)),
+    [api, load, accept],
+  );
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    const timer = setInterval(() => void load(controller.signal), 1000);
+    const timer = setInterval(() => void poll(controller.signal), 1000);
     return () => {
       clearInterval(timer);
       controller.abort();
     };
-  }, [active, load]);
+  }, [active, poll]);
   const finished = status?.run && !active;
   useEffect(() => {
     if (finished) {
