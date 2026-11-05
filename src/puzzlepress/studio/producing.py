@@ -188,22 +188,14 @@ class ProducingService:
     def _locate(self, key: str) -> tuple[Project, str, Path, Path]:
         """(project, revision, book.yaml, release directory) for the saved source.
 
-        The library's boundary checks and the output folder's resolution run on every
-        call; only parsing is skipped when book.yaml holds exactly the bytes last parsed
-        (the revision is their SHA-256), so polling stays cheap and never serves a
-        project that differs from the file."""
+        `ProjectStore.snapshot` reads and hashes book.yaml on every call and reuses a
+        parsed project only for byte-identical source, so polling stays cheap and
+        never serves a project that differs from the file."""
         source = self.service.store.source(key)
-        try:
-            raw = source.read_bytes()
-        except OSError:
-            raw = None
-        revision = "sha256-" + hashlib.sha256(raw).hexdigest() if raw is not None else None
+        project, revision = self.service.store.snapshot(key)
         with self._parsed_lock:
             cached = self._parsed.get(key)
-        if cached is not None and revision is not None and cached[0] == revision:
-            project = cached[1]
-        else:
-            project, revision = self.service.store.snapshot(key)
+        if cached is None or cached[0] != revision:
             with self._parsed_lock:
                 self._parsed[key] = (revision, project, build_identity(project))
         try:
