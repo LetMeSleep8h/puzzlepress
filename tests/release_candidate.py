@@ -146,7 +146,8 @@ def build(approved: Path, originals: Path, output: Path) -> Path:
             "blocking": validation.get("blocking", []),
             "warnings": validation.get("warnings", []),
             "manual_review": validation.get("manual_review", []),
-            "release_directory": str((library / release).resolve()),
+            # Studio writes `<output.directory>-release`, relative to the book folder.
+            "release_directory": str((book / f"{release}-release").resolve()),
         }
     (output / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     lines = ["# Release-candidate demonstration", "", str(summary["status"]), ""]
