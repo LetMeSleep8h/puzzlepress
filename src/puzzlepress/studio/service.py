@@ -174,9 +174,11 @@ class StudioService:
                 # An incomplete coloring plan (no pages yet, a drawing that cannot be
                 # read) is reported with its issues, so the composer can show them.
                 payload = engine.payload(content, plan, verification)
+                pages = getattr(plan, "pages", ())
+                count = len(pages) if isinstance(pages, tuple | list) else 0
                 return {
                     **payload,
-                    "geometry": coloring_page_geometry(project),
+                    "geometry": coloring_page_geometry(project, count),
                     "placements": coloring_placements(project, content, plan),
                 }
             if not verification.valid:
@@ -210,18 +212,20 @@ class StudioService:
             }
 
 
-def coloring_page_geometry(project: Project) -> dict[str, object]:
-    """Trim, live area and art box (PDF points, origin bottom-left) of a recto and a verso
-    coloring page under the book's print profile (the default when it has none): what
-    the composer outlines on its page previews. Python's layout geometry; the browser
-    only draws it."""
+def coloring_page_geometry(project: Project, page_count: int = 0) -> dict[str, object]:
+    """Media, trim, live area, art box, fill area and KDP safe area (PDF points, origin
+    at the media box's bottom-left) of a recto and a verso coloring page under the
+    book's print profile (the default when it has none): what the composer outlines on
+    its page previews. Without bleed the media box is the trim. Python's layout
+    geometry; the browser only draws it."""
     from puzzlepress.coloring_config import Border
     from puzzlepress.interior import DEFAULT_PROFILE, print_profile
-    from puzzlepress.interior.coloring import art_box
+    from puzzlepress.interior.coloring import art_box, fill_box
     from puzzlepress.interior.engine import FOLIO_BAND
     from puzzlepress.interior.geometry import page_frame
     from puzzlepress.interior.model import Box
-    from puzzlepress.interior.spec import PrintSpecification
+    from puzzlepress.interior.spec import KDP, PrintSpecification
+    from puzzlepress.preflight.rules import kdp_safe_area
 
     spec = print_profile(project.printing.profile if project.printing else DEFAULT_PROFILE)
     assert isinstance(spec, PrintSpecification)
@@ -235,27 +239,58 @@ def coloring_page_geometry(project: Project) -> dict[str, object]:
         frame = page_frame(spec, number)
         content = frame.content
         body = Box(content.x, content.y + FOLIO_BAND, content.width, content.height - FOLIO_BAND)
-        sides[side] = {"live": box(content), "art": box(art_box(body, border))}
+        safe = kdp_safe_area(spec, max(page_count, KDP.min_pages), frame.recto, frame.trim)
+        sides[side] = {
+            "media": box(frame.media),
+            "trim_box": box(frame.trim),
+            "live": box(content),
+            "art": box(art_box(body, border)),
+            "fill": box(fill_box(frame, spec)) if spec.bleed else None,
+            "safe": box(safe) if safe else None,
+        }
     return {
         "profile": spec.profile_id,
+        "bleed": spec.bleed,
         "trim": {"width": spec.trim.width, "height": spec.trim.height},
+        "media": {
+            "width": spec.trim.width + (KDP.interior_bleed if spec.bleed else 0.0),
+            "height": spec.trim.height + (2 * KDP.interior_bleed if spec.bleed else 0.0),
+        },
         "border": border.value,
         "sides": sides,
     }
 
 
+def _points(box: object) -> dict[str, float]:
+    return {k: round(getattr(box, k), 3) for k in ("x", "y", "width", "height")}
+
+
 def coloring_placements(project: Project, content: object, plan: object) -> dict[str, object]:
     """Where each coloring page of a draft plan prints its drawing (PDF points, origin
     bottom-left) and at what effective DPI, by physical page: computed by the same
-    `place_art` the interior layout uses, from the prepared pixel size."""
+    `place_art` / `place_fill` the interior layout uses, from the prepared pixel size.
+
+    A drawing that fills a full-bleed page reports its printed area (`box`, the fill
+    area it is clipped to), its whole extent (`drawing`) and `crop`: the shares of its
+    line work cut off the page, printed only in the bleed, and outside the safe area,
+    measured by the preflight rule's own `bleed_crop`. Fill on a profile without bleed
+    reports `error` and no box: the build refuses it, so nothing is drawn as if it
+    printed."""
     from puzzlepress.coloring.content import ColoringContent
-    from puzzlepress.coloring_config import CENTRED, Border
+    from puzzlepress.coloring_config import CENTRED, Border, Fit
     from puzzlepress.interior import DEFAULT_PROFILE, print_profile
-    from puzzlepress.interior.coloring import art_box, place_art
+    from puzzlepress.interior.coloring import (
+        art_box,
+        bleed_crop,
+        fill_box,
+        place_art,
+        place_fill,
+    )
     from puzzlepress.interior.engine import FOLIO_BAND
     from puzzlepress.interior.geometry import page_frame
-    from puzzlepress.interior.model import Box
+    from puzzlepress.interior.model import Box, ImageBlock, ImageEncoding
     from puzzlepress.interior.spec import PrintSpecification
+    from puzzlepress.preflight.rules import kdp_safe_area
     from puzzlepress.publication import PageKind, PublicationPlan
 
     if not isinstance(content, ColoringContent) or not isinstance(plan, PublicationPlan):
@@ -272,15 +307,43 @@ def coloring_placements(project: Project, content: object, plan: object) -> dict
         prepared = content.art.get(ref.id) if ref else None
         if page.kind is not PageKind.COLORING or ref is None or prepared is None:
             continue
-        frame = page_frame(spec, page.index).content
+        page_box = page_frame(spec, page.index)
+        frame = page_box.content
         body = Box(frame.x, frame.y + FOLIO_BAND, frame.width, frame.height - FOLIO_BAND)
         authored = placements.get(ref.entry, CENTRED)
-        box, dpi = place_art(art_box(body, border), prepared.width, prepared.height, authored)
-        result[str(page.index)] = {
+        record: dict[str, object] = {
             "entry": ref.entry,
-            "box": {k: round(getattr(box, k), 3) for k in ("x", "y", "width", "height")},
-            "effective_dpi": round(dpi, 1),
+            "fit": authored.fit.value,
             "pixels": {"width": prepared.width, "height": prepared.height},
             "placement": authored.to_dict(),
         }
+        if authored.fit is Fit.FILL and not spec.bleed:
+            record["error"] = "fill_needs_bleed"
+        elif authored.fit is Fit.FILL:
+            clip = fill_box(page_box, spec)
+            drawing, dpi = place_fill(clip, prepared.width, prepared.height, authored)
+            safe = kdp_safe_area(spec, len(plan.pages), page_box.recto, page_box.trim)
+            block = ImageBlock(
+                "coloring_art",
+                clip,
+                prepared.digest,
+                drawing,
+                (0, 0, prepared.width, prepared.height),
+                dpi,
+                dpi,
+                ImageEncoding.LOSSLESS,
+                bleed=True,
+            )
+            record.update(
+                box=_points(clip),
+                drawing=_points(drawing),
+                effective_dpi=round(dpi, 1),
+                crop=bleed_crop(prepared.image(), block, page_box.trim, safe).to_dict()
+                if safe
+                else None,
+            )
+        else:
+            box, dpi = place_art(art_box(body, border), prepared.width, prepared.height, authored)
+            record.update(box=_points(box), effective_dpi=round(dpi, 1))
+        result[str(page.index)] = record
     return result

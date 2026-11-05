@@ -5249,3 +5249,75 @@ button.primary.danger {
 .produce-history ul {
   padding-left: 1.2em;
 }
+
+/* ---------------------------------------------------------- Interval 9: full bleed */
+.page-card .bleed-area,
+.designer-page .bleed-area {
+  fill: #f3e7e3;
+  stroke: #c98b7b;
+  stroke-width: 1;
+}
+.designer-page .gutter {
+  fill: rgb(74 127 166 / 0.12);
+  stroke: none;
+}
+.designer-page .safe {
+  fill: none;
+  stroke: #b8621d;
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+.designer-page .crop-ghost {
+  opacity: 0.22;
+}
+.designer-page .trimmed-band {
+  fill: rgb(150 60 40 / 0.18);
+  stroke: none;
+}
+.designer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.designer-legend .key {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: middle;
+  border: 1px solid var(--line);
+}
+.designer-legend .key.bleed {
+  background: #f3e7e3;
+  border-color: #c98b7b;
+}
+.designer-legend .key.trim {
+  background: var(--paper);
+}
+.designer-legend .key.safe {
+  border: 1px dashed #b8621d;
+}
+.designer-legend .key.gutter {
+  background: rgb(74 127 166 / 0.25);
+}
+.placement-fit label {
+  display: block;
+}
+.overlay-trim {
+  stroke: #7a2e1f;
+}
+.sheet-overlay .overlay-bleed {
+  fill: rgb(150 60 40 / 0.16);
+  stroke: none;
+}
+.overlay-key.trim {
+  color: #7a2e1f;
+  border-top-style: solid;
+}
+.overlay-key.bleed {
+  color: #c98b7b;
+  border-top-style: solid;
+}

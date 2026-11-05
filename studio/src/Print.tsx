@@ -34,7 +34,13 @@ const ZOOMS = [50, 75, 100, 150, 200, 300];
 const CSS_PX_PER_PT = 96 / 72;
 const OVERLAYS = [
   ['live', 'Live area', 'The margins of the print profile'],
-  ['kdp', 'KDP minimum margins', 'Gutter for this page count and 0.25 in outside'],
+  [
+    'kdp',
+    'KDP minimum margins',
+    'Gutter for this page count and 0.25 in outside (0.375 in with bleed)',
+  ],
+  ['trim', 'Trim line', 'Where the printed page is cut (full-bleed interiors)'],
+  ['bleed', 'Bleed', 'Printed beyond the trim and cut away (full-bleed interiors)'],
   ['elements', 'Element bounds', 'Painted extent of every layout element'],
   ['findings', 'Finding regions', 'Regions named by preflight findings'],
 ] as const;
@@ -127,11 +133,17 @@ function Sheet({
   const page = preview.pages[number - 1];
   const geometry: PageGeometry | undefined = preview.geometry?.[number - 1];
   const profile = status.report?.profile;
+  // The rendered page is the media box (the trim plus bleed on a full-bleed interior).
   const trim =
+    geometry?.media ??
     geometry?.trim ??
     (profile
       ? { x: 0, y: 0, width: profile.trim.width_in * 72, height: profile.trim.height_in * 72 }
       : { x: 0, y: 0, width: 612, height: 792 });
+  const bleeds =
+    !!geometry?.media &&
+    (geometry.media.width !== geometry.trim.width ||
+      geometry.media.height !== geometry.trim.height);
   const height = (width * trim.height) / trim.width;
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   const size = width * dpr <= trim.width * preview.scales.page ? 'page' : 'detail';
@@ -164,6 +176,16 @@ function Sheet({
               width={4}
               height={trim.height}
             />
+            {bleeds && overlays.has('bleed') && (
+              <path
+                className="overlay-bleed"
+                fillRule="evenodd"
+                d={`M0 ${-trim.height}h${trim.width}v${trim.height}h${-trim.width}z M${geometry.trim.x} ${-(geometry.trim.y + geometry.trim.height)}h${geometry.trim.width}v${geometry.trim.height}h${-geometry.trim.width}z`}
+              />
+            )}
+            {bleeds && overlays.has('trim') && (
+              <Rect box={geometry.trim} className="overlay-trim" />
+            )}
             {overlays.has('live') && <Rect box={geometry.live} className="overlay-live" />}
             {overlays.has('kdp') && geometry.kdp_safe && (
               <Rect box={geometry.kdp_safe} className="overlay-kdp" />
@@ -542,6 +564,7 @@ function Viewer({ status }: { status: InteriorStatus }) {
   const gap = spread ? 2 : 0;
   // The built PDF's own trim (points): pages are sized from it, never from 8.5 x 11.
   const pageTrim =
+    preview.geometry?.[0]?.media ??
     preview.geometry?.[0]?.trim ??
     (report.profile
       ? { width: report.profile.trim.width_in * 72, height: report.profile.trim.height_in * 72 }

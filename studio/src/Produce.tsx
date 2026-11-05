@@ -67,6 +67,8 @@ export interface ProduceStatus {
     verified: boolean;
     problem: string | null;
     engine?: string;
+    /** The print profile the release was built with (production.json). */
+    profile?: string | null;
     stale?: boolean;
     manifest_sha256?: string | null;
     result?: Record<string, unknown>;
@@ -417,6 +419,14 @@ export function Produce({ project, dirty }: { project: Project; dirty: boolean }
               )}{' '}
               {active && <Status tone="neutral">Kept until the new job verifies</Status>}
             </p>
+            {release.profile && (
+              <p className="small">
+                Print profile <code>{release.profile}</code>
+                {release.profile.endsWith('-bleed')
+                  ? ': full bleed. In KDP, choose Bleed (PDF only) for the interior.'
+                  : ': no bleed.'}
+              </p>
+            )}
             {validation && (
               <div className="produce-findings">
                 {(

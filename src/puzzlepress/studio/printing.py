@@ -71,6 +71,9 @@ def _geometry(layout: InteriorLayout) -> list[dict[str, object]]:
         pages.append(
             {
                 "physical_page": page.number,
+                # The rendered page is the media box: the trim plus bleed on a
+                # full-bleed interior, the trim itself otherwise.
+                "media": _box(frame.media),
                 "trim": _box(frame.trim),
                 "live": _box(frame.content),
                 "kdp_safe": _box(safe) if safe else None,

@@ -417,6 +417,7 @@ class ProducingService:
                 "verified": problem is None,
                 "problem": problem,
                 "engine": manifest.get("engine", "word_search"),
+                "profile": manifest.get("profile"),
                 "result": result,
                 "build_identity": recorded,
                 "stale": recorded != self._identity(key, revision, project),

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, request } from './api';
 import { Field } from './editor-fields';
-import { profileLabel } from './print-profiles';
+import { offeredFor, profileLabel } from './print-profiles';
 import type { Issue, Project, ProjectTypes } from './types';
 import { ErrorState, Issues, Loading } from './ui';
 
@@ -246,7 +246,10 @@ export function CreateBook() {
             </div>
             <fieldset className="choice-group">
               <legend>Trim and paper</legend>
-              <p className="small muted">KDP standard paperback sizes, black ink, no bleed.</p>
+              <p className="small muted">
+                KDP standard paperback sizes, black ink; no bleed unless it says full bleed
+                {type.kind === 'coloring' ? ' (coloring books only)' : ''}.
+              </p>
               <label>
                 <input
                   type="radio"
@@ -258,17 +261,19 @@ export function CreateBook() {
                   Decide later (Print proof builds 8.5 × 11 in, white paper, unless you choose)
                 </span>
               </label>
-              {types.profiles.map((p) => (
-                <label key={p.id}>
-                  <input
-                    type="radio"
-                    name="profile"
-                    checked={values.profile === p.id}
-                    onChange={() => set('profile')(p.id)}
-                  />
-                  <span>{profileLabel(p)}</span>
-                </label>
-              ))}
+              {types.profiles
+                .filter((p) => offeredFor(p, type.kind === 'coloring'))
+                .map((p) => (
+                  <label key={p.id}>
+                    <input
+                      type="radio"
+                      name="profile"
+                      checked={values.profile === p.id}
+                      onChange={() => set('profile')(p.id)}
+                    />
+                    <span>{profileLabel(p)}</span>
+                  </label>
+                ))}
             </fieldset>
             <fieldset className="choice-group">
               <legend>Start from</legend>
