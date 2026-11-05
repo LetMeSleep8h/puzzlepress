@@ -13,11 +13,10 @@ test('produce a coloring book from Studio and download its verified files', asyn
   await expect(page.getByText('Every file verified')).toBeVisible({ timeout: 240000 });
   await expect(page.getByRole('heading', { name: /Last run/ })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Steps run' })).toContainText('interior');
-  const manifest = page.waitForResponse((r) =>
-    r.url().includes('produce/file?name=production.json'),
-  );
+  // A download link: the browser saves the file; Python served the verified bytes.
+  const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download production.json' }).click();
-  expect((await manifest).status()).toBe(200);
+  expect((await download).suggestedFilename()).toBe('production.json');
   await page.getByText(/All \d+ files/).click();
   await expect(page.getByRole('link', { name: 'interior.pdf', exact: true })).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

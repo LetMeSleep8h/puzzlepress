@@ -2021,9 +2021,15 @@ summary:hover {
   align-items: center;
   gap: 8px;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 .print-profile select {
   min-height: 44px;
+  /* Profile descriptions are long; the select shrinks with the page instead. */
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
 }
 /* Cover Studio workspace: tools | canvas | inspector, each scrolling on its own. */
 .cover-workspace {
