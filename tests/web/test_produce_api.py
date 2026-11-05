@@ -497,3 +497,167 @@ def test_the_parse_cache_follows_the_exact_bytes_of_book_yaml(
     assert after != before
     assert after == client.get("/api/projects/colors").json()["revision"]
     assert client.get("/api/projects/colors/produce").json()["revision"] == after
+
+
+# ---------------------------------------------------------------- worker hardening (Interval 9)
+
+
+@pytest.mark.parametrize(
+    "step", ["interior", "interior_preflight", "duplicates", "manifest", "release_verify"]
+)
+def test_a_worker_killed_at_any_step_leaves_the_release_unchanged(
+    client: TestClient, library: Path, monkeypatch: pytest.MonkeyPatch, step: str
+) -> None:
+    start(client, "colors")
+    before = finish(client, "colors")["release"]
+    harness(monkeypatch, "--crash", step)
+    start(client, "colors")
+    status = finish(client, "colors")
+    assert status["run"]["state"] == "interrupted", status["run"]
+    assert status["run"]["release_preserved"] == "unchanged"
+    assert status["release"]["manifest_sha256"] == before["manifest_sha256"]
+    assert status["release"]["verified"]
+
+
+def test_a_worker_killed_inside_the_swap_is_restored_by_the_next_job(
+    client: TestClient, library: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    start(client, "colors")
+    before = finish(client, "colors")["release"]
+    original = producing.worker_command
+    harness(monkeypatch, "--crash-in-swap")
+    start(client, "colors")
+    status = finish(client, "colors")
+    assert status["run"]["state"] == "interrupted"
+    assert status["release"] is None and status["recovery_pending"] is True
+    assert status["run"]["release_preserved"] == "pending_recovery"
+    assert client.get("/api/projects/colors/produce/job").json()["recovery_pending"] is True
+    monkeypatch.setattr(producing, "worker_command", original)
+    start(client, "colors")
+    again = finish(client, "colors")
+    assert again["run"]["state"] == "completed", again["run"]
+    assert any("Restored the previous output" in n for n in again["run"]["notes"])
+    assert again["release"]["verified"] and again["recovery_pending"] is False
+    assert again["release"]["files"] == before["files"]  # Same source, same bytes.
+    assert leftovers(library / "colors") == []
+
+
+def test_two_workers_racing_for_one_release_never_both_write(library: Path) -> None:
+    """Two job records for one release, both workers started at once (as two Studio
+    processes could): the lock lets exactly one produce; the other is refused."""
+    import subprocess
+
+    from puzzlepress.project import load_project
+    from puzzlepress.source_store import source_revision
+
+    book = library / "colors"
+    target = release_folder(book)
+    project = load_project(book).project
+    specs = [
+        jobs.JobSpec(
+            jobs.new_job_id(),
+            "colors",
+            project.book.id,
+            "coloring",
+            str(book / "book.yaml"),
+            source_revision(book / "book.yaml"),
+            str(target),
+            jobs.now(),
+        )
+        for _ in range(2)
+    ]
+    directories = [jobs.create_job(spec) for spec in specs]
+    workers = [
+        subprocess.Popen([sys.executable, "-m", "puzzlepress.production.worker", str(d)])
+        for d in directories
+    ]
+    codes = sorted(w.wait(timeout=300) for w in workers)
+    views = [jobs.read_job(d) for d in directories]
+    states = sorted(v.state for v in views)
+    assert codes == [0, 1] and states == ["completed", "failed"], [v.error for v in views]
+    refused = next(v for v in views if v.state == "failed")
+    assert refused.error and refused.error["code"] == "production_in_progress"
+    from puzzlepress.production import release
+
+    assert release.verify_release(target)["book_id"] == project.book.id
+
+
+def test_a_second_studio_waits_for_a_job_another_one_is_starting(
+    library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = app(library, tmp_path)
+    harness(monkeypatch, "--hold", "4")  # The worker takes 4 s to report anything.
+    start(first, "colors")
+    second = app(library, tmp_path)
+    seen = second.get("/api/projects/colors/produce/job").json()["run"]
+    assert seen["state"] == "queued"  # Not called interrupted while it may be starting.
+    refused = second.post(
+        "/api/projects/colors/produce", json={"revision": revision(second, "colors")}
+    )
+    assert refused.json()["error"]["code"] == "production_in_progress"
+    assert finish(second, "colors")["run"]["state"] == "completed"
+
+
+def test_a_starting_job_whose_worker_never_came_is_interrupted_after_the_grace(
+    library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puzzlepress.project import load_project
+
+    client = app(library, tmp_path)
+    book = library / "colors"
+    spec = jobs.JobSpec(
+        jobs.new_job_id(),
+        "colors",
+        load_project(book).project.book.id,
+        "coloring",
+        str(book / "book.yaml"),
+        revision(client, "colors"),
+        str(release_folder(book)),
+        jobs.now(),
+    )
+    job = jobs.create_job(spec)
+    jobs.append_event(job, {"event": "state", "state": "starting", "pid": 1}, True)
+    assert client.get("/api/projects/colors/produce/job").json()["run"]["state"] == "starting"
+    monkeypatch.setattr(producing, "STARTING_GRACE", 0.0)
+    run = client.get("/api/projects/colors/produce/job").json()["run"]
+    assert run["state"] == "interrupted" and run["error"]["code"] == "worker_lost"
+
+
+def test_the_memory_cap_fails_the_job_and_keeps_the_release(
+    library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def capped(service: object) -> producing.ProducingService:
+        return producing.ProducingService(service, memory_limit_mb=1024)  # type: ignore[arg-type]
+
+    frontend = tmp_path / "frontend"
+    frontend.mkdir(exist_ok=True)
+    (frontend / "index.html").write_text("<!doctype html>", encoding="utf-8")
+    client = TestClient(create_app(library, frontend, capped))
+    start(client, "colors")
+    before = finish(client, "colors")["release"]
+    harness(monkeypatch, "--allocate", "duplicates", "2048")
+    start(client, "colors")
+    run = finish(client, "colors")["run"]
+    assert run["limits"]["memory_mb"] == 1024
+    assert run["state"] == "failed" and run["error"]["code"] == "memory_limit", run
+    after = client.get("/api/projects/colors/produce").json()["release"]
+    assert after["manifest_sha256"] == before["manifest_sha256"] and after["verified"]
+    assert leftovers(library / "colors") == []
+
+
+def test_worker_logs_are_bounded(
+    client: TestClient, library: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness(monkeypatch, "--noise", "1500")
+    start(client, "colors")
+    run = finish(client, "colors")["run"]
+    job = next(
+        d
+        for d in jobs.job_directories(release_folder(library / "colors"))
+        if d.name == run["job_id"]
+    )
+    deadline = time.monotonic() + 15  # Bounded by the monitor once the worker exited.
+    while len(data := (job / jobs.LOG_NAME).read_bytes()) > producing.LOG_LIMIT + 100:
+        assert time.monotonic() < deadline, len(data)
+        time.sleep(0.1)
+    assert data.startswith(b"[worker.log: the first ")

@@ -52,6 +52,7 @@ from .service import StudioError, StudioService
 LOGGER = logging.getLogger(__name__)
 MANIFEST = "production.json"
 STARTING_GRACE = 30.0  # Seconds a worker not started by this Studio may take to lock.
+LOG_LIMIT = 1024 * 1024  # worker.log keeps at most its last megabyte.
 STEP_LABELS = {
     "interior": "Building the interior PDF",
     "interior_preflight": "Checking the interior",
@@ -121,6 +122,23 @@ def verified_release(directory: Path) -> tuple[dict[str, object] | None, str | N
     return manifest, None
 
 
+def _bound_log(path: Path) -> None:
+    """Keep only the last LOG_LIMIT bytes of a finished worker's log (marked as cut)."""
+    try:
+        size = path.stat().st_size
+        if size <= LOG_LIMIT:
+            return
+        with open(path, "rb") as stream:
+            stream.seek(size - LOG_LIMIT)
+            tail = stream.read()
+        note = f"[worker.log: the first {size - LOG_LIMIT} bytes were removed]\n".encode()
+        staged = path.with_name(path.name + ".tmp")
+        staged.write_bytes(note + tail)
+        os.replace(staged, path)
+    except OSError:
+        LOGGER.warning("Could not bound %s", path)
+
+
 def _manifest_digest(release: Path) -> str | None:
     try:
         return hashlib.sha256((release / MANIFEST).read_bytes()).hexdigest()
@@ -151,7 +169,7 @@ class ProducingService:
         service: StudioService,
         max_workers: int | None = None,
         memory_limit_mb: int | None = DEFAULT_MEMORY_MB,
-        lower_priority: bool = True,
+        lower_priority: bool = False,
     ) -> None:
         self.service = service
         self.max_workers = max_workers or default_workers()
@@ -209,6 +227,8 @@ class ProducingService:
         """Record the end of a job whose worker is provably gone (caller holds _lock)."""
         if view.terminal or str(release) in self._jobs:
             return view
+        if view.state == "queued" and (_seconds(view.spec.created, None) or 0) < STARTING_GRACE:
+            return view  # Another Studio process may be starting its worker right now.
         if view.state == "queued":
             error = {
                 "code": "studio_stopped",
@@ -315,6 +335,7 @@ class ProducingService:
             log.close()  # type: ignore[attr-defined]
         except OSError:
             pass
+        _bound_log(worker.directory / jobs.LOG_NAME)
         with self._lock:
             try:
                 view = jobs.read_job(worker.directory)

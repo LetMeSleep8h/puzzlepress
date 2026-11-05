@@ -245,3 +245,26 @@ def test_priority_is_recorded_and_older_records_default_to_below_normal(tmp_path
     del data["lower_priority"]
     (older / jobs.SPEC_NAME).write_text(json.dumps(data), encoding="utf-8")
     assert jobs.read_spec(older).lower_priority is True
+
+
+def test_the_default_4096_mb_cap_refuses_a_5_gib_allocation() -> None:
+    """The real default: refused at commit time, so nothing is ever allocated and no
+    other process feels it."""
+    from puzzlepress.production.limits import DEFAULT_MEMORY_MB
+
+    script = (
+        "from puzzlepress.production.limits import apply_limits\n"
+        f"applied = apply_limits({DEFAULT_MEMORY_MB})\n"
+        f"assert applied['memory_mb'] == {DEFAULT_MEMORY_MB}, applied\n"
+        "try:\n"
+        "    block = bytearray(5 * 1024 ** 3)\n"
+        "except MemoryError:\n"
+        "    print('refused')\n"
+        "else:\n"
+        "    print('allocated')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=120
+    )
+    assert DEFAULT_MEMORY_MB == 4096
+    assert result.stdout.strip() == "refused", result.stderr

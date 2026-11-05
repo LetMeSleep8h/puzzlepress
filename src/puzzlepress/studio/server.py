@@ -757,12 +757,23 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--frontend", type=Path, default=None, help="Built Studio (studio/dist)")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--worker-priority",
+        choices=("normal", "low"),
+        default="normal",
+        help="Scheduling priority of production workers (low yields to other work)",
+    )
     args = parser.parse_args(argv)
     if not args.books.is_dir():
         parser.error(f"--books {args.books} is not a directory of book projects.")
     frontend = args.frontend if args.frontend is not None else default_frontend()
     print(f"PuzzlePress Studio library: {args.books.resolve()}")
-    uvicorn.run(create_app(args.books, frontend), host="127.0.0.1", port=args.port)
+    low = args.worker_priority == "low"
+
+    def jobs(service: StudioService) -> ProducingService:
+        return ProducingService(service, lower_priority=low)
+
+    uvicorn.run(create_app(args.books, frontend, jobs), host="127.0.0.1", port=args.port)
 
 
 if __name__ == "__main__":
