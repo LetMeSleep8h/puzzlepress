@@ -729,6 +729,31 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Print validation and production readiness (Interval 7), 2026-11-05 (Windows,
+Python 3.13):
+
+- Python: **2234 passed, 10 skipped** (symlink permission, Windows drive paths),
+  golden test 4/4 with PDF bytes compared: word-search outputs, identities, plan JSON
+  and reports byte-identical. Ruff lint and format, strict mypy (160 files), pip
+  check, `git diff --check`.
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build; Vitest **128/128**.
+  Playwright **39/40**: new `produce.spec.ts` and `authoring.spec.ts` pass;
+  `templates.spec.ts` rich text fails at line 300 as on main. Rewritten image captures
+  restored.
+- Real artwork: 17 approved files downloaded one at a time (Wikimedia throttled twice;
+  the downloader honoured Retry-After), every one matching Commons' SHA-1; reviewed
+  under three settings; visual checks on screen by the agent, labelled as such. No
+  printed proof reviewed; no threshold changed.
+- Trims: composition-demo, cover-demo (with cover) and the coloring "sections"
+  sample build and pass structural preflight on all eight profiles; pages and covers
+  on 6 x 9 and 8.5 x 8.5 inspected as rasters.
+- Performance (tests/coloring_benchmark.py): 300 drawings / 602 pages build 38.3 s,
+  first preflight 193.1 s, produce 40.5 s, peak 182 MB, PDF 8.6 MB; Studio-started
+  150-drawing runs 152-156 s (27 s repeated), status requests median 231-249 ms
+  during a run, cancel to stop 12.5-12.7 s, previous release kept.
+- CI: PR #20's studio job timed out once on the new journey spec (Linux); PR #21
+  (diagnostics only) then passed all 35 checks including that spec.
+
 Visual authoring (Interval 6), 2026-11-04 (Windows, Python 3.13):
 
 - Baseline (main `b42b5bd` plus the CI fixture fix): the full suite exited 0 with 9
