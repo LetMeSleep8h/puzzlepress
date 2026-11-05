@@ -21,12 +21,15 @@ def canonical_build_inputs(project: Project) -> bytes:
     publishing identities, so editing a crop or a keyword never stales the interior.
     The interior style is excluded too: it is renderer input recorded in the
     interior identity, so restyling never changes the plan or generation.
+    The catalog (subject, collection) describes the book in the Library only. The
+    `print` section, when authored, stays in: paper changes what is built.
     """
     data = project.to_dict()
     del data["output"]
     data.pop("cover", None)
     data.pop("publishing", None)
     data.pop("interior", None)
+    data.pop("catalog", None)
     envelope = {
         "identity_version": IDENTITY_VERSION,
         "engine_version": __version__,

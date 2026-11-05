@@ -354,7 +354,16 @@ def produce(
     directory.mkdir(parents=True, exist_ok=True)
     _owned(directory, project.book.id)
 
-    spec = print_profile(profile or DEFAULT_PROFILE)
+    from ..print_config import ProfileConflict, chosen_profile
+
+    try:
+        chosen = chosen_profile(project.printing, profile)
+    except ProfileConflict as conflict:
+        raise InteriorError(
+            "print_spec",
+            (LayoutIssue("profile_conflict", str(conflict), region="print.profile"),),
+        ) from conflict
+    spec = print_profile(chosen or DEFAULT_PROFILE)
     if isinstance(spec, LayoutIssue):
         raise InteriorError("print_spec", (spec,))
     build = build_interior(project, spec, source)

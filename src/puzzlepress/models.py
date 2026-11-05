@@ -2,12 +2,14 @@
 
 from dataclasses import asdict, dataclass
 
+from .catalog_config import Catalog
 from .coloring_config import ColoringBook
 from .composition import Composition
 from .content import WordSearchContent
 from .cover_config import CoverConfig
 from .engines.kind import EngineKind
 from .interior_style import InteriorStyle
+from .print_config import PrintSettings
 from .publishing_config import PublishingConfig
 
 
@@ -52,6 +54,8 @@ class Project:
     publishing: PublishingConfig | None = None
     interior: InteriorStyle | None = None
     coloring: ColoringBook | None = None
+    catalog: Catalog | None = None
+    printing: PrintSettings | None = None  # The `print` section.
 
     @property
     def engine(self) -> EngineKind:
@@ -87,4 +91,10 @@ class Project:
             del data["coloring"]
         else:
             data["coloring"] = self.coloring.to_dict()
+        # Emitted only when present, so sources without them keep their bytes and identities.
+        del data["catalog"], data["printing"]
+        if self.catalog is not None:
+            data["catalog"] = self.catalog.to_dict()
+        if self.printing is not None:
+            data["print"] = self.printing.to_dict()
         return data

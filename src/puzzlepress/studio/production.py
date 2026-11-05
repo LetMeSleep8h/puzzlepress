@@ -109,7 +109,9 @@ class ProductionService:
             assessment = assess(
                 project, evaluate_readiness(project, source, directory), source, directory
             )
-            profile = _built_profile(read_interior_artifacts(directory).manifest)
+            profile = (project.printing.profile if project.printing else None) or _built_profile(
+                read_interior_artifacts(directory).manifest
+            )
             spec = PROFILES[profile or DEFAULT_PROFILE]
 
             def unchanged() -> None:

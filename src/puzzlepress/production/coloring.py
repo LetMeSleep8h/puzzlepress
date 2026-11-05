@@ -192,8 +192,16 @@ def _run(
     )
     from ..interior.build import write_preflight_report
     from ..preflight import preflight_interior, read_interior_artifacts, report_bytes
+    from ..print_config import ProfileConflict, chosen_profile
 
-    spec = print_profile(profile or DEFAULT_PROFILE)
+    try:
+        chosen = chosen_profile(project.printing, profile)
+    except ProfileConflict as conflict:
+        raise InteriorError(
+            "print_spec",
+            (LayoutIssue("profile_conflict", str(conflict), region="print.profile"),),
+        ) from conflict
+    spec = print_profile(chosen or DEFAULT_PROFILE)
     if isinstance(spec, LayoutIssue):
         raise InteriorError("print_spec", (spec,))
     build = build_interior(project, spec, source)

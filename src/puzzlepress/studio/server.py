@@ -17,11 +17,13 @@ from starlette.staticfiles import StaticFiles
 
 from puzzlepress.cover.assets import MAX_ASSET_BYTES
 from puzzlepress.cover.font_assets import MAX_FONT_BYTES
+from puzzlepress.creation import NewProject
 from puzzlepress.errors import ProjectError
 
 from .assets import AssetService
 from .coloring import ColoringService, PreparationService
 from .covering import CoverService
+from .creating import CreationService
 from .designing import DesignService
 from .editing import DraftStore
 from .planning import PlanningInvalid, PlanningService
@@ -56,6 +58,22 @@ class BuildRequest(BaseModel):
 
 class InteriorBuildRequest(BuildRequest):
     profile: str | None = None
+
+
+class ProjectCreateRequest(BaseModel):
+    """A new book. Python validates every value; the browser only collects them."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: str
+    key: str
+    title: str
+    language: str = "en"
+    subtitle: str | None = None
+    author: str | None = None
+    subject: str | None = None
+    collection: str | None = None
+    profile: str | None = None
+    template: str | None = None
 
 
 class ExportRequest(BuildRequest):
@@ -211,6 +229,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     preparation = PreparationService(service, coloring)
     reviews = ReviewService(service)
     production = ProductionService(service)
+    creating = CreationService(service)
     app = FastAPI(title="PuzzlePress Studio", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
@@ -296,6 +315,14 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     @app.get("/api/projects")
     def projects() -> dict[str, object]:
         return {"projects": service.store.discover()}
+
+    @app.get("/api/project-types")
+    def project_types() -> dict[str, object]:
+        return creating.types()
+
+    @app.post("/api/projects", status_code=201)
+    def create_project(body: ProjectCreateRequest) -> dict[str, object]:
+        return creating.create(NewProject(**body.model_dump()))
 
     @app.get("/api/projects/{key}")
     def project(key: str) -> dict[str, object]:
@@ -635,7 +662,9 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
 
     @app.get("/")
     @app.get("/books")
+    @app.get("/create")
     @app.get("/books/{key}")
+    @app.get("/books/{key}/settings")
     @app.get("/books/{key}/puzzles")
     @app.get("/books/{key}/quality")
     @app.get("/books/{key}/edit")

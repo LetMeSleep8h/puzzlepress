@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import cast
 
+from .catalog_config import validate_catalog
 from .coloring_validation import validate_coloring
 from .composition_validation import divider_issues, validate_composition
 from .content_validation import validate_word_search_content
@@ -14,6 +15,7 @@ from .errors import MAX_SEED
 from .errors import ProjectError as ProjectError
 from .errors import ValidationIssue as ValidationIssue
 from .models import Book, Build, Content, Output, Project
+from .print_config import validate_print
 from .publishing_validation import validate_publishing
 
 SCHEMA_VERSION = 1
@@ -89,6 +91,8 @@ def validate_project(data: object) -> ValidationResult:
             "cover",
             "publishing",
             "interior",
+            "catalog",
+            "print",
         },
     )
     version = required(root, "schema_version", "schema_version")
@@ -218,6 +222,14 @@ def validate_project(data: object) -> ValidationResult:
                         "unknown_theme",
                         f"No puzzle has the theme {divider.theme!r}.",
                     )
+    catalog = None
+    if "catalog" in root:
+        catalog, catalog_issues = validate_catalog(root["catalog"])
+        issues.extend(catalog_issues)
+    printing = None
+    if "print" in root:
+        printing, print_issues = validate_print(root["print"])
+        issues.extend(print_issues)
     if issues:
         return ValidationResult(None, tuple(issues))
     return ValidationResult(
@@ -241,6 +253,8 @@ def validate_project(data: object) -> ValidationResult:
             publishing=publishing,
             interior=interior,
             coloring=coloring,
+            catalog=catalog,
+            printing=printing,
         ),
         (),
     )
