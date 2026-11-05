@@ -30,7 +30,8 @@ decisions only the author can make and on artwork limits.
 | Demonstration book, `paperback-8.5x11` | `tests/release_candidate.py` through Studio's API and worker | 41 pages, structurally valid, release verified, blocked |
 | Demonstration book, `paperback-8.5x11-bleed`, 3 filled pages | same | 41 pages (8.625 x 11.25 in), structurally valid, blocked |
 | Word-search books | golden baseline, full suite | outputs unchanged |
-| 1-300 drawings, standard and full bleed | `tests/production_benchmark.py` | CONTEXT.md, Interval 10 |
+| 1-300 drawings, standard and full bleed | `tests/production_benchmark.py` | 150 drawings 145 s, 300 drawings 271 s, peak 208 MB; CONTEXT.md, Interval 10 |
+| Studio | Vitest, Playwright (42 journeys) | all pass |
 
 ## The release-candidate package
 
@@ -98,4 +99,3 @@ uploaded or submitted by PuzzlePress.
 - An artwork crop step (non-destructive, recorded as configuration) for scan frames.
 - A physical proof of the demonstration (standard and bleed) to settle pale hatch,
   grain, tint and trim behavior.
-- The inherited rich-text browser failure (templates.spec.ts) as its own task.
