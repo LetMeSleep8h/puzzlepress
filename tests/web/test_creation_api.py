@@ -28,7 +28,8 @@ def test_types_list_both_engines_and_the_print_profiles(client: TestClient) -> N
     data = client.get("/api/project-types").json()
     assert [t["kind"] for t in data["types"]] == ["word_search", "coloring"]
     assert {p["paper"] for p in data["profiles"]} == {"white", "cream"}
-    assert all(p["trim"] == {"width": 612, "height": 792} for p in data["profiles"])
+    trims = {(p["trim"]["width"], p["trim"]["height"]) for p in data["profiles"]}
+    assert trims == {(612, 792), (432, 648), (576, 720), (612, 612)}
 
 
 def test_created_books_are_immediately_in_the_library(client: TestClient, library: Path) -> None:

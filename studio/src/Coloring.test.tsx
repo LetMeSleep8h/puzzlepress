@@ -52,7 +52,16 @@ test('a coloring book opens its own workspace without word-search sections', asy
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['Overview', 'Settings', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
+  ).toEqual([
+    'Overview',
+    'Settings',
+    'Artwork',
+    'Pages',
+    'Cover',
+    'Print proof',
+    'Publishing',
+    'Produce',
+  ]);
   expect(screen.getByText('Book type').nextElementSibling).toHaveTextContent('Coloring book');
   expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);
 });

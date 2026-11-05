@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, request } from './api';
 import { Field } from './editor-fields';
+import { profileLabel } from './print-profiles';
 import type { Issue, Project, ProjectTypes } from './types';
 import { ErrorState, Issues, Loading } from './ui';
 
@@ -245,7 +246,7 @@ export function CreateBook() {
             </div>
             <fieldset className="choice-group">
               <legend>Trim and paper</legend>
-              <p className="small muted">8.5 × 11 in, no bleed: the trim PuzzlePress supports.</p>
+              <p className="small muted">KDP standard paperback sizes, black ink, no bleed.</p>
               <label>
                 <input
                   type="radio"
@@ -253,7 +254,9 @@ export function CreateBook() {
                   checked={values.profile === ''}
                   onChange={() => set('profile')('')}
                 />
-                <span>Decide later (Print proof builds on white paper unless you choose)</span>
+                <span>
+                  Decide later (Print proof builds 8.5 × 11 in, white paper, unless you choose)
+                </span>
               </label>
               {types.profiles.map((p) => (
                 <label key={p.id}>
@@ -263,7 +266,7 @@ export function CreateBook() {
                     checked={values.profile === p.id}
                     onChange={() => set('profile')(p.id)}
                   />
-                  <span>{p.paper === 'cream' ? 'Cream paper' : 'White paper'}</span>
+                  <span>{profileLabel(p)}</span>
                 </label>
               ))}
             </fieldset>

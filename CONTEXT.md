@@ -2,9 +2,36 @@
 
 ## Completed scope
 
-Multi-engine Interval 6 (visual book authoring and Studio UX) on branch
-`feat/studio-visual-authoring`, cut from main `b42b5bd` after PRs #18 and #19;
-committed locally, not pushed. Walkthrough: docs/studio-coloring-walkthrough.md.
+Multi-engine Interval 7 (real-world print validation and production readiness) on
+branch `feat/print-validation-production`, cut from main `34efd48` after PR #20;
+committed locally, not pushed. Evidence: docs/artwork-validation/.
+
+- Real artwork: 17 drawings approved by the author (pre-1931 US patent drawings
+  from NARA scans, Van Gogh drawings, Meyer ornament, Britton & Brown botany, Doré,
+  Tenniel), provenance and SHA-256 in `approved.json`; reviewed under defaults,
+  cleanup 0.6 + despeckle 2, and + threshold 0.5 (`findings.md`). Finding:
+  fine-line retention (and line work kept) is biased by background cleanup on tinted
+  paper: 47-89 % measured while 99.3-100 % of the ink still prints. No threshold
+  changed; the measure fix waits for the printed proof. Faint drawings on tinted
+  paper are no longer called blank (`artwork_empty`, `prepared_blank` wording).
+- Proof package: `tests/proof_project.py` builds a NOT FOR SALE 41-page proof and
+  cover from the approved files with `sources.json` tracing every page;
+  `proof-checklist.md` for the printed copy. Nothing ordered.
+- Settings is the one editor for book details in word-search books too (Puzzles,
+  Book and Publishing link there); no schema or identity change.
+- Produce from Studio (`studio/producing.py`, `Produce.tsx`): background run of the
+  unchanged `produce()` into `<output.directory>-release` for the saved revision,
+  step progress (new optional `progress` callback; outputs unchanged), success only
+  after every listed file is re-verified, cancellation between steps for coloring
+  (`ProductionCancelled`, previous release kept), downloads and the package ZIP from
+  verified bytes, stale by build identity.
+- Print profiles `paperback-6x9`, `-8x10`, `-8.5x8.5` (+ `-cream`) from KDP's
+  standard table, black ink, no bleed, the 8.5 x 11 gutter; covers wrap every trim;
+  Studio offers trim and paper together. Bleed assessed, not built. 8.5 x 11 unchanged.
+- PR #21 (separate, from main): the journey spec's CI timeout diagnostics.
+
+Earlier: multi-engine Interval 6 (visual book authoring and Studio UX), merged as
+PR #20. Walkthrough: docs/studio-coloring-walkthrough.md.
 
 - Creation (`creation.py`, `creation_cli.py`, `studio/creating.py`): `puzzlepress
   book new FOLDER --type word_search|coloring --title ...` and Studio **New book**
@@ -701,6 +728,31 @@ reload. Canonical YAML loses comments/formatting. One Studio process per library
 small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
+
+Print validation and production readiness (Interval 7), 2026-11-05 (Windows,
+Python 3.13):
+
+- Python: **2234 passed, 10 skipped** (symlink permission, Windows drive paths),
+  golden test 4/4 with PDF bytes compared: word-search outputs, identities, plan JSON
+  and reports byte-identical. Ruff lint and format, strict mypy (160 files), pip
+  check, `git diff --check`.
+- Frontend: tsc, ESLint, Prettier (`--end-of-line auto`), build; Vitest **128/128**.
+  Playwright **39/40**: new `produce.spec.ts` and `authoring.spec.ts` pass;
+  `templates.spec.ts` rich text fails at line 300 as on main. Rewritten image captures
+  restored.
+- Real artwork: 17 approved files downloaded one at a time (Wikimedia throttled twice;
+  the downloader honoured Retry-After), every one matching Commons' SHA-1; reviewed
+  under three settings; visual checks on screen by the agent, labelled as such. No
+  printed proof reviewed; no threshold changed.
+- Trims: composition-demo, cover-demo (with cover) and the coloring "sections"
+  sample build and pass structural preflight on all eight profiles; pages and covers
+  on 6 x 9 and 8.5 x 8.5 inspected as rasters.
+- Performance (tests/coloring_benchmark.py): 300 drawings / 602 pages build 38.3 s,
+  first preflight 193.1 s, produce 40.5 s, peak 182 MB, PDF 8.6 MB; Studio-started
+  150-drawing runs 152-156 s (27 s repeated), status requests median 231-249 ms
+  during a run, cancel to stop 12.5-12.7 s, previous release kept.
+- CI: PR #20's studio job timed out once on the new journey spec (Linux); PR #21
+  (diagnostics only) then passed all 35 checks including that spec.
 
 Visual authoring (Interval 6), 2026-11-04 (Windows, Python 3.13):
 

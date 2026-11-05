@@ -45,10 +45,11 @@ def test_status_of_the_demo_and_of_a_project_without_a_plan(
         "report": None,
         "options": data["options"],
     }
-    assert [p["id"] for p in data["options"]["print_profiles"]] == [
-        "paperback-8.5x11",
-        "paperback-8.5x11-cream",
-    ]
+    assert [p["id"] for p in data["options"]["print_profiles"]] == sorted(
+        f"paperback-{trim}{paper}"
+        for trim in ("8.5x11", "6x9", "8x10", "8.5x8.5")
+        for paper in ("", "-cream")
+    )
     assert data["options"]["puzzle_types"] == ["word_search"]
     assert data["options"]["directions"][0] == "right" and len(data["options"]["directions"]) == 8
     assert client.get("/api/projects/missing/planning").status_code == 404

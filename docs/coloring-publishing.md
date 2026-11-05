@@ -192,6 +192,11 @@ and KDP metadata, `publishing-validation.json`/`.md`, `production.json`, and
 beside `release/` and swapped in only after every file is read back; a failed run
 leaves the previous release untouched. Exit 0 only with no blocking item.
 
+In Studio, **Produce** runs the same thing for the saved book into
+`<output.directory>-release`, shows each step, lets you cancel a coloring run between
+steps (the previous release stays), and offers the files and the upload package as a
+ZIP only after reading every file back against `production.json`.
+
 Only one run may write an output at a time. The lock `.release.produce.lock` beside
 it is an operating-system lock that ends with its process, so:
 
@@ -314,6 +319,34 @@ than any difference between the two, so these runs show no measurable change; th
 lock adds a file open and an OS lock call per run. The four sample books of
 `tests/coloring_samples.py` build byte-identical PDFs with equal build and interior
 identities on both.
+
+### Interval 7 (Studio production, the cap, repeated runs)
+
+Same machine, Windows, Python 3.13, `tests/coloring_benchmark.py`:
+
+| Workload | Measure | Result |
+| --- | --- | --- |
+| 300 drawings (the cap), 602 pages, fresh process | `book build` / first preflight / second preflight / `book produce` | 38.3 s / 193.1 s / 27.8 s / 40.5 s |
+| 300 drawings | interior.pdf size; peak working set | 8.6 MB; 182 MB |
+| 300 drawings | readiness | blocked, as it must be: 602 pages exceed KDP's 550-page cream maximum for 8.5 x 11 with blank backs (with two front-matter pages, 274 drawings is the most that fits) |
+| 150 drawings, Studio `--studio`, two runs | first Studio run (fresh process) | 152-156 s, release verified |
+| 150 drawings, Studio | second run in the same process | 27.3-27.6 s |
+| 150 drawings, Studio | status requests while running (project + produce status) | median 231-249 ms, max 508-779 ms |
+| 150 drawings, Studio | cancel requested during interior preflight to stop | 12.5-12.7 s (stops at the next step boundary); previous release still verified |
+| 150 drawings, Studio | peak working set across three runs | 157-158 MB |
+
+An earlier 300-drawing run showed a 1.9 GB peak because that process also generated
+the 300 synthetic test images; run on the existing book in a fresh process it is
+182 MB. Studio stays usable during a run, but each request waits a few hundred
+milliseconds while the run holds the Python interpreter. Re-checking the release
+on every poll was not the cause (a cache made no measurable difference and was
+removed). Cancellation waits for the current step, which for a large book is the
+interior preflight (up to about 3 minutes at 300 drawings).
+
+**Unsupported sizes.** More than 300 drawings or 300 page entries is refused by the
+schema (unchanged; not raised without measuring). With blank backs and two front-matter pages, more than 274
+drawings exceeds KDP's page maximum on 8.5 x 11 (and 8.5 x 8.5); 6 x 9 and 8 x 10
+allow up to 776 pages, but the 300 cap applies.
 
 ## Known limitations
 

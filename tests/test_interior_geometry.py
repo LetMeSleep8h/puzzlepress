@@ -66,7 +66,11 @@ def test_profiles_state_ink_and_paper_explicitly():
     # Paper changes no page geometry; only the spine width of a cover depends on it.
     assert (cream.trim, cream.margins, cream.bleed) == (SPEC.trim, SPEC.margins, SPEC.bleed)
     assert validate_print_spec(cream) == ()
-    assert sorted(PROFILES) == ["paperback-8.5x11", "paperback-8.5x11-cream"]
+    assert sorted(PROFILES) == sorted(
+        f"paperback-{trim}{paper}"
+        for trim in ("8.5x11", "6x9", "8x10", "8.5x8.5")
+        for paper in ("", "-cream")
+    )
 
 
 @pytest.mark.parametrize(
@@ -102,7 +106,7 @@ def test_gutter_and_page_count_are_checked_against_physical_count():
         ({"margins": Margins(54, 36, 45, 17.9)}, "margin_too_small"),
         ({"margins": Margins(300, 200, 45, 45)}, "invalid_page_geometry"),
         ({"bleed": True}, "unsupported_bleed_configuration"),
-        ({"trim": TrimSize("6x9", inches(6), inches(9))}, "unsupported_trim_size"),
+        ({"trim": TrimSize("7x10", inches(7), inches(10))}, "unsupported_trim_size"),
         ({"typography": Typography(body=6.5)}, "font_too_small"),
         ({"typography": Typography(solution_letter_min=6.9)}, "font_too_small"),
         ({"typography": Typography(grid_letter_min=25)}, "invalid_typography"),

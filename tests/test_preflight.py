@@ -224,7 +224,7 @@ def test_manifest_identity_profile_and_book_corruption(demo):
     assert {"interior_identity", "plan_current"} <= set(codes(report))
 
     def unknown_profile(data):
-        data["print_profile"] = {**data["print_profile"], "profile_id": "paperback-6x9"}
+        data["print_profile"] = {**data["print_profile"], "profile_id": "paperback-7x10"}
 
     report = preflight_interior(project, artifacts(build, manifest=unknown_profile)).report
     results = by_rule(report)

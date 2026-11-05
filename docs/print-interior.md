@@ -87,6 +87,39 @@ changing page templates. Specs are validated before layout.
 | Ink | DeviceGray only, no transparency |
 | Folios | centered at the foot of the live area (`outside` also supported) |
 
+### Print profiles (Interval 7)
+
+Three more trims from KDP's standard paperback table ("Set Trim Size, Bleed, and
+Margins", read 2026-11-05), each on white or cream paper, black ink, no bleed. A
+book chooses one in Settings (`print.profile`); the CLI's `--profile` must match it.
+
+| Profile (white / cream) | Trim | Margins (inside / outside / top / bottom) | KDP pages (white / cream) | Modeled maximum | Word search | Coloring | Cover |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `paperback-8.5x11` (v2), `-cream` (v1) | 8.5 x 11 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-590 / 24-550 | 550 | yes | yes | yes |
+| `paperback-6x9`, `-cream` | 6 x 9 in | 0.75 / 0.5 / 0.5 / 0.5 in | 24-828 / 24-776 | 776 | yes (letters may fall below 9 pt and fail) | yes | yes |
+| `paperback-8x10`, `-cream` | 8 x 10 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-828 / 24-776 | 776 | yes | yes | yes |
+| `paperback-8.5x8.5`, `-cream` | 8.5 x 8.5 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-590 / 24-550 | 550 | yes | yes | yes |
+
+"Yes" means the demos (composition-demo, cover-demo with its cover, the coloring
+"sections" sample) build, pass structural preflight and, where they are long
+enough, KDP preflight on that trim (`tests/test_print_profiles.py`). A larger grid
+than the demos' can be too small on 6 x 9: the build then fails with the measured
+letter size; nothing is shrunk. The modeled maximum keys on trim only, so each
+trim's cream value applies to both papers. KDP's table now lists 8.5 x 11 explicitly
+(590 white), but the existing rule keeps 550 and its wording until a ruleset change
+is decided, because that wording is in every word-search report. Cover templates
+are authored on 8.5 x 11 and scaled to the trim; a cover element pushed outside the
+media is reported, not moved. Not offered: other KDP trims, groundwood and color
+papers, hardcover.
+
+**Bleed (assessed, not built).** KDP bleed adds 0.125 in at top, bottom and outside
+(page 8.625 x 11.25 in for 8.5 x 11) and raises the minimum outside margin to 0.375
+in; one bleed page makes the whole file bleed. Supporting it means a second page box
+in geometry and rendering, bleed-aware margin, page-size, live-area and
+printer-mark rules in preflight, preview overlays, and art placement that may reach
+the bleed edge, which coloring layout does not do today. No current book needs it,
+so it is left for a later interval rather than built partly.
+
 Paper is stated by the profile, never inferred: it does not change interior page
 geometry or PDF bytes, but it is part of the interior identity and sets the cover's
 spine width ([cover](cover.md)). Version 1 of `paperback-8.5x11` did not model

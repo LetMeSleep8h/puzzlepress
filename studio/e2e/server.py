@@ -154,4 +154,13 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
         .replace("../build/synthetic-coloring-book", "../../build/coloring-pages"),
         encoding="utf-8",
     )
+    # Produce: a SYNTHETIC composed book of its own, so its release disturbs no other spec.
+    composed_coloring_book(books / "coloring-produce", 2)
+    source = books / "coloring-produce" / "book.yaml"
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        .replace("id: synthetic-coloring-book", "id: coloring-produce-acceptance")
+        .replace("../build/synthetic-coloring-book", "../../build/coloring-produce"),
+        encoding="utf-8",
+    )
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)

@@ -2021,9 +2021,15 @@ summary:hover {
   align-items: center;
   gap: 8px;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 .print-profile select {
   min-height: 44px;
+  /* Profile descriptions are long; the select shrinks with the page instead. */
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
 }
 /* Cover Studio workspace: tools | canvas | inspector, each scrolling on its own. */
 .cover-workspace {
@@ -5182,4 +5188,38 @@ button.primary.danger {
   .page-designer {
     padding: 12px;
   }
+}
+
+/* ---------------------------------------------------------- Interval 7: produce */
+.produce {
+  display: grid;
+  gap: var(--space-3);
+}
+.produce-run,
+.produce-release {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  background: var(--paper);
+  min-width: 0;
+}
+.produce-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding-left: 1.2em;
+}
+.produce-steps li[aria-current='true'] {
+  font-weight: 600;
+}
+.produce-files {
+  display: grid;
+  gap: 4px;
+  padding-left: 1.2em;
+  overflow-wrap: anywhere;
+}
+.produce-findings {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
 }

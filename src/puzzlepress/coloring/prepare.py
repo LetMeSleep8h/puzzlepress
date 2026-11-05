@@ -453,8 +453,20 @@ def _findings(m: PreparationMeasures, adjustments: Adjustments) -> tuple[Artwork
         found.append(ArtworkFinding(code, severity, message, actual, required))
 
     if m.ink_after < BLANK_INK:
-        if m.ink_before >= BLANK_INK:
+        if m.ink_before >= BLANK_INK and m.faint_line_pixels and m.faint_line_retention:
+            why = (
+                "The settings leave no line work dark enough to print as ink; only pale "
+                "gray strokes remain. Lower the cleanup or raise the contrast."
+            )
+        elif m.ink_before >= BLANK_INK:
             why = "The settings remove all line work: the prepared page is blank."
+        elif m.faint_line_pixels:
+            # Pale gray strokes, not colored ones (a chalk drawing in the real-artwork
+            # review): they print, if at all, only as pale gray.
+            why = (
+                "No line work is dark enough to print as ink: the drawing's strokes are "
+                "pale gray. Raise the contrast or set a threshold to darken them."
+            )
         elif adjustments.grayscale:
             why = (
                 "The prepared page is blank. Light colored lines vanish in gray; turn off "

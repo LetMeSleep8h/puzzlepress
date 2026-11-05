@@ -205,10 +205,10 @@ def test_interior_profile_choice_is_kept_between_builds(studio):
     client, _, output = studio
     data = build_interior(client, "paperback-8.5x11-cream").json()
     assert data["profile"] == "paperback-8.5x11-cream"
-    assert [p["paper"] for p in data["profiles"]] == ["white", "cream"]
+    assert [p["paper"] for p in data["profiles"]] == ["white", "cream"] * 4
     assert build_interior(client).json()["profile"] == "paperback-8.5x11-cream"
     assert draft(client, detail(client)["source"]).json()["interior"]["paper"] == "cream"
-    bad = build_interior(client, "paperback-6x9")
+    bad = build_interior(client, "paperback-7x10")
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "unsupported_profile"
 
 

@@ -12,6 +12,36 @@
       "id": "paperback-8.5x11-cream",
       "description": "8.5 x 11 in paperback interior, black ink on cream paper, no bleed",
       "paper": "cream"
+    },
+    {
+      "id": "paperback-6x9",
+      "description": "6 x 9 in paperback interior, black ink on white paper, no bleed",
+      "paper": "white"
+    },
+    {
+      "id": "paperback-6x9-cream",
+      "description": "6 x 9 in paperback interior, black ink on cream paper, no bleed",
+      "paper": "cream"
+    },
+    {
+      "id": "paperback-8x10",
+      "description": "8 x 10 in paperback interior, black ink on white paper, no bleed",
+      "paper": "white"
+    },
+    {
+      "id": "paperback-8x10-cream",
+      "description": "8 x 10 in paperback interior, black ink on cream paper, no bleed",
+      "paper": "cream"
+    },
+    {
+      "id": "paperback-8.5x8.5",
+      "description": "8.5 x 8.5 in paperback interior, black ink on white paper, no bleed",
+      "paper": "white"
+    },
+    {
+      "id": "paperback-8.5x8.5-cream",
+      "description": "8.5 x 8.5 in paperback interior, black ink on cream paper, no bleed",
+      "paper": "cream"
     }
   ],
   "profile": "paperback-8.5x11",

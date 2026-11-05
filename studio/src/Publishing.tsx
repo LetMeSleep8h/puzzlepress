@@ -102,13 +102,16 @@ const AREAS: Record<PublishingFinding['area'], string> = {
   cover: 'Cover',
 };
 
-// Coloring books edit book details and composition in Pages; there is no Puzzles or
-// Book page for them.
-function areaRoute(area: PublishingFinding['area'], coloring: boolean): string {
-  return coloring && (area === 'edit' || area === 'book') ? 'pages' : area;
+// Book details (title, subtitle, author, imprint, language) are edited in Settings for
+// every book. Coloring books compose in Pages; there is no Puzzles or Book page for them.
+// Python's report keeps its own area names; only the link target is chosen here.
+function areaRoute(f: Pick<PublishingFinding, 'area' | 'field'>, coloring: boolean): string {
+  if (f.field?.startsWith('book.')) return 'settings';
+  return coloring && (f.area === 'edit' || f.area === 'book') ? 'pages' : f.area;
 }
-function areaLabel(area: PublishingFinding['area'], coloring: boolean): string {
-  return coloring && (area === 'edit' || area === 'book') ? 'Pages' : AREAS[area];
+function areaLabel(f: Pick<PublishingFinding, 'area' | 'field'>, coloring: boolean): string {
+  if (f.field?.startsWith('book.')) return 'Settings';
+  return coloring && (f.area === 'edit' || f.area === 'book') ? 'Pages' : AREAS[f.area];
 }
 
 // A whole number, null when empty, or the text itself so Python reports it.
@@ -370,17 +373,8 @@ function Metadata({
         </dl>
         <FieldFindings id="book" findings={findings} />
         <p className="small muted">
-          These come from the book and print on the cover, so KDP sees the same values.{' '}
-          {coloring ? (
-            <>
-              Edit them in <a href={`${base}/settings`}>Settings</a>.
-            </>
-          ) : (
-            <>
-              Edit the title and language at the top of <a href={`${base}/edit`}>Puzzles</a>;
-              subtitle, author and imprint on the title page in <a href={`${base}/book`}>Book</a>.
-            </>
-          )}
+          These come from the book and print on the cover, so KDP sees the same values. Edit them in{' '}
+          <a href={`${base}/settings`}>Settings</a>.
         </p>
         <div className="field-pair">
           {text(
@@ -1002,7 +996,7 @@ function FindingGroups({
                 <li key={i}>
                   <div className="finding-head">
                     <Status tone={SEVERITY[severity][0]}>{SEVERITY[severity][1]}</Status>
-                    <span className="finding-scope">{areaLabel(f.area, coloring)}</span>
+                    <span className="finding-scope">{areaLabel(f, coloring)}</span>
                   </div>
                   <p>{f.message}</p>
                   {f.action && <p className="small">{f.action}</p>}
@@ -1010,8 +1004,8 @@ function FindingGroups({
                     {f.area === 'publishing' && f.field ? (
                       <a href={`#${f.field}`}>Go to field</a>
                     ) : (
-                      <a href={`${base}/${areaRoute(f.area, coloring)}`}>
-                        Open {areaLabel(f.area, coloring)}
+                      <a href={`${base}/${areaRoute(f, coloring)}`}>
+                        Open {areaLabel(f, coloring)}
                       </a>
                     )}{' '}
                     · <code>{f.code}</code>

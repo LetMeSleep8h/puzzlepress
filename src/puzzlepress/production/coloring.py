@@ -30,6 +30,7 @@ import os
 import platform
 import shutil
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -46,7 +47,9 @@ from .produce import (
     KIND,
     MANIFEST_NAME,
     Item,
+    ProductionCancelled,
     ProductionResult,
+    Progress,
     Validation,
     _fail,
     _json_bytes,
@@ -184,9 +187,25 @@ def _previous_environment(directory: Path) -> dict[str, object] | None:
 
 
 def produce_coloring(
-    loaded: LoadedProject, output: str | Path, profile: str | None = None
+    loaded: LoadedProject,
+    output: str | Path,
+    profile: str | None = None,
+    progress: Progress | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> ProductionResult:
-    """Produce a coloring book into `output`; raises for unusable inputs or outputs."""
+    """Produce a coloring book into `output`; raises for unusable inputs or outputs.
+
+    `progress` hears each step's name as it starts. `cancelled` is asked at every step
+    boundary up to verification; when it answers yes the run stops with
+    `ProductionCancelled`, its staging folder is removed and the previous output is
+    left as it was. Once verified files are being swapped in, nothing cancels."""
+
+    def step(name: str) -> None:
+        if cancelled is not None and cancelled():
+            raise ProductionCancelled(name)
+        if progress is not None:
+            progress(name)
+
     project = loaded.project
     assert project.coloring is not None
     source = loaded.source_path.parent
@@ -207,9 +226,13 @@ def produce_coloring(
         try:
             staging = Path(tempfile.mkdtemp(prefix=_prefixes(directory)[0], dir=parent))
             previous_environment = _previous_environment(directory) if directory.exists() else None
-            run = _run(project, source, staging, profile, previous_environment)
+            run = _run(project, source, staging, profile, previous_environment, step)
+            step("manifest")
             files = _manifest(project, staging, run)
+            step("verify")
             _verify(staging, files)
+            if progress is not None:
+                progress("swap")
             _swap(staging, directory)
             staging = None
             return ProductionResult(directory, run.validation, files, notes)
@@ -224,6 +247,7 @@ def _run(
     staging: Path,
     profile: str | None,
     previous_environment: dict[str, object] | None,
+    step: Progress = lambda name: None,
 ) -> ColoringRun:
     from ..cover.build import build_cover, write_cover, write_cover_preflight
     from ..cover.issues import CoverError
@@ -251,14 +275,17 @@ def _run(
     spec = print_profile(chosen or DEFAULT_PROFILE)
     if isinstance(spec, LayoutIssue):
         raise InteriorError("print_spec", (spec,))
+    step("interior")
     build = build_interior(project, spec, source)
     write_interior(build, staging, source)
+    step("interior_preflight")
     interior = preflight_interior(
         project, read_interior_artifacts(staging), build, source_directory=source
     )
     write_preflight_report(report_bytes(interior.report), project.book.id, staging, source)
     write_file(staging, INTEGRITY_NAME, _json_bytes(artwork_integrity(project, staging, interior)))
 
+    step("duplicates")
     duplicates = _duplicates(project, source)
     write_file(staging, DUPLICATES_JSON, _json_bytes(duplicates))
     write_file(staging, DUPLICATES_MD, duplicates_markdown(duplicates).encode())
@@ -266,6 +293,7 @@ def _run(
     cover_report = None
     cover_error: str | None = None
     if project.cover is not None:
+        step("cover")
         try:
             cover = build_cover(project, source, staging)
             write_cover(cover, staging, source)
@@ -280,6 +308,7 @@ def _run(
     readiness = None
     packaged = False
     if project.publishing is not None:
+        step("readiness")
         from ..publishing import evaluate_readiness, readiness_bytes
         from ..publishing.package import assemble_package, write_package
         from ..publishing.submission import kdp_metadata
@@ -288,6 +317,7 @@ def _run(
         write_file(staging, READINESS_NAME, readiness_bytes(readiness))
         write_file(staging, METADATA_NAME, _json_bytes(kdp_metadata(readiness)))
         if readiness.package_ready:
+            step("package")
             write_package(assemble_package(readiness), staging, source)
             packaged = True
 

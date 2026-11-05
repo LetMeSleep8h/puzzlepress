@@ -640,6 +640,7 @@ export function Composer({ d }: { d: Draft }) {
                   draft={draft}
                   onChange={(front_matter) => set({ ...composition, front_matter })}
                   onBook={(book) => d.change({ ...draft, book })}
+                  settings={`/books/${encodeURIComponent(d.key)}/settings`}
                 />
               </OutlineSection>
               <OutlineSection
@@ -758,6 +759,7 @@ export function Composer({ d }: { d: Draft }) {
                   draft={draft}
                   onChange={(back_matter) => set({ ...composition, back_matter })}
                   onBook={(book) => d.change({ ...draft, book })}
+                  settings={`/books/${encodeURIComponent(d.key)}/settings`}
                 />
               </OutlineSection>
               <OutlineSection

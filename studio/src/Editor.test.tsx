@@ -5,7 +5,8 @@ import { App } from './App';
 import projectData from './fixtures/project.json';
 import generated from './fixtures/generation.json';
 
-function setup(fail?: string) {
+// Book details (title, language) are edited in Settings; the editor links there.
+function setup(fail?: string, page = 'edit') {
   let saved = structuredClone(projectData);
   const calls: { url: string; body: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
@@ -76,9 +77,27 @@ function setup(fail?: string) {
       );
     return new Response(JSON.stringify(path.endsWith('/preview') ? generated : saved));
   });
-  history.replaceState(null, '', '/books/garden-demo/edit');
+  history.replaceState(null, '', `/books/garden-demo/${page}`);
   render(<App />);
   return calls;
+}
+
+// The word-search editor stays mounted (hidden) in other sections, so a message
+// can be in the DOM twice; only what is shown counts.
+const VISIBLE = { ignore: '[hidden] *, script, style' };
+
+// Background requests (such as editorial reviews) can start at any moment, so a
+// test answers only the request it means instead of whichever fetch comes next.
+function answerOnce(suffix: string, answer: () => Promise<Response>) {
+  const fallback = vi.mocked(fetch).getMockImplementation()!;
+  let used = false;
+  vi.mocked(fetch).mockImplementation((url, options) => {
+    if (!used && String(url).endsWith(suffix)) {
+      used = true;
+      return answer();
+    }
+    return fallback(url, options);
+  });
 }
 
 test('loads, edits, validates, previews and saves authoritative returned state', async () => {
@@ -97,14 +116,14 @@ test('loads, edits, validates, previews and saves authoritative returned state',
   await user.click(screen.getByRole('button', { name: 'Whole-book quality' }));
   expect(screen.getByText('No target words are shared between definitions.')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('Saved and reloaded from source.')).toBeVisible();
+  expect(await screen.findByText('Saved and reloaded from source.', VISIBLE)).toBeVisible();
   expect(title).toHaveValue('Edited flowers');
   expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   expect(calls.find((c) => c.url.endsWith('/save'))?.body.revision).toBe(projectData.revision);
 });
 
 test('the book title is visible on opening, saves only the title and reloads', async () => {
-  const calls = setup();
+  const calls = setup(undefined, 'settings');
   const user = userEvent.setup();
   const field = await screen.findByRole('textbox', { name: 'Book title' });
   // Publishing and Book link here to change the title: it must not be tucked away.
@@ -114,7 +133,7 @@ test('the book title is visible on opening, saves only the title and reloads', a
   await user.type(field, 'Garden Word Search Puzzle Book for Adults');
   expect(screen.getByText('Unsaved draft')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('Saved and reloaded from source.')).toBeVisible();
+  expect(await screen.findByText('Saved and reloaded from source.', VISIBLE)).toBeVisible();
   const sent = calls.find((c) => c.url.endsWith('/save'))!.body.source as typeof projectData.source;
   expect(sent).toEqual({
     ...projectData.source,
@@ -130,7 +149,7 @@ test('the book title is visible on opening, saves only the title and reloads', a
 });
 
 test('a blank book title is reported beside its field by Python validation', async () => {
-  setup();
+  setup(undefined, 'settings');
   const user = userEvent.setup();
   const field = await screen.findByRole('textbox', { name: 'Book title' });
   await user.clear(field);
@@ -140,11 +159,11 @@ test('a blank book title is reported beside its field by Python validation', asy
   expect(beside).toBeVisible();
   expect(beside).toHaveTextContent('book.title: Expected a nonempty string.');
   expect(field).toHaveAccessibleDescription(/Expected a nonempty string/);
-  expect(screen.queryByText('Saved and reloaded from source.')).not.toBeInTheDocument();
+  expect(screen.queryByText('Saved and reloaded from source.', VISIBLE)).not.toBeInTheDocument();
 });
 
 test('the language is beside the title, prepopulated, and saves only the language', async () => {
-  const calls = setup();
+  const calls = setup(undefined, 'settings');
   const user = userEvent.setup();
   const field = await screen.findByRole('textbox', { name: 'Language' });
   // Publishing's language_supported finding links here: the field must be in view.
@@ -157,7 +176,7 @@ test('the language is beside the title, prepopulated, and saves only the languag
   await user.type(field, 'en-GB');
   expect(screen.getByText('Unsaved draft')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('Saved and reloaded from source.')).toBeVisible();
+  expect(await screen.findByText('Saved and reloaded from source.', VISIBLE)).toBeVisible();
   const sent = calls.find((c) => c.url.endsWith('/save'))!.body.source as typeof projectData.source;
   expect(sent).toEqual({
     ...projectData.source,
@@ -168,7 +187,7 @@ test('the language is beside the title, prepopulated, and saves only the languag
 });
 
 test('a malformed language is reported beside its field by Python validation', async () => {
-  const calls = setup();
+  const calls = setup(undefined, 'settings');
   const user = userEvent.setup();
   const field = await screen.findByRole('textbox', { name: 'Language' });
   await user.clear(field);
@@ -186,14 +205,14 @@ test('a malformed language is reported beside its field by Python validation', a
 });
 
 test('a failed title save keeps the draft and never reports success', async () => {
-  setup('save_failed');
+  setup('save_failed', 'settings');
   const user = userEvent.setup();
   const field = await screen.findByRole('textbox', { name: 'Book title' });
   await user.clear(field);
   await user.type(field, 'Retitled garden');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText(/Save failed/)).toBeVisible();
-  expect(screen.queryByText('Saved and reloaded from source.')).not.toBeInTheDocument();
+  expect(await screen.findByText(/Save failed/, VISIBLE)).toBeVisible();
+  expect(screen.queryByText('Saved and reloaded from source.', VISIBLE)).not.toBeInTheDocument();
   expect(field).toHaveValue('Retitled garden');
   expect(screen.getByText('Unsaved draft')).toBeVisible();
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Garden Word Searches');
@@ -285,7 +304,7 @@ test.each(['unavailable', 'malformed'])('preserves edits after %s response', asy
   setup();
   const user = userEvent.setup();
   fireEvent.change(await screen.findByLabelText('Puzzle title'), { target: { value: 'Retained' } });
-  vi.mocked(fetch).mockImplementationOnce(async () => {
+  answerOnce('/save', async () => {
     if (failure === 'unavailable') throw new TypeError('Network error');
     return new Response('not json');
   });
@@ -302,7 +321,8 @@ test('pending operations disable changes and unmounted preview responses are ign
   const user = userEvent.setup();
   const title = await screen.findByLabelText('Puzzle title');
   let finish!: (response: Response) => void;
-  vi.mocked(fetch).mockImplementationOnce(
+  answerOnce(
+    '/preview',
     () =>
       new Promise<Response>((resolve) => {
         finish = resolve;
