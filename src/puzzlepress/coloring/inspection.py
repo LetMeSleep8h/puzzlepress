@@ -358,7 +358,12 @@ def _findings(info: ArtworkInfo, edges: list[str], mode: str) -> tuple[ArtworkFi
             ArtworkFinding(
                 "artwork_empty",
                 Severity.BLOCKING,
-                "No line work found: the image is blank or almost white.",
+                # A faint drawing on tinted paper is not blank: say what was measured.
+                # (Seen on a chalk drawing on gray-190 paper, docs/artwork-validation.)
+                "No line work darker than mid-gray: the drawing is too faint to print as "
+                "ink on this tinted paper."
+                if info.background_level < GRAY_BACKGROUND
+                else "No line work found: the image is blank or almost white.",
                 f"{info.ink_coverage:.2%} ink",
                 f"at least {EMPTY_INK:.1%} ink",
             )

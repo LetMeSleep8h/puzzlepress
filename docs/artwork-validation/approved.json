@@ -1,0 +1,399 @@
+{
+  "manifest_version": 1,
+  "status": "approved by the author on 2026-11-05 for testing; not for publication or sale",
+  "downloaded": "2026-11-05, one at a time, honouring Wikimedia rate limits; originals kept unmodified outside the repository",
+  "profile": "paperback-8.5x11",
+  "artworks": [
+    {
+      "n": 1,
+      "file": "01-libbey-automobile.jpg",
+      "title": "H. W. Libbey, Automobile Vehicle, sheet 1",
+      "short_title": "Libbey automobile",
+      "creator": "H. W. Libbey (inventor); draftsman unknown",
+      "date": "1900-07-03",
+      "identifier": "US 652,851; NARA NAID 7369158",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Patent_Drawing_for_H._W._Libbey%27s_Automobile_Vehicle_-_NARA_-_7369158.jpg",
+      "source_host": "National Archives (NARA) via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Commons calls 652,851 an agency-assigned identifier",
+      "bytes": 1278886,
+      "sha256": "aef305cd1bad226123b09367545de5f22e4508302c802e1a12112871d770556f",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Patent drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        },
+        "cover": true
+      }
+    },
+    {
+      "n": 2,
+      "file": "02-lose-one-wheel.jpg",
+      "title": "J. O. Lose, One Wheeled Vehicle, sheet 1",
+      "short_title": "Lose one-wheeled vehicle",
+      "creator": "J. O. Lose; draftsman unknown",
+      "date": "1885-09-01",
+      "identifier": "US 325,548; NARA NAID 6277782",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Patent_Drawing_for_J._O._Lose%27s_One_Wheeled_Vehicle_-_NARA_-_6277782.jpg",
+      "source_host": "National Archives (NARA) via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Same identifier caveat",
+      "bytes": 767891,
+      "sha256": "421f879d3a1fb8a3a41de09c38f2f7a954d8476904b5103b7ca11bde5731ffd9",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Patent drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 3,
+      "file": "03-knight-bag-machine.jpg",
+      "title": "Margaret E. Knight, Bag Machine, page 1",
+      "short_title": "Knight bag machine",
+      "creator": "M. E. Knight; draftsman unknown",
+      "date": "1871-07-11",
+      "identifier": "US 116,842; NARA NAID 12007669",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Patent_Drawing_for_Margaret_E._Knight%27s_Bag_Machine_-_NARA_-_12007669_%28page_1%29.jpg",
+      "source_host": "National Archives (NARA) via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Same identifier caveat",
+      "bytes": 1404331,
+      "sha256": "c5fafbe3536cbcba1f149d1724abba0761fb3756a8151f3b28674fc14f92edcf",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Patent drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 4,
+      "file": "04-deere-plow.jpg",
+      "title": "John Deere, Improvement in Plows",
+      "short_title": "Deere plow",
+      "creator": "J. Deere; draftsman unknown",
+      "date": "1865-07-21",
+      "identifier": "US 46,454; NARA NAID 12007668",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/8/85/Patent_Drawing_for_John_Deere%27s_Improvement_in_Plows_-_NARA_-_12007668.jpg",
+      "source_host": "National Archives (NARA) via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Same identifier caveat",
+      "bytes": 2507862,
+      "sha256": "1172c06b518281ed52f0d28240a6a8a95314bc305068aa73c68d8361089086e5",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Patent drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 5,
+      "file": "05-edison-lamp.jpg",
+      "title": "T. A. Edison, Incandescent Electric Lamp",
+      "short_title": "Edison lamp (placed 70%, top)",
+      "creator": "T. A. Edison; draftsman unknown",
+      "date": "1881-06-14",
+      "identifier": "US 242,896; NARA NAID 6277646",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Patent_Drawing_for_T._A._Edison%27s_Incandescent_Electric_Lamp_-_NARA_-_6277646.jpg",
+      "source_host": "National Archives (NARA) via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Same identifier caveat",
+      "bytes": 576055,
+      "sha256": "ef2152d4044d59a3637362e4ff0a76489a3a5101303b0a340cf6d284af3c47df",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Patent drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        },
+        "placement": {
+          "scale": 0.7,
+          "x": 0,
+          "y": 1
+        }
+      }
+    },
+    {
+      "n": 6,
+      "file": "06-otis-elevator.jpg",
+      "title": "E. G. Otis, Elevator (reissue drawing)",
+      "short_title": "Otis elevator",
+      "creator": "E. G. Otis; draftsman unknown",
+      "date": "1861-01-15",
+      "identifier": "US 31,128; NARA NAID 305889",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/a3/Elisha_Otis%27s_Elevator_Patent_Drawing_-_NARA_-_305889.jpg",
+      "source_host": "National Archives (NARA) via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Reissue series",
+      "bytes": 1321008,
+      "sha256": "4efee45b3e099816ecb65c7b8785ec08ea0be191cbe2dac1fbcef275fba98c20",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Patent drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 7,
+      "file": "07-steering-gear-small.jpg",
+      "title": "Steering-gear for automobiles (crop)",
+      "short_title": "Steering gear",
+      "creator": "US Patent Office record; inventor not stated",
+      "date": "1911",
+      "identifier": "patent number not stated",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/00/Car_steering_gear.jpg",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Patent number and inventor unknown",
+      "bytes": 50064,
+      "sha256": "f5b098f5d7a11571b4a844abd16db93363bc44a3ba342dc3218a090e8ff56376",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": false,
+        "reason": "Blocked: 462 x 549 px is 64 DPI at full fit (artwork_resolution_too_low). Correct."
+      }
+    },
+    {
+      "n": 8,
+      "file": "08-van-gogh-enclosed-wheatfield.jpg",
+      "title": "Vincent van Gogh, The Enclosed Wheatfield After a Storm (F1547, JH1724)",
+      "short_title": "Van Gogh, Enclosed Wheatfield",
+      "creator": "Vincent van Gogh",
+      "date": "1889-07",
+      "identifier": "F1547 / JH1724",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/27/Vincent_van_Gogh_-_The_Enclosed_Wheatfield_After_a_Storm_F1547_JH1724.jpg",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "Artist died more than 70 years ago; faithful reproduction of a 2D public-domain work",
+      "uncertainty": "Medium not stated on the file page",
+      "bytes": 6199185,
+      "sha256": "e618e895c28cf04028dde7cf9073e1c4ef70f53094966fd71a4b5991584fe717",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": false,
+        "reason": "Refused: 45 MP is over the 40 MP preparation bound (too_large_to_prepare). Correct; a reduced copy would be a new, resampled file."
+      }
+    },
+    {
+      "n": 9,
+      "file": "09-van-gogh-cypresses.jpg",
+      "title": "Vincent van Gogh, Landscape with Cypresses (F1541r, JH1730)",
+      "short_title": "Van Gogh, Cypresses (defaults)",
+      "creator": "Vincent van Gogh",
+      "date": "1889",
+      "identifier": "F1541r / JH1730",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/a8/Vincent_van_Gogh_-_Landscape_with_Cypresses_F1541r_JH_1730.jpg",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "Artist died more than 70 years ago; faithful reproduction of a 2D public-domain work",
+      "uncertainty": "Medium not confirmed; credit 'Museum page'",
+      "bytes": 6561061,
+      "sha256": "9b9c64608c6dd936df58c76b66eb3fe47bfdbfe4d59c9439afeb67bf57351ad2",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Drawings",
+        "adjustments": {}
+      }
+    },
+    {
+      "n": 10,
+      "file": "10-van-gogh-montmajour.jpg",
+      "title": "Vincent van Gogh, Rock-hill with trees: Montmajour",
+      "short_title": "Van Gogh, Montmajour",
+      "creator": "Vincent van Gogh",
+      "date": "1888-07",
+      "identifier": "Commons file only",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/3/31/Van_Gogh_-_Felsh%C3%BCgel_mit_B%C3%A4umen_-_Montmajour.jpeg",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "Artist died more than 70 years ago; faithful reproduction of a 2D public-domain work",
+      "uncertainty": "Source 'copied from an art book', book not named",
+      "bytes": 6887587,
+      "sha256": "856337b90b0ad54a32c661411bf04e6c16e14693217e80ae6b5288ee8f669411",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 11,
+      "file": "11-van-gogh-pollard-willows.jpg",
+      "title": "Vincent van Gogh, Landscape with Path and Pollard Willows",
+      "short_title": "Van Gogh, Pollard Willows",
+      "creator": "Vincent van Gogh",
+      "date": "1888-03",
+      "identifier": "Commons file only",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/99/%27Landscape_with_Path_and_Pollard_Willows%27_by_Vincent_Van_Gogh%2C_March%2C_1888.jpg",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "Artist died more than 70 years ago; faithful reproduction of a 2D public-domain work; file marked CC0",
+      "uncertainty": "Uploader credit only",
+      "bytes": 488813,
+      "sha256": "8217c0ac6b8e4e22008259df64159bb2702f23e2886a324048255cd69a551d44",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Drawings",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 12,
+      "file": "12-meyer-ornament-1900.jpg",
+      "title": "F. S. Meyer, Handbook of Ornament (1900), plate",
+      "short_title": "Meyer ornament plate",
+      "creator": "F. S. Meyer",
+      "date": "1900",
+      "identifier": "Internet Archive handbookoforname1900meye; Flickr 14597855857",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/55/Handbook_of_ornament%3B_a_grammar_of_art%2C_industrial_and_architectural_designing_in_all_its_branches%2C_for_practical_as_well_as_theoretical_use_%281900%29_%2814597855857%29.jpg",
+      "source_host": "Internet Archive via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired; Meyer died 1926",
+      "uncertainty": "Plate number not recorded",
+      "bytes": 522187,
+      "sha256": "2b916ac930c9b57af2f224332dcbed27910c923d9a50d75759f7f3d1c0e7d105",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Ornament and botany",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 13,
+      "file": "13-meyer-kreis.png",
+      "title": "F. S. Meyer, ornament 'Kreis', plate 158",
+      "short_title": "Meyer circle ornament",
+      "creator": "F. S. Meyer",
+      "date": "1898",
+      "identifier": "Commons Orna158",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Orna158-Kreis.png",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired; Meyer died 1926",
+      "uncertainty": "Edition from Commons template",
+      "bytes": 284682,
+      "sha256": "7c487405cea4363e603989c05763b8e5ca9e3dda52a373e69de769ac885bbaff",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Ornament and botany",
+        "adjustments": {
+          "background_cleanup": 0.6,
+          "despeckle": 2
+        }
+      }
+    },
+    {
+      "n": 14,
+      "file": "14-juncus-gerardii.png",
+      "title": "Britton & Brown, Juncus gerardii",
+      "short_title": "Juncus gerardii",
+      "creator": "N. L. Britton, A. Brown (illustrator not named)",
+      "date": "1913",
+      "identifier": "Illustrated Flora vol. 1 p. 470",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/76/Juncus_gerardii_line_drawing.png",
+      "source_host": "USDA PLANTS via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Scan via USDA PLANTS; illustrator unknown",
+      "bytes": 424145,
+      "sha256": "f2687f60fc1160c38278ea028ab15642aafb4f24974927835f849997aa72d46c",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Ornament and botany",
+        "adjustments": {}
+      }
+    },
+    {
+      "n": 15,
+      "file": "15-vitis-labrusca.png",
+      "title": "Britton & Brown, Vitis labrusca (fox grape)",
+      "short_title": "Vitis labrusca",
+      "creator": "N. L. Britton, A. Brown",
+      "date": "1913",
+      "identifier": "Illustrated Flora",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Vitis_labrusca_BB-1913.png",
+      "source_host": "USDA PLANTS via Wikimedia Commons",
+      "rights_basis": "US pre-1931 publication: US copyright term expired",
+      "uncertainty": "Scan via USDA PLANTS",
+      "bytes": 388165,
+      "sha256": "5aa43a5a6da6bad1cb1a78d1b0b25bf954fc13de8725427ce0901b47c621b56b",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Ornament and botany",
+        "adjustments": {}
+      }
+    },
+    {
+      "n": 16,
+      "file": "16-dore-quixote.jpg",
+      "title": "Gustave Doré, Don Quixote and Sancho Panza Entertained by Basil and Quiteria",
+      "short_title": "Doré, Quixote",
+      "creator": "G. Doré (design); engraver not named",
+      "date": "c. 1863",
+      "identifier": "Metropolitan Museum DP318275",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/8/8e/Don_Quixote_and_Sancho_Panza_Entertained_by_Basil_and_Quiteria_MET_DP318275.jpg",
+      "source_host": "Metropolitan Museum via Wikimedia Commons",
+      "rights_basis": "Pre-1931; Met Open Access CC0",
+      "uncertainty": "Engraver not named",
+      "bytes": 3434925,
+      "sha256": "5f10be9713eea35a7253cc5147752487b36f39bb8543f58526160061b268d1ee",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Engravings",
+        "adjustments": {}
+      }
+    },
+    {
+      "n": 17,
+      "file": "17-tenniel-alice.png",
+      "title": "John Tenniel, Alice illustration (Commons 'Alice par John Tenniel 21')",
+      "short_title": "Tenniel, Alice",
+      "creator": "J. Tenniel",
+      "date": "drawn 1869 (file); scan of a 1933 reprint",
+      "identifier": "Commons file only",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Alice_par_John_Tenniel_21.png",
+      "source_host": "Wikimedia Commons",
+      "rights_basis": "Artist died more than 70 years ago; faithful reproduction of a 2D public-domain work",
+      "uncertainty": "Scan from a 1933 reprint; dates differ across Commons pages",
+      "bytes": 795430,
+      "sha256": "d0ca4554d31dd37b022f25b61cb3dd9a5ec5f68c09d79ee3d9f61f2a9fa16dc6",
+      "commons_sha1_verified": true,
+      "proof": {
+        "include": true,
+        "section": "Engravings",
+        "adjustments": {}
+      }
+    }
+  ]
+}

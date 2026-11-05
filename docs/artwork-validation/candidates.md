@@ -1,7 +1,8 @@
 # Real-artwork validation: candidate manifest (awaiting approval)
 
-Status: **proposed, not downloaded.** Nothing below has been fetched, imported or
-processed. Metadata was read on 2026-11-04 from each file's Wikimedia Commons page
+Status: **all 17 approved by the author on 2026-11-05 and downloaded** (hashes in
+[approved.json](approved.json); results in [findings.md](findings.md)). The table is the
+manifest as proposed. Metadata was read on 2026-11-04 from each file's Wikimedia Commons page
 (API `imageinfo`); the NARA catalog records named there were not opened separately.
 
 Purpose: testing PuzzlePress's preparation and coloring preflight on real line art,
