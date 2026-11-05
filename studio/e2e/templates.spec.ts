@@ -312,10 +312,11 @@ test('rich text: format the selection, keep it through typing and undo, save and
   await expect(editor).toContainText('Twenty word searches');
   const toolbar = page.getByRole('toolbar', { name: 'Back-cover text formatting' });
 
-  // Select the first word by keyboard and make it bold with the shortcut.
+  // Select the first word by keyboard and make it bold with the shortcut. Character
+  // by character: Ctrl+Shift+ArrowRight also takes the trailing space on Windows.
   await editor.click();
   await page.keyboard.press('Control+Home');
-  await page.keyboard.press('Control+Shift+ArrowRight');
+  for (let i = 0; i < 'Twenty'.length; i += 1) await page.keyboard.press('Shift+ArrowRight');
   // Edits reach Python after a debounce, so an earlier preview can still be in flight:
   // wait for the preview of this edit, not merely the next response.
   let next = draft(page, isRich);
