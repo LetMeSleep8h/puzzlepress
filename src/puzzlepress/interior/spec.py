@@ -331,7 +331,9 @@ def validate_print_spec(spec: PrintSpecification) -> tuple[LayoutIssue, ...]:
         issues.append(
             LayoutIssue(
                 "unsupported_bleed_configuration",
-                "Bleed is not supported: no puzzle-book element prints to the trim edge.",
+                "Full-bleed interiors are not available in this version: page boxes, "
+                "bleed margins, art placed past the trim and their preflight rules are not "
+                "built (docs/print-interior.md, Full bleed). Use a no-bleed profile.",
                 region="print.bleed",
             )
         )

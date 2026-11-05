@@ -98,7 +98,7 @@ and are refused for coloring books (`not_applicable_for_engine`).
 
 | File | Content |
 | --- | --- |
-| `interior.pdf`, `interior.json`, `preflight.json` | Interior and its coloring preflight (`puzzlepress-kdp-coloring` v2) |
+| `interior.pdf`, `interior.json`, `preflight.json` | Interior and its coloring preflight (`puzzlepress-kdp-coloring` v3) |
 | `cover.pdf`, `cover.json`, `cover-preflight.json` | Cover, when configured |
 | `artwork-integrity.json` | Each printed drawing: pinned original SHA-256, prepared pixel digest, pixels, bits, DPI, placement, pages and its preflight findings; the integrity rules' outcomes |
 | `artwork-duplicates.json`/`.md` | Same file under two entries, drawings on several pages, look-alike pairs (heuristic), and anything not compared |
@@ -112,7 +112,9 @@ DIR, every file is read back against the manifest, and only then is the staged
 directory swapped into place; the previous output stays until then. A failed or
 interrupted run removes its staging directory and leaves DIR as it was. A lock
 file `.<DIR name>.produce.lock` beside DIR refuses a second run for the same output
-(`production_in_progress`); after a crash, delete it by hand. A completed run with
+(`production_in_progress`); the OS releases it when a run dies, and an abandoned
+record from this host is reclaimed. Studio runs the same production as a job in a
+worker process ([production jobs](production-jobs.md)). A completed run with
 blocking findings is written in full but reported as `blocked`, and no package is
 written. Manual review always lists the artwork, Print Previewer, printed-proof,
 cover and rights items: automated checks cannot guarantee KDP acceptance or judge

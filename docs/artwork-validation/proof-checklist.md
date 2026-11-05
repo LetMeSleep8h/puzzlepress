@@ -57,3 +57,21 @@ that PuzzlePress did not report.
 
 Only results recorded here count as physical-print evidence. Thresholds change only
 from such records (docs/coloring.md, Calibration).
+
+## Questions only print answers
+
+Software measured these on screen; only the printed proof can settle them:
+
+1. Do the fine hatching lines of drawings 3, 4 and 6 (patent scans, cleanup 0.6 +
+   despeckle 2) print continuous and colorable, as measures version 2 now reports,
+   or do they break up as version 1 claimed?
+2. Does the lightened rim of strokes after cleanup (paper 213-235 stretched to white)
+   print visibly thinner than on screen?
+3. Is the speck warning (5 per megapixel) right after cleanup on pages 2, 3, 6, 11
+   and 12: does paper grain print as dots?
+4. Do the under-300-DPI pages (12, 13, 15, 17 at 208-296 DPI) look soft?
+5. Does Doré's dense engraving (excessive ink) print as muddy solid areas?
+6. How much does a drawing show through to its blank back on this paper?
+7. Does a gray-201 background left on Pollard Willows (#11) print as a tint?
+
+Record answers in the tables above; thresholds change only from such records.

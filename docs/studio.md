@@ -66,18 +66,22 @@ paper are one choice of print profile (see
 [print profiles](print-interior.md#print-profiles-interval-7)).
 
 **Produce** runs `book produce` for the saved source into
-`<output.directory>-release`, on a background thread, and shows each step as Python
-reports it. Success is shown only after every file `production.json` lists has been
+`<output.directory>-release` as a job in its own worker process
+([production jobs](production-jobs.md)), so Studio stays responsive. The page shows
+the job's state, Python's current step and, where Python counts them, work units
+("12 of 40 pages drawn", with a progress bar; never an estimated percentage), the
+elapsed time, job ID and peak worker memory. Cancel asks for confirmation; the job
+stops at the next safe point inside the current step and the previous release stays.
+A failure shows its code, message and whether the previous release is unchanged,
+with Retry. Success is shown only after every file `production.json` lists has been
 read back against its SHA-256 and size; a damaged release is reported and its files
-are not offered. The page lists blocking findings, warnings and items that need a
-person, recovery notes (a reclaimed lock, a restored previous release), every file
-for download, `production.json` and, when there is one, the upload package as a ZIP.
-A release is marked out of date when the saved book's build identity differs from
-the one it recorded (cover-only or metadata-only edits are not detected that way;
-Publishing and Cover show those). A coloring run can be cancelled between steps (it
-stops before anything is swapped in, so the previous release stays); a word-search
-run writes in place and runs to the end. One run per book at a time in Studio, and
-the production lock refuses any other writer to the same release.
+are not offered. Recovery notes (a reclaimed lock, a removed staging folder, a
+restored release), every file, `production.json` and the upload package ZIP are
+listed as before, plus recent jobs. A release is marked out of date when the saved
+book's build identity differs from the one it recorded. Job records outlive Studio:
+after a reload or restart the page shows the job as it is (still running, finished,
+or interrupted). One job per book at a time; the production lock refuses any other
+writer, the command line included.
 
 Settings, Puzzles, Book, Interior, Cover and Publishing share one draft of `book.yaml`; Plan has its
 own draft of `planning.yaml`. Switching sections keeps both drafts, the project
@@ -484,9 +488,9 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | Method and path | Request / result |
 | --- | --- |
 | `GET /api/projects` | Sorted library, including invalid projects (a folder without `book.yaml`, such as an interrupted creation, is not listed) |
-| `GET /api/projects/{key}/produce` | Current or last run (state, step, steps, seconds, error, notes) and the release on disk (verified, problem, stale, files, findings) |
-| `POST /api/projects/{key}/produce` | `{revision}`; starts a run for the saved revision (409 `source_changed`, `production_in_progress`) |
-| `POST /api/projects/{key}/produce/cancel` | `{}`; coloring only, stops at the next step (409 `not_cancellable` for word search) |
+| `GET /api/projects/{key}/produce` | The latest job (state, seq, step, progress, seconds, error, notes, release_preserved; see production-jobs.md), the release on disk (verified, problem, stale, files, findings), history and worker slots |
+| `POST /api/projects/{key}/produce` | `{revision}`; records and starts (or queues) a job for the saved revision (409 `source_changed`, `production_in_progress`) |
+| `POST /api/projects/{key}/produce/cancel` | `{}`; any engine; stops at the next checkpoint (409 `no_active_run`, `not_cancellable` while the release is swapped in) |
 | `GET /api/projects/{key}/produce/file?name=` | One file the verified release lists, as an attachment (404 otherwise) |
 | `GET /api/projects/{key}/produce/package.zip` | The verified `publishing/` package as a stored ZIP |
 | `GET /api/project-types` | Creatable book types with their starter templates, and the print profiles (paper, trim) |

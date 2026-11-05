@@ -95,30 +95,56 @@ book chooses one in Settings (`print.profile`); the CLI's `--profile` must match
 
 | Profile (white / cream) | Trim | Margins (inside / outside / top / bottom) | KDP pages (white / cream) | Modeled maximum | Word search | Coloring | Cover |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `paperback-8.5x11` (v2), `-cream` (v1) | 8.5 x 11 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-590 / 24-550 | 550 | yes | yes | yes |
-| `paperback-6x9`, `-cream` | 6 x 9 in | 0.75 / 0.5 / 0.5 / 0.5 in | 24-828 / 24-776 | 776 | yes (letters may fall below 9 pt and fail) | yes | yes |
-| `paperback-8x10`, `-cream` | 8 x 10 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-828 / 24-776 | 776 | yes | yes | yes |
-| `paperback-8.5x8.5`, `-cream` | 8.5 x 8.5 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-590 / 24-550 | 550 | yes | yes | yes |
+| `paperback-8.5x11` (v2), `-cream` (v1) | 8.5 x 11 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-590 / 24-550 | 590 / 550 | yes | yes | yes |
+| `paperback-6x9`, `-cream` | 6 x 9 in | 0.75 / 0.5 / 0.5 / 0.5 in | 24-828 / 24-776 | 828 / 776 | yes (letters may fall below 9 pt and fail) | yes | yes |
+| `paperback-8x10`, `-cream` | 8 x 10 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-828 / 24-776 | 828 / 776 | yes | yes | yes |
+| `paperback-8.5x8.5`, `-cream` | 8.5 x 8.5 in | 0.75 / 0.5 / 0.625 / 0.625 in | 24-590 / 24-550 | 590 / 550 | yes | yes | yes |
 
 "Yes" means the demos (composition-demo, cover-demo with its cover, the coloring
 "sections" sample) build, pass structural preflight and, where they are long
 enough, KDP preflight on that trim (`tests/test_print_profiles.py`). A larger grid
 than the demos' can be too small on 6 x 9: the build then fails with the measured
-letter size; nothing is shrunk. The modeled maximum keys on trim only, so each
-trim's cream value applies to both papers. KDP's table now lists 8.5 x 11 explicitly
-(590 white), but the existing rule keeps 550 and its wording until a ruleset change
-is decided, because that wording is in every word-search report. Cover templates
+letter size; nothing is shrunk. The modeled maximum follows the trim and the
+profile's paper (interior preflight ruleset 5; rulesets 3-4 used each trim's cream value
+for both papers while the official 8.5 x 11 row was missing). Cover templates
 are authored on 8.5 x 11 and scaled to the trim; a cover element pushed outside the
 media is reported, not moved. Not offered: other KDP trims, groundwood and color
 papers, hardcover.
 
-**Bleed (assessed, not built).** KDP bleed adds 0.125 in at top, bottom and outside
-(page 8.625 x 11.25 in for 8.5 x 11) and raises the minimum outside margin to 0.375
-in; one bleed page makes the whole file bleed. Supporting it means a second page box
-in geometry and rendering, bleed-aware margin, page-size, live-area and
-printer-mark rules in preflight, preview overlays, and art placement that may reach
-the bleed edge, which coloring layout does not do today. No current book needs it,
-so it is left for a later interval rather than built partly.
+### Full bleed (not available)
+
+Full-bleed interiors are refused (`unsupported_bleed_configuration`); every profile
+is no-bleed and Studio offers none. Interval 8 verified KDP's rules and assessed the
+work, and kept bleed unavailable rather than ship a partial publishing option.
+
+KDP rules, read 2026-11-05 ("Set Trim Size, Bleed, and Margins"; "Paperback
+Submission Guidelines"):
+
+- Bleed is 0.125 in beyond the trim at the top, bottom and outside edge; the inside
+  (gutter) edge has none. The PDF page is 0.125 in wider and 0.25 in taller than the
+  trim (8.625 x 11.25 in for 8.5 x 11). Bleed needs a PDF upload, and one bleed page
+  makes the whole file a bleed file.
+- With bleed, outside, top and bottom margins are at least 0.375 in (0.25 in
+  without); the gutter table is the same. No crop or trim marks.
+
+What a bleed slice needs (recommended for Interval 9, coloring first):
+
+1. Bleed profiles (`paperback-<trim>-bleed`, white and cream) with 0.375 in or larger
+   outside/top/bottom margins, in `spec.py` beside the no-bleed ones.
+2. `geometry.page_frame`: media = trim + bleed; the trim box sits at the media's
+   inside edge (left on rectos, right on versos) and 0.125 in up; content boxes follow
+   the trim. Renderer: MediaBox, BleedBox = media, TrimBox per page.
+3. Coloring placement: an explicit per-page `fit: bleed` that cover-fits the drawing to
+   the bleed box, records the crop as configuration (the original is untouched) and
+   reports the ink share that falls outside the trim and outside the safe area.
+4. Preflight: bleed variants of `kdp_no_bleed`, `kdp_page_size`, `kdp_outside_margins`,
+   `content_in_live_area` and `kdp_no_printer_marks` (art past the trim is bleed, not a
+   slug), plus a parity check of alternating trim boxes; unevaluated rules block.
+5. Publishing: the upload checklist and metadata state "Bleed (PDF only)"; package
+   identity already includes the print configuration. Cover geometry is unchanged
+   (trim and page count).
+6. Studio: bleed profiles in Settings, trim/bleed/safe overlays in Pages and Print, a
+   "will be trimmed" view, and the profile shown in Cover, Publishing and Produce.
 
 Paper is stated by the profile, never inferred: it does not change interior page
 geometry or PDF bytes, but it is part of the interior identity and sets the cover's

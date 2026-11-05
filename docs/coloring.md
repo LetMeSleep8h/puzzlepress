@@ -219,6 +219,45 @@ All thresholds are PuzzlePress conventions, not KDP values or print-quality
 guarantees. Most findings report measured damage. `large_change` is different: it
 only asks for a visual comparison.
 
+### Paper-relative line measures (measures version 2, Interval 8)
+
+The line measures (fine-line retention, line work kept, stroke counts, light
+strokes and dust) read the original and the prepared page *relative to each one's
+own paper*, not as absolute gray levels. `paper_background` estimates the local
+paper level: a 3 x 3 maximum lifts fine strokes to the paper beside them, 4 x 4
+blocks are averaged, the brightest block within 5 blocks (20 px) is taken, that is
+reduced to a 128-sample grid, floored at 80 % of the page's 95th-percentile level
+(solid ink is not paper), smoothed and scaled back. `paper_relative` divides each
+pixel by it (rounded, 0..255). A page whose paper is at least 250 everywhere is
+white paper and is measured exactly as before (the same image object). Light
+strokes now exclude a 2 px rim around ink (scanner blur belongs to the ink line).
+
+Why: background cleanup stretches tinted paper to white, which lightens every
+stroke by the same ratio. Version 1 counted each stroke rim that crossed gray 128
+after the stretch as a lost fine line; relative to the paper the stroke is
+unchanged, so version 2 does not. Erasing, thinning or lightening a stroke relative
+to its paper is still loss. Printing measures (ink coverage, specks, paper level,
+line core, edges, change) still read the prepared pixels as they print.
+Prepared pixels and `PREPARATION_VERSION` are unchanged (no interior identity
+changes); findings can change, so the coloring preflight ruleset is 3. Thresholds
+are unchanged. Old against new on SYNTHETIC scan-like pages (`aged_scan`: ink 70,
+blur 0.8 px, grainy tinted paper), `background_cleanup 0.6`:
+
+| Page | Version 1 fine lines kept | Version 2 | Version 2 findings |
+| --- | --- | --- | --- |
+| Paper 226 | 51 % (`thin_lines_destroyed`) | 100 % | `faint_lines` only (pale ink) |
+| Paper 213, darkening by 30 down the page | 70 % (`thin_lines_lost`, `strokes_broken`) | 100 % | none of the line-loss codes |
+| Paper 158, grain 20 | 21 % (destroyed, `detail_lost`, `strokes_broken`) | 98 % | none of the line-loss codes |
+| Paper 226, `line_weight -1` (real thinning) | 0 % | 0 % | `thin_lines_destroyed`, `detail_lost` |
+| Paper 226, brightness +0.35 | n/a | below 60 % | `thin_lines_destroyed` |
+| Paper 226, half the lines painted out | n/a | 30-75 % | loss found where it was made |
+| Paper 226, cleanup + threshold 0.5 | 51 % | 100 % | `faint_strokes_erased` (the pale 1 px hatching is really erased) |
+| White-paper fixtures | as before | identical, except light strokes, which now exclude a 2 px rim around ink | existing tests unchanged and passing |
+
+Tests: `tests/test_coloring_line_measures.py`. This is digital evidence on synthetic
+pages; the 17 real scans were not available locally in this interval (see
+[findings](artwork-validation/findings.md#interval-8-paper-relative-measures)).
+
 ### Calibration
 
 What kind of evidence each threshold rests on (Interval 6 review):
@@ -234,7 +273,7 @@ What kind of evidence each threshold rests on (Interval 6 review):
 | Line core (`faint_lines`) | darkest tenth > 64 | Subjective: a synthetic pencil page judged pale in an on-screen review |
 | Light strokes erased | kept < 50 % | Conservative heuristic: synthetic results were 100 % or <= 19 % |
 
-None has been checked against real artwork or a printed proof. `tests/artwork_review.py`
+None has been checked against a printed proof; Interval 7 compared them with 17 real scans (artwork-validation/findings.md). `tests/artwork_review.py`
 produces the evidence a person needs to recalibrate them from real drawings (see
 [coloring-publishing.md](coloring-publishing.md#real-artwork-review)).
 

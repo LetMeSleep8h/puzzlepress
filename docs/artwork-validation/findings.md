@@ -90,3 +90,32 @@ lines and gray paper. Cover preflight: only the usual RGB color-space warning. T
 proof is not KDP ready by PuzzlePress's rules, deliberately: it exists to compare
 those findings with paper. Nothing has been ordered. Review it with
 [proof-checklist.md](proof-checklist.md).
+
+## Interval 8: paper-relative measures
+
+The fix recommended in point 1 is in measures version 2 (docs/coloring.md,
+"Paper-relative line measures"): line measures read each image relative to its own
+local paper level, so cleanup that whitens tinted paper is no longer counted as
+fine-line loss, while thinning, erasing or lightening strokes relative to their
+paper still is. No threshold changed.
+
+Evidence is **digital and synthetic only**. The 17 approved originals were kept
+outside the repository and were not present on this machine in Interval 8;
+downloading them again needs the author's go-ahead, so the table above was not
+re-measured. On scan-like synthetic pages built to reproduce the bias (ink 70,
+scanner blur, grainy paper 158-226, uneven aging) version 1 reported 21-70 % fine
+lines kept after cleanup 0.6 and version 2 reports 98-100 %, with real thinning
+still 0 %. Expected effect on the real table: drawings 1-6 and 10-12 should no longer
+report `thin_lines_lost` or `thin_lines_destroyed` under cleanup alone; drawings 4
+and 6 may still report erased light strokes, which the review judged partly true.
+To confirm: re-download the files listed in approved.json (SHA-256 pinned), run
+`tests/artwork_review.py` on both versions, and compare.
+
+Remaining uncertainty: the paper estimate uses a 20 px window floored at 80 % of the
+page's 95th-percentile level, so a tinted area wider than that which is genuinely
+part of the drawing (a wash) is read as paper; whether the measures now agree with
+printed pages needs the physical proof.
+
+**Physical proof status (2026-11-05):** not ordered, not inspected. Nothing in this
+file is print validation. The questions only a printed copy answers are listed in
+[proof-checklist.md](proof-checklist.md#questions-only-print-answers).

@@ -84,3 +84,15 @@ def test_page_maximum_follows_trim_and_paper(trim: str, white: int, cream: int) 
     assert KDP.max_pages_for(trim, Paper.WHITE) == white
     assert KDP.max_pages_for(trim, Paper.CREAM) == cream
     assert KDP.max_pages_for("5x8", Paper.WHITE) is None  # Not a supported profile.
+
+
+def test_full_bleed_stays_unavailable_everywhere() -> None:
+    """Interval 8 assessed full bleed against KDP's rules but did not build it: no
+    profile offers it and the specification refuses it with the reason."""
+    from dataclasses import replace
+
+    assert all(not spec.bleed for spec in PROFILES.values())
+    assert all("no bleed" in spec.description for spec in PROFILES.values())
+    issues = validate_print_spec(replace(PROFILES["paperback-8.5x11"], bleed=True))
+    refusal = next(i for i in issues if i.code == "unsupported_bleed_configuration")
+    assert "not available" in refusal.message
