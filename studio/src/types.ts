@@ -81,14 +81,41 @@ export interface Project {
     publishing?: PublishingConfig;
     interior?: InteriorStyle;
     coloring?: ColoringSource;
+    /** How the author files the book in the Library; read by nothing else. */
+    catalog?: { subject?: string; collection?: string };
+    /** The print profile (trim and paper) the author chose; builds use it. */
+    print?: { profile: string };
   };
+}
+/** Python's lossless placement of one drawing inside its art box. */
+export interface Placement {
+  scale: number;
+  x: number;
+  y: number;
+}
+/** What a new book can be created as (GET /api/project-types). */
+export interface ProjectTypes {
+  types: {
+    kind: string;
+    label: string;
+    default_template: string;
+    templates: { id: string; label: string; description: string }[];
+  }[];
+  profiles: {
+    id: string;
+    description: string;
+    paper: string;
+    trim: { width: number; height: number };
+  }[];
 }
 /** The authored coloring section, as Python normalized it. */
 export interface ColoringSource {
   version: number;
   artwork: { id: string; path: string; sha256: string; title: string | null }[];
   /** Publication order: a drawing, or a section divider. */
-  pages: ({ artwork: string } | { divider: { title: string; text?: string } })[];
+  pages: (
+    { artwork: string; placement?: Placement } | { divider: { title: string; text?: string } }
+  )[];
   layout: { blank_reverse: boolean; border: string };
 }
 /** Line-art preparation settings, as Python normalizes them (invert only when set). */
@@ -377,6 +404,8 @@ export interface InteriorStatus {
   ruleset: number;
   profiles?: { id: string; description: string; paper: string }[];
   profile?: string;
+  /** The book's own print profile (Settings), when it chose one. */
+  authored_profile?: string;
   state: 'missing' | 'current' | 'stale' | 'invalid';
   report: PreflightReport | null;
   preview: {
@@ -1459,4 +1488,15 @@ export interface ColoringPlanResult {
     border: string;
     sides: Record<'recto' | 'verso', { live: PtRect; art: PtRect }>;
   };
+  /** By physical page: where Python places each drawing and its effective DPI. */
+  placements?: Record<
+    string,
+    {
+      entry: number;
+      box: PtRect;
+      effective_dpi: number;
+      pixels: { width: number; height: number };
+      placement: Placement;
+    }
+  >;
 }

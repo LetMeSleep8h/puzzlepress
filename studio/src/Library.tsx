@@ -30,7 +30,9 @@ export function Library() {
           <h1>Your books</h1>
           <p>From the first word to a puzzle worth publishing.</p>
         </div>
-        <span className="source-note">Local project library</span>
+        <a className="button primary" href="/create">
+          New book
+        </a>
       </header>
       <div className="library-toolbar">
         <p>{projects ? `${projects.length} source projects` : 'Reading your library'}</p>
@@ -49,9 +51,9 @@ export function Library() {
       ) : !projects ? (
         <Loading>Reading the local book library…</Loading>
       ) : !projects.length ? (
-        <Empty title="A place for your next puzzle book">
-          Add a project folder containing book.yaml under the configured books directory, then
-          reload this page.
+        <Empty title="A place for your next book">
+          <a href="/create">Create a new book</a>, or add a project folder containing book.yaml
+          under the configured books directory and reload this page.
         </Empty>
       ) : !visible?.length ? (
         <Empty title="No matching books">Try another title or project ID.</Empty>
@@ -81,6 +83,13 @@ export function Library() {
                     </a>
                   </h2>
                   {source?.book.subtitle && <p>{source.book.subtitle}</p>}
+                  {source?.catalog && (source.catalog.subject || source.catalog.collection) && (
+                    <p className="small muted">
+                      {[source.catalog.subject, source.catalog.collection]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  )}
                   <p className="muted">{source?.book.id ?? project.key}</p>
                   {source && coloring ? (
                     <dl className="inline-facts">

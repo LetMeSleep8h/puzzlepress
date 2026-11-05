@@ -135,7 +135,7 @@ test('empty project library is useful', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ projects: [] })));
   render(<App />);
   expect(
-    await screen.findByRole('heading', { name: 'A place for your next puzzle book' }),
+    await screen.findByRole('heading', { name: 'A place for your next book' }),
   ).toBeInTheDocument();
 });
 

@@ -154,6 +154,7 @@ export function MatterList({
   onBook,
   make = newItem,
   titleNote = 'edit it at the top of Puzzles',
+  settings,
 }: {
   items: MatterItem[];
   kinds: string[];
@@ -165,6 +166,8 @@ export function MatterList({
   /** A new page of this kind; coloring books start with their own instructions. */
   make?: (kind: string) => MatterItem;
   titleNote?: string;
+  /** Where the book details are edited, when not here (coloring books: Settings). */
+  settings?: string;
 }) {
   const missing = kinds.filter((kind) => !items.some((item) => item.kind === kind));
   return (
@@ -218,7 +221,16 @@ export function MatterList({
                 id={at}
                 issues={issues.filter((x) => x.path === at || x.path === `${at}.kind`)}
               />
-              {item.kind === 'title_page' && (
+              {item.kind === 'title_page' && settings && (
+                <p className="small">
+                  Prints the book details: <strong>{draft.book.title}</strong>
+                  {draft.book.subtitle && <> · {draft.book.subtitle}</>}
+                  {draft.book.author && <> · {draft.book.author}</>}
+                  {draft.book.imprint && <> · {draft.book.imprint}</>}.{' '}
+                  <a href={settings}>Edit book details in Settings</a>
+                </p>
+              )}
+              {item.kind === 'title_page' && !settings && (
                 <>
                   <p className="small">
                     Uses the book’s metadata. Title: <strong>{draft.book.title}</strong>{' '}

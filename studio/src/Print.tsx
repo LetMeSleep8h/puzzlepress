@@ -39,7 +39,8 @@ const OVERLAYS = [
   ['findings', 'Finding regions', 'Regions named by preflight findings'],
 ] as const;
 type Overlay = (typeof OVERLAYS)[number][0];
-type Zoom = 'fit' | number;
+// Fit the page, fit the width, or a percentage of print size.
+type Zoom = 'fit' | 'width' | number;
 
 const SEVERITY = {
   error: { tone: 'fail', label: 'Blocking' },
@@ -541,8 +542,54 @@ function Viewer({ status }: { status: InteriorStatus }) {
     160,
     Math.floor(Math.min((stageWidth - 34 - gap) / columns, (viewport - 240) * (612 / 792))),
   );
-  const width = zoom === 'fit' ? fitWidth : 612 * CSS_PX_PER_PT * (zoom / 100);
-  const zoomIndex = zoom === 'fit' ? -1 : ZOOMS.indexOf(zoom);
+  const widthFit = Math.max(160, Math.floor((stageWidth - 34 - gap) / columns));
+  const width =
+    zoom === 'fit' ? fitWidth : zoom === 'width' ? widthFit : 612 * CSS_PX_PER_PT * (zoom / 100);
+  // From a fitted view, zoom steps from the size it shows.
+  const percent = (width / (612 * CSS_PX_PER_PT)) * 100;
+  const zoomIndex = typeof zoom === 'number' ? ZOOMS.indexOf(zoom) : -1;
+  const zoomBy = (direction: 1 | -1) => {
+    if (typeof zoom === 'number') {
+      const next = ZOOMS[zoomIndex + direction];
+      if (next) setZoom(next);
+      return;
+    }
+    const next =
+      direction > 0
+        ? ZOOMS.find((z) => z > percent + 0.5)
+        : [...ZOOMS].reverse().find((z) => z < percent - 0.5);
+    setZoom(next ?? (direction > 0 ? ZOOMS[ZOOMS.length - 1] : ZOOMS[0]));
+  };
+  const resetView = () => {
+    setZoom('fit');
+    stage.current?.scrollTo?.({ left: 0, top: 0 });
+  };
+  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [panning, setPanning] = useState(false);
+  const panStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    if (event.button !== 0) return;
+    if (element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight)
+      return;
+    drag.current = {
+      x: event.clientX,
+      y: event.clientY,
+      left: element.scrollLeft,
+      top: element.scrollTop,
+    };
+    element.setPointerCapture?.(event.pointerId);
+    setPanning(true);
+  };
+  const panMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = drag.current;
+    if (!start) return;
+    event.currentTarget.scrollLeft = start.left - (event.clientX - start.x);
+    event.currentTarget.scrollTop = start.top - (event.clientY - start.y);
+  };
+  const panEnd = () => {
+    drag.current = null;
+    setPanning(false);
+  };
   const selectedFinding = selected === null ? undefined : report.findings[selected];
   const keys = (event: React.KeyboardEvent) => {
     if ((event.target as HTMLElement).closest('input, select, textarea')) return;
@@ -553,6 +600,10 @@ function Viewer({ status }: { status: InteriorStatus }) {
       PageUp: () => step(-1),
       Home: () => go(1),
       End: () => go(total),
+      '+': () => zoomBy(1),
+      '=': () => zoomBy(1),
+      '-': () => zoomBy(-1),
+      '0': resetView,
     };
     const action = actions[event.key];
     if (action) {
@@ -636,8 +687,8 @@ function Viewer({ status }: { status: InteriorStatus }) {
               <button
                 type="button"
                 aria-label="Zoom out"
-                disabled={zoomIndex === 0}
-                onClick={() => setZoom(zoomIndex <= 0 ? ZOOMS[0] : ZOOMS[zoomIndex - 1])}
+                disabled={zoomIndex === 0 || (zoomIndex < 0 && percent <= ZOOMS[0] + 0.5)}
+                onClick={() => zoomBy(-1)}
               >
                 −
               </button>
@@ -648,10 +699,15 @@ function Viewer({ status }: { status: InteriorStatus }) {
                 id="zoom-level"
                 value={String(zoom)}
                 onChange={(event) =>
-                  setZoom(event.target.value === 'fit' ? 'fit' : Number(event.target.value))
+                  setZoom(
+                    event.target.value === 'fit' || event.target.value === 'width'
+                      ? event.target.value
+                      : Number(event.target.value),
+                  )
                 }
               >
-                <option value="fit">Fit</option>
+                <option value="fit">Fit page</option>
+                <option value="width">Fit width</option>
                 {ZOOMS.map((z) => (
                   <option key={z} value={z}>
                     {z}%
@@ -661,10 +717,16 @@ function Viewer({ status }: { status: InteriorStatus }) {
               <button
                 type="button"
                 aria-label="Zoom in"
-                disabled={zoomIndex === ZOOMS.length - 1}
-                onClick={() => setZoom(ZOOMS[Math.min(zoomIndex + 1, ZOOMS.length - 1)] ?? 100)}
+                disabled={
+                  zoomIndex === ZOOMS.length - 1 ||
+                  (zoomIndex < 0 && percent >= ZOOMS[ZOOMS.length - 1] - 0.5)
+                }
+                onClick={() => zoomBy(1)}
               >
                 +
+              </button>
+              <button type="button" onClick={resetView}>
+                Reset view
               </button>
             </div>
           </div>
@@ -677,10 +739,14 @@ function Viewer({ status }: { status: InteriorStatus }) {
               : `${pageLabel(current, page)} of ${total}`}
         </p>
         <div
-          className="print-canvas"
+          className={`print-canvas${panning ? ' panning' : ''}`}
           ref={stage}
           tabIndex={0}
-          aria-label="Rendered pages. Use arrow keys, Page Up, Page Down, Home and End to turn pages."
+          aria-label="Rendered pages. Use arrow keys, Page Up, Page Down, Home and End to turn pages; plus, minus and 0 zoom; drag to pan when zoomed in."
+          onPointerDown={panStart}
+          onPointerMove={panMove}
+          onPointerUp={panEnd}
+          onPointerCancel={panEnd}
         >
           <div className={`print-pages${spread ? ' spread' : ''}`}>
             {spread && spreadOf(page, total)[0] === null && (
@@ -789,7 +855,7 @@ export function Print({ project, dirty }: { project: Project; dirty: boolean }) 
     try {
       const data = await request<InteriorStatus>(`${base}/build`, new AbortController().signal, {
         revision: project.revision,
-        ...(profile ? { profile } : {}),
+        ...(profile && !status?.authored_profile ? { profile } : {}),
       });
       setStatus(data);
       if (data.build?.success) setMessage('Interior built and preflight complete.');
@@ -841,26 +907,39 @@ export function Print({ project, dirty }: { project: Project; dirty: boolean }) 
           </p>
         </div>
         <div className="editor-actions">
-          {status.profiles && (
-            <div className="editor-field print-profile">
-              <label htmlFor="print-profile">Paper</label>
-              <select
-                id="print-profile"
-                value={profile ?? status.profile}
-                disabled={busy}
-                aria-describedby="print-profile-hint"
-                onChange={(event) => setProfile(event.target.value)}
-              >
-                {status.profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.paper === 'cream' ? 'Cream' : 'White'} paper, black ink
-                  </option>
-                ))}
-              </select>
-              <span className="sr-only" id="print-profile-hint">
-                Paper sets the cover's spine width. Pages are laid out identically.
-              </span>
-            </div>
+          {status.authored_profile ? (
+            <p className="small print-profile">
+              Paper:{' '}
+              <strong>
+                {status.profiles?.find((p) => p.id === status.authored_profile)?.paper === 'cream'
+                  ? 'Cream'
+                  : 'White'}
+              </strong>
+              , from this book&apos;s{' '}
+              <a href={`/books/${encodeURIComponent(status.key)}/settings`}>Settings</a>
+            </p>
+          ) : (
+            status.profiles && (
+              <div className="editor-field print-profile">
+                <label htmlFor="print-profile">Paper</label>
+                <select
+                  id="print-profile"
+                  value={profile ?? status.profile}
+                  disabled={busy}
+                  aria-describedby="print-profile-hint"
+                  onChange={(event) => setProfile(event.target.value)}
+                >
+                  {status.profiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.paper === 'cream' ? 'Cream' : 'White'} paper, black ink
+                    </option>
+                  ))}
+                </select>
+                <span className="sr-only" id="print-profile-hint">
+                  Paper sets the cover's spine width. Pages are laid out identically.
+                </span>
+              </div>
+            )
           )}
           <button
             type="button"

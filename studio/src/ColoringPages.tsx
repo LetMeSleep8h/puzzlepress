@@ -3,6 +3,7 @@ import { ApiError, request } from './api';
 import { MatterList } from './Composer';
 import { DraftToolbar, type Draft } from './draft';
 import { Field, FieldErrors, SelectField, matchIssues, type Source } from './editor-fields';
+import { useHistory, useUndoShortcuts } from './history';
 import type {
   ColoringPlanPage,
   ColoringPlanResult,
@@ -10,13 +11,17 @@ import type {
   InteriorStatus,
   Issue,
   MatterItem,
+  Placement,
 } from './types';
 import { Issues, Status } from './ui';
+import { PageViewport } from './viewport';
+import { CSS_PX_PER_PT, svgRect } from './zoom';
 
 // Pages: the order of drawings and section dividers, front and back matter, blank
-// backs, borders and page numbers. The browser edits the authored source only; which
-// physical page each entry lands on, every blank page and every number come from
-// Python's verified plan, and the built pages from Print proof.
+// backs, borders, placement and page numbers. The browser edits the authored source
+// only; which physical page each entry lands on, every blank page, every number and
+// where each drawing prints come from Python's verified plan, and the built pages
+// from Print proof.
 
 type Entry = ColoringSource['pages'][number];
 type ColoringComposition = {
@@ -31,6 +36,7 @@ type ColoringComposition = {
   };
 };
 
+const CENTRED: Placement = { scale: 1, x: 0, y: 0 };
 const BLANK_REASONS: Record<string, string> = {
   reverse_blank: 'Back of the page before, left blank so markers do not show through',
   section_recto_start: 'Added so the drawings start on a right-hand page',
@@ -76,6 +82,18 @@ function describe(page: ColoringPlanPage): string {
   return MATTER_NAMES[page.kind] ?? page.kind;
 }
 
+/** A placement equal to the centred default is written as no placement at all. */
+function withPlacement(entry: { artwork: string }, placement: Placement): Entry {
+  const rounded = {
+    scale: Math.round(placement.scale * 100) / 100,
+    x: Math.round(placement.x * 100) / 100,
+    y: Math.round(placement.y * 100) / 100,
+  };
+  return rounded.scale === 1 && rounded.x === 0 && rounded.y === 0
+    ? { artwork: entry.artwork }
+    : { artwork: entry.artwork, placement: rounded };
+}
+
 export function ColoringPages({ d }: { d: Draft }) {
   const source = d.draft;
   const coloring = source.coloring!;
@@ -88,21 +106,18 @@ export function ColoringPages({ d }: { d: Draft }) {
   const [status, setStatus] = useState<InteriorStatus>();
   const [announce, setAnnounce] = useState('');
   const [dragging, setDragging] = useState<number>();
+  const [selected, setSelected] = useState(0);
   const [adding, setAdding] = useState(coloring.artwork[0]?.id ?? '');
-  const history = useRef<Source[]>([]);
-  const [undoCount, setUndoCount] = useState(0);
+  // Undo and redo cover this project's unsaved edits; a save, reload or revert
+  // (a new epoch) starts afresh.
+  const history = useHistory<Source>(source, d.change, d.epoch);
+  useUndoShortcuts(!d.busy, history.undo, history.redo);
   const sequence = useRef(0);
   // Python runs one preparation at a time; a busy answer is retried, a few times.
   const [retry, setRetry] = useState(0);
   const retries = useRef(0);
   const api = `/api/projects/${encodeURIComponent(d.key)}`;
   const base = `/books/${encodeURIComponent(d.key)}`;
-
-  // A save, reload or revert starts a fresh undo history.
-  useEffect(() => {
-    history.current = [];
-    setUndoCount(0);
-  }, [d.epoch]);
 
   // Python plans every draft (debounced); only the latest answer is shown, so a slow
   // answer never replaces a newer draft's plan.
@@ -154,22 +169,14 @@ export function ColoringPages({ d }: { d: Draft }) {
     return () => controller.abort();
   }, [api, d.saved.revision]);
 
-  const change = (next: Source, said?: string) => {
-    history.current = [...history.current.slice(-49), source];
-    setUndoCount(history.current.length);
-    d.change(next);
+  const change = (next: Source, said?: string, group?: string) => {
+    history.edit(next, group);
     if (said) setAnnounce(said);
   };
-  const undo = () => {
-    const previous = history.current.pop();
-    setUndoCount(history.current.length);
-    if (previous) {
-      d.change(previous);
-      setAnnounce('Undid the last change.');
-    }
-  };
-  const setPages = (pages: Entry[], said?: string) =>
-    change({ ...source, coloring: { ...coloring, pages } } as Source, said);
+  const undo = () => history.undo() && setAnnounce('Undid the last change.');
+  const redo = () => history.redo() && setAnnounce('Redid the change.');
+  const setPages = (pages: Entry[], said?: string, group?: string) =>
+    change({ ...source, coloring: { ...coloring, pages } } as Source, said, group);
   const setLayout = (layout: Partial<ColoringSource['layout']>) =>
     change({
       ...source,
@@ -207,14 +214,39 @@ export function ColoringPages({ d }: { d: Draft }) {
     'artwork' in entry
       ? (titles.get(entry.artwork) ?? entry.artwork)
       : `Divider: ${entry.divider.title}`;
+  const current = Math.min(selected, Math.max(coloring.pages.length - 1, 0));
+  const chosen = coloring.pages[current] as Entry | undefined;
 
   const moveEntry = (from: number, to: number) => {
     if (to < 0 || to >= coloring.pages.length || from === to) return;
     const pages = [...coloring.pages];
     const [item] = pages.splice(from, 1);
     pages.splice(to, 0, item);
+    if (selected === from) setSelected(to);
     setPages(pages, `Moved ${name(item)} to position ${to + 1} of ${pages.length}.`);
   };
+  const insertAfter = (at: number, entry: Entry, said: string) => {
+    const pages = [...coloring.pages];
+    pages.splice(at + 1, 0, entry);
+    setSelected(at + 1);
+    setPages(pages, said);
+  };
+  const removeAt = (at: number) => {
+    const entry = coloring.pages[at];
+    setPages(
+      coloring.pages.filter((_, j) => j !== at),
+      'artwork' in entry
+        ? `Removed ${name(entry)}. The drawing stays in the artwork library.`
+        : `Removed ${name(entry)}.`,
+    );
+    if (selected >= at && selected > 0) setSelected(selected - 1);
+  };
+  const replaceAt = (at: number, entry: Entry, said?: string, group?: string) =>
+    setPages(
+      coloring.pages.map((x, j) => (j === at ? entry : x)),
+      said,
+      group,
+    );
   const drop = (event: DragEvent, to: number) => {
     event.preventDefault();
     if (dragging !== undefined) moveEntry(dragging, to);
@@ -241,27 +273,53 @@ export function ColoringPages({ d }: { d: Draft }) {
               <div>
                 <h3 id="pages-order">Drawings and dividers</h3>
                 <p className="small muted">
-                  In printing order. Drag a row, or use Up and Down. Blank pages are never listed
-                  here: Python adds them where the layout needs one.
+                  In printing order. Select a page to design it; drag a row, or use Up and Down.
+                  Blank pages are never listed here: Python adds them where the layout needs one.
                 </p>
               </div>
-              <button type="button" disabled={!undoCount} onClick={undo}>
-                Undo
-              </button>
+              <div className="history-actions" role="group" aria-label="Edit history">
+                <button
+                  type="button"
+                  disabled={!history.canUndo}
+                  onClick={undo}
+                  aria-keyshortcuts="Control+Z"
+                  title="Undo (Ctrl+Z)"
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  disabled={!history.canRedo}
+                  onClick={redo}
+                  aria-keyshortcuts="Control+Shift+Z Control+Y"
+                  title="Redo (Ctrl+Shift+Z)"
+                >
+                  Redo
+                </button>
+              </div>
             </div>
             <FieldErrors id="coloring.pages" issues={matchIssues(issues, 'coloring.pages')} />
             {coloring.pages.length === 0 && (
-              <p className="muted">No pages yet. Add a drawing below.</p>
+              <p className="muted">
+                No pages yet.{' '}
+                {coloring.artwork.length
+                  ? 'Add a drawing below.'
+                  : 'Import drawings in Artwork first, then add them here.'}
+              </p>
             )}
             <ol className="page-order" aria-label="Drawings and dividers in printing order">
               {coloring.pages.map((entry, i) => {
                 const label = name(entry);
                 const page = physical[i];
                 const at = `coloring.pages.${i}`;
+                const placed = 'artwork' in entry && entry.placement;
                 return (
                   <li
                     key={i}
-                    className={dragging === i ? 'dragging' : undefined}
+                    className={[
+                      dragging === i ? 'dragging' : '',
+                      current === i ? 'selected' : '',
+                    ].join(' ')}
                     draggable
                     onDragStart={(e) => {
                       setDragging(i);
@@ -295,6 +353,7 @@ export function ColoringPages({ d }: { d: Draft }) {
                         {'artwork' in entry && (uses.get(entry.artwork) ?? 0) > 1 && (
                           <> · used {uses.get(entry.artwork)} times (intended?)</>
                         )}
+                        {placed && <> · placed {Math.round(placed.scale * 100)}%</>}
                       </span>
                       {'divider' in entry && (
                         <div className="field-pair">
@@ -304,10 +363,11 @@ export function ColoringPages({ d }: { d: Draft }) {
                             value={entry.divider.title}
                             issues={issues}
                             onChange={(title) =>
-                              setPages(
-                                coloring.pages.map((x, j) =>
-                                  j === i ? { divider: { ...entry.divider, title } } : x,
-                                ),
+                              replaceAt(
+                                i,
+                                { divider: { ...entry.divider, title } },
+                                undefined,
+                                `${at}.title`,
                               )
                             }
                           />
@@ -318,16 +378,15 @@ export function ColoringPages({ d }: { d: Draft }) {
                             issues={issues}
                             multiline
                             onChange={(text) =>
-                              setPages(
-                                coloring.pages.map((x, j) =>
-                                  j === i
-                                    ? {
-                                        divider: text
-                                          ? { title: entry.divider.title, text }
-                                          : { title: entry.divider.title },
-                                      }
-                                    : x,
-                                ),
+                              replaceAt(
+                                i,
+                                {
+                                  divider: text
+                                    ? { title: entry.divider.title, text }
+                                    : { title: entry.divider.title },
+                                },
+                                undefined,
+                                `${at}.text`,
                               )
                             }
                           />
@@ -335,10 +394,20 @@ export function ColoringPages({ d }: { d: Draft }) {
                       )}
                       <FieldErrors
                         id={at}
-                        issues={issues.filter((x) => x.path === at || x.path === `${at}.artwork`)}
+                        issues={issues.filter(
+                          (x) => x.path === at || x.path.startsWith(`${at}.artwork`),
+                        )}
                       />
                     </div>
                     <div className="page-order-actions">
+                      <button
+                        type="button"
+                        aria-pressed={current === i}
+                        aria-label={`Design ${label}`}
+                        onClick={() => setSelected(i)}
+                      >
+                        Design
+                      </button>
                       <button
                         type="button"
                         aria-label={`Move ${label} up`}
@@ -359,11 +428,13 @@ export function ColoringPages({ d }: { d: Draft }) {
                         <button
                           type="button"
                           aria-label={`Use ${label} again after this page`}
-                          onClick={() => {
-                            const pages = [...coloring.pages];
-                            pages.splice(i + 1, 0, { artwork: entry.artwork });
-                            setPages(pages, `Added ${label} again as page entry ${i + 2}.`);
-                          }}
+                          onClick={() =>
+                            insertAfter(
+                              i,
+                              { artwork: entry.artwork },
+                              `Added ${label} again as page entry ${i + 2}.`,
+                            )
+                          }
                         >
                           Repeat
                         </button>
@@ -371,12 +442,7 @@ export function ColoringPages({ d }: { d: Draft }) {
                       <button
                         type="button"
                         aria-label={`Remove ${label} from the book`}
-                        onClick={() =>
-                          setPages(
-                            coloring.pages.filter((_, j) => j !== i),
-                            `Removed ${label}. The drawing stays in the artwork library.`,
-                          )
-                        }
+                        onClick={() => removeAt(i)}
                       >
                         Remove
                       </button>
@@ -399,12 +465,13 @@ export function ColoringPages({ d }: { d: Draft }) {
                   <button
                     type="button"
                     disabled={!adding}
-                    onClick={() =>
+                    onClick={() => {
+                      setSelected(coloring.pages.length);
                       setPages(
                         [...coloring.pages, { artwork: adding }],
                         `Added ${titles.get(adding) ?? adding} at the end.`,
-                      )
-                    }
+                      );
+                    }}
                   >
                     Add drawing at the end
                   </button>
@@ -429,22 +496,11 @@ export function ColoringPages({ d }: { d: Draft }) {
           </section>
 
           <section aria-labelledby="pages-front">
-            <h3 id="pages-front">Book details and front matter</h3>
-            <Field
-              label="Title"
-              path="book.title"
-              value={source.book.title}
-              issues={issues}
-              onChange={(title) => change({ ...source, book: { ...source.book, title } })}
-            />
-            <Field
-              label="Language"
-              path="book.language"
-              value={source.book.language}
-              issues={issues}
-              hint="A language tag such as en or fr-CA; Python checks it against KDP's paperback languages in Publishing."
-              onChange={(language) => change({ ...source, book: { ...source.book, language } })}
-            />
+            <h3 id="pages-front">Front matter</h3>
+            <p className="small muted">
+              Title, subtitle, author and language are book details:{' '}
+              <a href={`${base}/settings`}>edit them in Settings</a>.
+            </p>
             <MatterList
               items={composition.front_matter}
               kinds={['title_page', 'copyright_page', 'instructions']}
@@ -452,7 +508,7 @@ export function ColoringPages({ d }: { d: Draft }) {
               issues={issues}
               draft={source}
               make={coloringMatter}
-              titleNote="edit it above"
+              settings={`${base}/settings`}
               onBook={(book) => change({ ...source, book })}
               onChange={(front_matter) => setComposition({ ...composition, front_matter })}
             />
@@ -467,7 +523,7 @@ export function ColoringPages({ d }: { d: Draft }) {
               issues={issues}
               draft={source}
               make={coloringMatter}
-              titleNote="edit it above"
+              settings={`${base}/settings`}
               onBook={(book) => change({ ...source, book })}
               onChange={(back_matter) => setComposition({ ...composition, back_matter })}
             />
@@ -582,6 +638,34 @@ export function ColoringPages({ d }: { d: Draft }) {
               {f.id}: {f.message}
             </p>
           ))}
+          {chosen && (
+            <PageDesigner
+              key={current}
+              entry={chosen}
+              index={current}
+              plan={plan}
+              physicalPage={physical[current]}
+              api={api}
+              artwork={coloring.artwork.map((a) => [a.id, a.title || a.id])}
+              checking={checking}
+              name={name(chosen)}
+              onReplace={(entry, said, group) => replaceAt(current, entry, said, group)}
+              onDuplicate={() =>
+                insertAfter(
+                  current,
+                  structuredClone(chosen),
+                  `Duplicated ${name(chosen)} as page entry ${current + 2}.`,
+                )
+              }
+              onDivider={() =>
+                insertAfter(
+                  current,
+                  { divider: { title: 'New section' } },
+                  `Inserted a section divider after ${name(chosen)}.`,
+                )
+              }
+            />
+          )}
           {stats && (
             <dl className="plan-stats">
               <div>
@@ -602,9 +686,242 @@ export function ColoringPages({ d }: { d: Draft }) {
               </div>
             </dl>
           )}
-          {plan && <Spreads plan={plan} api={api} />}
+          {plan && (
+            <Spreads
+              plan={plan}
+              api={api}
+              selectedPage={physical[current]}
+              onSelect={(page) => {
+                const at = physical.indexOf(page);
+                if (at >= 0) setSelected(at);
+              }}
+            />
+          )}
         </aside>
       </div>
+    </div>
+  );
+}
+
+function PageDesigner({
+  entry,
+  index,
+  plan,
+  physicalPage,
+  api,
+  artwork,
+  checking,
+  name,
+  onReplace,
+  onDuplicate,
+  onDivider,
+}: {
+  entry: Entry;
+  index: number;
+  plan?: ColoringPlanResult;
+  physicalPage?: number;
+  api: string;
+  artwork: [string, string][];
+  checking: boolean;
+  name: string;
+  onReplace: (entry: Entry, said?: string, group?: string) => void;
+  onDuplicate: () => void;
+  onDivider: () => void;
+}) {
+  const page = plan?.plan.pages.find((p) => p.index === physicalPage);
+  const placed = physicalPage ? plan?.placements?.[String(physicalPage)] : undefined;
+  const placement = ('artwork' in entry && entry.placement) || CENTRED;
+  const set = (patch: Partial<Placement>, group: string) =>
+    'artwork' in entry &&
+    onReplace(withPlacement(entry, { ...placement, ...patch }), undefined, group);
+  const g = plan?.geometry;
+  return (
+    <section className="page-designer" aria-labelledby="designer-heading">
+      <h4 id="designer-heading">
+        Designing entry {index + 1}: {name}
+      </h4>
+      <p className="small">
+        {page ? (
+          <>
+            PDF page <strong>{page.index}</strong> ·{' '}
+            {page.side === 'recto' ? 'right-hand (recto)' : 'left-hand (verso)'} ·{' '}
+            {page.number.displayed ? `prints “${page.number.label}”` : 'no printed number'}
+          </>
+        ) : (
+          'Not planned yet.'
+        )}
+      </p>
+      {g && page && (
+        <PageViewport
+          label="Selected page"
+          page={{ width: g.trim.width * CSS_PX_PER_PT, height: g.trim.height * CSS_PX_PER_PT }}
+        >
+          {(scale) => (
+            <svg
+              width={g.trim.width * CSS_PX_PER_PT * scale}
+              height={g.trim.height * CSS_PX_PER_PT * scale}
+              viewBox={`0 0 ${g.trim.width} ${g.trim.height}`}
+              role="img"
+              aria-label={`${describe(page)}, with the live area${placed ? ', art box and drawing' : ''} outlined`}
+              className={`designer-page ${page.side}`}
+            >
+              <rect className="trim" x="0" y="0" width={g.trim.width} height={g.trim.height} />
+              <rect className="live" {...svgRect(g.sides[page.side].live, g.trim.height)} />
+              {page.kind === 'coloring' && (
+                <rect className="art" {...svgRect(g.sides[page.side].art, g.trim.height)} />
+              )}
+              {page.kind === 'coloring' && placed && page.artwork && (
+                <>
+                  <line
+                    className="guide"
+                    x1={g.trim.width / 2}
+                    x2={g.trim.width / 2}
+                    y1="0"
+                    y2={g.trim.height}
+                  />
+                  <image
+                    href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
+                    {...svgRect(placed.box, g.trim.height)}
+                    preserveAspectRatio="none"
+                  />
+                  <rect className="placed" {...svgRect(placed.box, g.trim.height)} />
+                </>
+              )}
+              {page.kind === 'divider' && (
+                <text
+                  x={g.trim.width / 2}
+                  y={g.trim.height / 2}
+                  textAnchor="middle"
+                  className="label"
+                >
+                  {page.divider?.title}
+                </text>
+              )}
+              <text
+                x={page.side === 'recto' ? g.trim.width - 18 : 18}
+                y="24"
+                textAnchor={page.side === 'recto' ? 'end' : 'start'}
+                className="side-label"
+              >
+                {page.side === 'recto' ? 'Recto (right)' : 'Verso (left)'}
+              </text>
+            </svg>
+          )}
+        </PageViewport>
+      )}
+      {'artwork' in entry && (
+        <div className="designer-controls">
+          <SelectField
+            label="Drawing on this page"
+            path={`coloring.pages.${index}.artwork`}
+            value={entry.artwork}
+            options={artwork}
+            issues={[]}
+            onChange={(id) =>
+              onReplace(
+                entry.placement ? { artwork: id, placement: entry.placement } : { artwork: id },
+                `Replaced the drawing on entry ${index + 1}.`,
+              )
+            }
+          />
+          <fieldset className="placement-fields">
+            <legend>Placement in the art box</legend>
+            <Slider
+              label="Size"
+              value={placement.scale}
+              min={0.5}
+              max={1}
+              format={(v) => `${Math.round(v * 100)}% of the full fit`}
+              onChange={(scale) => set({ scale }, `placement.scale.${index}`)}
+            />
+            <Slider
+              label="Horizontal position"
+              value={placement.x}
+              min={-1}
+              max={1}
+              format={(v) => (v === 0 ? 'centred' : v < 0 ? 'toward the left' : 'toward the right')}
+              onChange={(x) => set({ x }, `placement.x.${index}`)}
+            />
+            <Slider
+              label="Vertical position"
+              value={placement.y}
+              min={-1}
+              max={1}
+              format={(v) => (v === 0 ? 'centred' : v < 0 ? 'toward the bottom' : 'toward the top')}
+              onChange={(y) => set({ y }, `placement.y.${index}`)}
+            />
+            <div className="button-row">
+              <button
+                type="button"
+                disabled={placement.x === 0 && placement.y === 0}
+                onClick={() => set({ x: 0, y: 0 }, 'centre')}
+              >
+                Centre
+              </button>
+              <button
+                type="button"
+                disabled={placement === CENTRED}
+                onClick={() =>
+                  onReplace({ artwork: entry.artwork }, 'Placement reset: whole fit, centred.')
+                }
+              >
+                Reset placement
+              </button>
+            </div>
+            <p className="small muted" aria-live="polite">
+              {checking
+                ? 'Python is placing the drawing…'
+                : placed
+                  ? `Prints ${(placed.box.width / 72).toFixed(2)} × ${(placed.box.height / 72).toFixed(2)} in from ${placed.pixels.width} × ${placed.pixels.height} pixels: ${placed.effective_dpi} DPI.`
+                  : 'Placement appears once Python plans this page.'}{' '}
+              The drawing always prints whole, inside the art box, with its own pixels: making it
+              smaller never crops or resamples it.
+            </p>
+          </fieldset>
+        </div>
+      )}
+      <div className="button-row">
+        <button type="button" onClick={onDuplicate}>
+          Duplicate page
+        </button>
+        <button type="button" onClick={onDivider}>
+          Insert divider after
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  format: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  const id = `slider-${label.toLowerCase().replace(/\W+/g, '-')}`;
+  return (
+    <div className="editor-field slider-field">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={0.05}
+        value={value}
+        aria-valuetext={format(value)}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <span className="small muted">{format(value)}</span>
     </div>
   );
 }
@@ -640,7 +957,18 @@ function InteriorState({
   );
 }
 
-function Spreads({ plan, api }: { plan: ColoringPlanResult; api: string }) {
+// Long books render many spreads: only those near the viewport draw their pages.
+function Spreads({
+  plan,
+  api,
+  selectedPage,
+  onSelect,
+}: {
+  plan: ColoringPlanResult;
+  api: string;
+  selectedPage?: number;
+  onSelect: (page: number) => void;
+}) {
   const pages = plan.plan.pages;
   // Page 1 is a right-hand page alone; then left-right spreads.
   const spreads: ColoringPlanPage[][] = [[pages[0]].filter(Boolean)];
@@ -650,7 +978,14 @@ function Spreads({ plan, api }: { plan: ColoringPlanResult; api: string }) {
       {spreads.map((spread, i) => (
         <li key={i} className={i === 0 ? 'spread first' : 'spread'}>
           {spread.map((page) => (
-            <PageCard key={page.index} page={page} plan={plan} api={api} />
+            <PageCard
+              key={page.index}
+              page={page}
+              plan={plan}
+              api={api}
+              selected={page.index === selectedPage}
+              onSelect={onSelect}
+            />
           ))}
         </li>
       ))}
@@ -662,24 +997,27 @@ function PageCard({
   page,
   plan,
   api,
+  selected,
+  onSelect,
 }: {
   page: ColoringPlanPage;
   plan: ColoringPlanResult;
   api: string;
+  selected: boolean;
+  onSelect: (page: number) => void;
 }) {
   const g = plan.geometry;
   const side = g.sides[page.side];
   const blank = page.kind === 'blank';
   const reason = page.blank ? (BLANK_REASONS[page.blank.reason] ?? page.blank.reason) : null;
-  // PDF points have their origin at the bottom-left; SVG at the top-left.
-  const rect = (b: { x: number; y: number; width: number; height: number }) => ({
-    x: b.x,
-    y: g.trim.height - b.y - b.height,
-    width: b.width,
-    height: b.height,
-  });
+  const placed = plan.placements?.[String(page.index)];
+  const rect = (b: { x: number; y: number; width: number; height: number }) =>
+    svgRect(b, g.trim.height);
+  const selectable = page.section === 'artwork' && !blank;
   return (
-    <figure className={`page-card ${page.side}${blank ? ' automatic' : ''}`}>
+    <figure
+      className={`page-card ${page.side}${blank ? ' automatic' : ''}${selected ? ' selected' : ''}`}
+    >
       <svg viewBox={`0 0 ${g.trim.width} ${g.trim.height}`} role="img" aria-label={describe(page)}>
         <rect className="trim" x="0" y="0" width={g.trim.width} height={g.trim.height} />
         <rect className="live" {...rect(side.live)} />
@@ -688,8 +1026,8 @@ function PageCard({
             <rect className="art" {...rect(side.art)} />
             <image
               href={`${api}/coloring/thumbnail?artwork=${encodeURIComponent(page.artwork.id)}`}
-              {...rect(side.art)}
-              preserveAspectRatio="xMidYMid meet"
+              {...rect(placed?.box ?? side.art)}
+              preserveAspectRatio={placed ? 'none' : 'xMidYMid meet'}
             />
           </>
         )}
@@ -710,6 +1048,16 @@ function PageCard({
           {page.number.displayed && <> · prints “{page.number.label}”</>}
         </span>
         <span className="small muted">{blank ? reason : describe(page)}</span>
+        {selectable && !selected && (
+          <button
+            type="button"
+            className="link-button small"
+            onClick={() => onSelect(page.index)}
+            aria-label={`Design page ${page.index}`}
+          >
+            Design
+          </button>
+        )}
       </figcaption>
     </figure>
   );

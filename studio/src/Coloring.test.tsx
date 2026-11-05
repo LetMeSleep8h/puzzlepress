@@ -46,13 +46,13 @@ test('a coloring book opens its own workspace without word-search sections', asy
   history.pushState(null, '', '/books/coloring-demo');
   mockApi();
   render(<App />);
-  expect(await screen.findByRole('heading', { name: 'Start with the artwork.' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Your next steps' })).toBeVisible();
   const nav = screen.getByRole('navigation', { name: 'Project' });
   expect(
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['Overview', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
+  ).toEqual(['Overview', 'Settings', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
   expect(screen.getByText('Book type').nextElementSibling).toHaveTextContent('Coloring book');
   expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);
 });
