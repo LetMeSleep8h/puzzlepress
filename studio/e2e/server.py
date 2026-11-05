@@ -163,4 +163,24 @@ with tempfile.TemporaryDirectory(prefix="puzzlepress-browser-") as directory:
         .replace("../build/synthetic-coloring-book", "../../build/coloring-produce"),
         encoding="utf-8",
     )
+    # Produce, cancelled and reloaded mid-job: the same SYNTHETIC book, run by the real
+    # worker with a slow step (tests/worker_harness.py) so the browser can catch it.
+    composed_coloring_book(books / "coloring-produce-slow", 2)
+    source = books / "coloring-produce-slow" / "book.yaml"
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        .replace("id: synthetic-coloring-book", "id: coloring-produce-slow-acceptance")
+        .replace("../build/synthetic-coloring-book", "../../build/coloring-produce-slow"),
+        encoding="utf-8",
+    )
+    from puzzlepress.production import jobs
+    from puzzlepress.studio import producing
+
+    def worker_command(job: Path) -> list[str]:
+        if jobs.read_spec(job).key == "coloring-produce-slow":
+            harness = ROOT / "tests" / "worker_harness.py"
+            return [sys.executable, str(harness), "--slow", "duplicates", "60", str(job)]
+        return [sys.executable, "-m", "puzzlepress.production.worker", str(job)]
+
+    producing.worker_command = worker_command
     uvicorn.run(create_app(books, ROOT / "studio/dist"), host="127.0.0.1", port=8015)

@@ -5223,3 +5223,29 @@ button.primary.danger {
   gap: var(--space-1);
   margin-bottom: var(--space-2);
 }
+
+/* ---------------------------------------------------------- Interval 8: production jobs */
+.produce-progress {
+  width: 100%;
+  max-width: 32rem;
+  height: 0.75rem;
+}
+.produce-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--space-2);
+  margin: var(--space-1) 0;
+}
+.produce-facts dt {
+  color: var(--muted, inherit);
+}
+.produce-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.produce-confirm .button-row {
+  margin-top: var(--space-1);
+}
+.produce-history ul {
+  padding-left: 1.2em;
+}
