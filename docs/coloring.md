@@ -39,6 +39,8 @@ coloring:
   pages:                                 # publication order
     - {divider: {title: Woodland, text: Animals of the forest.}}   # optional
     - {artwork: fox-in-the-ferns}
+    - artwork: fox-in-the-ferns          # optional placement (see Interior)
+      placement: {scale: 0.8, x: 0, y: 1}
   layout:
     blank_reverse: true                  # default: single-sided, blank backs
     border: none                         # none | thin | double
@@ -63,6 +65,7 @@ composition:                             # required to plan or build
 | `sha256` is 64 lowercase hex digits and starts with the name's 12 hex | `sha256`, `sha256_mismatch` |
 | Pages name existing artwork; an artwork may be on several pages (reported as a duplicate) | `unknown_artwork` |
 | A divider has a one-line title (<=200) and optional text (<=600, line breaks allowed) | `required`, `text` |
+| `placement` (drawings only): `scale` 0.5..1, `x` and `y` -1..1, 4 dp; centred `{1, 0, 0}` is written as none | `range`, `type`, `unknown_field` |
 | At most 300 artwork and 300 page entries | `count` |
 | Composition: puzzle and solution settings (`puzzles`, `solutions`, `show_solutions`) do not apply | `not_applicable_for_engine` |
 | No `interior` style section (covers and publishing are shared sections) | `not_available_for_engine` |
@@ -218,6 +221,23 @@ only asks for a visual comparison.
 
 ### Calibration
 
+What kind of evidence each threshold rests on (Interval 6 review):
+
+| Threshold | Value | Evidence |
+| --- | --- | --- |
+| Blank page (`prepared_blank`) | under 0.1 % ink | Empirical on synthetic pages: clean art measured 3.5-4.1 %; a definition, not a judgement |
+| Fine-line retention | warn < 0.90, block < 0.60 | Conservative heuristic: synthetic results were >= 0.99 or <= 0.05, so any value in the gap works equally well on them |
+| Line work kept | warn < 0.60 | Conservative heuristic from synthetic thinning (74 %, 48 %, 58 %) |
+| Heavy ink | warn 35 %, block 60 % | Conservative heuristic; no real dense artwork measured |
+| Paper tint | median < 240 | Empirical on one synthetic noisy scan (224) and pencil (246) |
+| Isolated marks | warn > 5 per MP | Subjective: lowered from 20 after one person judged a synthetic page dusty on screen |
+| Line core (`faint_lines`) | darkest tenth > 64 | Subjective: a synthetic pencil page judged pale in an on-screen review |
+| Light strokes erased | kept < 50 % | Conservative heuristic: synthetic results were 100 % or <= 19 % |
+
+None has been checked against real artwork or a printed proof. `tests/artwork_review.py`
+produces the evidence a person needs to recalibrate them from real drawings (see
+[coloring-publishing.md](coloring-publishing.md#real-artwork-review)).
+
 Measured on synthetic 2175 x 2925 fixtures in `tests/coloring_helpers.py` (fine 1, 2,
 3 and 6 px lines, circles, zigzag glyphs and a crosshatch; a soft gray pencil
 sketch; a dense mandala; a noisy scan on gray paper with specks; white-on-black;
@@ -296,8 +316,15 @@ use the classic templates. A coloring page holds its drawing:
   inside the live area, and the art keeps 12 pt inside it: 6.89 x 9.06 in and
   6.74 x 8.91 in. Full-page 300 DPI art for these boxes is 2175 x 2825, 2067 x 2717
   and 2023 x 2673 px.
-- **Placement.** The whole drawing, uniformly scaled to fit the box and centred. It
-  is never cropped, clipped, stretched or resampled by PuzzlePress. Effective DPI is
+- **Placement.** The whole drawing, uniformly scaled to fit the box and centred,
+  unless its page entry authors a `placement`: then it is drawn at `scale` (0.5-1)
+  of that fit and moved within the space left (`x`, `y`: -1 left/bottom, 0 centre,
+  1 right/top). Either way it stays whole and inside the art box. It is never
+  cropped, clipped, stretched or resampled by PuzzlePress; a smaller drawing simply
+  prints its same pixels at a higher effective DPI. The layout validator checks each
+  drawing is exactly where its page puts it (`artwork_placement`, reported by
+  `coloring_art_placement`). Books without placements render the same bytes as
+  before (renderer version 1). Effective DPI is
   prepared pixels per printed inch; under 300 is a preflight finding, not a build
   failure.
 - **Pixels.** Each drawing is prepared from its verified original with its saved
@@ -455,26 +482,32 @@ production rebuild panel is not offered.
 
 ## Studio Pages
 
-**Pages** (`/books/{key}/pages`) edits the composition visually: drawings and
-section dividers in printing order (drag and drop, or Up and Down for keyboard
-use), add a drawing from the library, repeat one on purpose (flagged as used more
-than once), remove a page entry (the file stays in the library), divider titles
-and text, the title, language and title-page details, copyright, instructions and
-back matter, blank backs, the border, the recto start and page numbering, with
-undo. Python plans every draft (debounced; only the newest answer is shown, and a
-busy engine is retried): each entry shows its PDF page and side, and the preview
-lays the plan out as spreads, marking the blank pages Python added and why, the
-printed page numbers, and the live area and art box from Python's geometry for the
-default profile. It is a plan preview drawn from small thumbnails; Print proof
-shows the built pages. The built interior's state (missing, current, out of date)
-and its finding counts are shown, and saving a new order makes it out of date.
-Pages, Cover and Publishing share one draft saved with the revision check.
+**Pages** (`/books/{key}/pages`) edits the composition visually. The list is the
+page sidebar: drawings and section dividers in printing order with thumbnails, the
+PDF page and side Python planned for each, reordered by drag and drop or Up and
+Down. **Design** selects an entry (also from the spread preview) and opens the page
+designer: a zoomable, pannable view of that page (Fit page, Fit width, 25-400 %,
+Reset view; drag, scroll bars or arrow keys to pan; `+`, `-`, `0`) with the trim,
+live area, art box, a centre guide, the recto/verso side and the printed number;
+**Drawing on this page** replaces the drawing; **Size**, **Horizontal position** and
+**Vertical position** set the placement, with **Centre** and **Reset placement**;
+**Duplicate page** and **Insert divider after**. The drawing's placed box, printed
+size and effective DPI are Python's (`placements` in the draft plan), never computed
+in the browser. Front and back matter, blank backs, border, recto start and
+numbering are below; title, author and language are in **Settings**.
+
+**Undo** and **Redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y outside text fields) cover this
+project's unsaved edits; one slider drag or one field's typing is one step. Saving,
+reloading or reverting clears the history, so nothing undoes past the saved source.
+Python plans every draft (debounced; only the newest answer is shown, and a busy
+engine is retried). The spread preview marks the blank pages Python added and why.
+Settings, Pages, Cover and Publishing share one draft saved with the revision check.
 
 ## Limitations
 
-8.5 x 11 in, no bleed only: art always prints inside the margins. No auto-crop, no
-per-page placement or scale: every drawing is fitted whole into the same art box,
-and no caption is printed. The similarity heuristic and every preparation threshold
+8.5 x 11 in, no bleed only: art always prints inside the margins. No auto-crop and
+no enlargement past the whole-drawing fit (placement only shrinks and moves a
+drawing inside its art box), and no caption is printed. The similarity heuristic and every preparation threshold
 were measured on synthetic drawings only; no genuine coloring artwork was available
 to this engine (real books live outside it), so real scans need the human review in
 [coloring-publishing.md](coloring-publishing.md#real-artwork-review). Light-stroke

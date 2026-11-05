@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .batch import BatchReport
+from .creation_cli import add_new_action, run_new
 from .engines.kind import EngineKind
 from .engines.registry import engine_for
 from .production_cli import add_book_actions, run_produce
@@ -28,6 +29,7 @@ def add_book_command(commands: "argparse._SubParsersAction[argparse.ArgumentPars
     book = commands.add_parser("book", help="Book composition tools")
     actions = book.add_subparsers(dest="book_command", required=True)
     add_book_actions(actions)
+    add_new_action(actions)
     plan = actions.add_parser("plan", help="Plan and verify the logical publication order")
     plan.add_argument("project", help="YAML file or directory containing book.yaml")
     plan.add_argument("--json", action="store_true", help="Print the structured plan")
@@ -99,6 +101,8 @@ def run_book_command(args: argparse.Namespace) -> int:
         return run_preflight_command(args)
     if args.book_command == "produce":
         return run_produce(args)
+    if args.book_command == "new":
+        return run_new(args)
     loaded = load_project(args.project)
     project = loaded.project
     engine = engine_for(project)
@@ -186,10 +190,18 @@ def run_build_command(args: argparse.Namespace) -> int:
         print_profile,
         write_interior,
     )
+    from .print_config import ProfileConflict, chosen_profile
 
     loaded = load_project(args.project)
     try:
-        spec = print_profile(args.profile or DEFAULT_PROFILE)
+        try:
+            chosen = chosen_profile(loaded.project.printing, args.profile)
+        except ProfileConflict as conflict:
+            raise InteriorError(
+                "print_spec",
+                (LayoutIssue("profile_conflict", str(conflict), region="print.profile"),),
+            ) from conflict
+        spec = print_profile(chosen or DEFAULT_PROFILE)
         if isinstance(spec, LayoutIssue):
             raise InteriorError("print_spec", (spec,))
         build = build_interior(loaded.project, spec, loaded.source_path.parent)

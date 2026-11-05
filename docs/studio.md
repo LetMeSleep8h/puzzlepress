@@ -29,12 +29,15 @@ run `npm run dev` in `studio/` alongside the Python server; Vite proxies API cal
 
 ## Navigation and drafts
 
-A compact app bar (logo, **Books**) sits above every page. A project's sections
+A compact app bar (logo, **Books**, **New book**) sits above every page. **New
+book** (`/create`) creates a word-search or coloring project in the library (see
+[the walkthrough](studio-coloring-walkthrough.md)). A project's sections
 are grouped in workflow order; every earlier URL is unchanged:
 
 | Group | Section | Route |
 | --- | --- | --- |
 |  | Overview (also the book title) | `/books/{key}` |
+| Create | Settings | `/books/{key}/settings` |
 | Create | Plan | `/books/{key}/planning` |
 | Create | Puzzles (the authoring editor, formerly Edit) | `/books/{key}/edit` |
 | Create | Book | `/books/{key}/book` |
@@ -45,14 +48,21 @@ are grouped in workflow order; every earlier URL is unchanged:
 | Review | Quality | `/books/{key}/quality` |
 | Publish | Publishing | `/books/{key}/publishing` |
 
-A coloring book has its own navigation: Overview, Artwork, Pages, Cover, Print
-proof and Publishing (routes `/artwork`, `/pages`, `/cover`, `/print`,
-`/publishing`); no puzzle, solution or word wording appears in it. Pages, Cover
-and Publishing share one draft, as below; Artwork saves imports and preparation
+A coloring book has its own navigation: Overview, Settings, Artwork, Pages, Cover,
+Print proof and Publishing (routes `/settings`, `/artwork`, `/pages`, `/cover`,
+`/print`, `/publishing`); no puzzle, solution or word wording appears in it.
+Settings, Pages, Cover and Publishing share one draft, as below; Artwork saves imports and preparation
 settings directly, and a clean draft reloads the saved source when you return to
 it (see [coloring-publishing.md](coloring-publishing.md)).
 
-Puzzles, Book, Interior, Cover and Publishing share one draft of `book.yaml`; Plan has its
+**Settings** separates what the book is (project details), how it is filed
+(catalog: subject, collection) and how it prints (trim, paper), and links to content
+(Pages or Puzzles, Book) and KDP metadata (Publishing) rather than repeating them. A
+coloring book's title, subtitle, author, imprint and language are edited only there;
+a word-search book's title and language stay in Puzzles and its title-page details
+in Book, and Settings links to them.
+
+Settings, Puzzles, Book, Interior, Cover and Publishing share one draft of `book.yaml`; Plan has its
 own draft of `planning.yaml`. Switching sections keeps both drafts, the project
 header shows **Unsaved draft** while either has edits, and leaving the project asks
 first. Each draft section has the same compact bar, sticky below the app bar:
@@ -456,7 +466,9 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 
 | Method and path | Request / result |
 | --- | --- |
-| `GET /api/projects` | Sorted library, including invalid projects |
+| `GET /api/projects` | Sorted library, including invalid projects (a folder without `book.yaml`, such as an interrupted creation, is not listed) |
+| `GET /api/project-types` | Creatable book types with their starter templates, and the print profiles (paper, trim) |
+| `POST /api/projects` | `{kind, key, title, language, subtitle?, author?, subject?, collection?, profile?, template?}`; 201 with the new project's detail and `recovered`; 422 `project_exists`, `invalid_key`, `reserved`, `unsupported_type`, `unknown_template` or a schema issue, writing nothing |
 | `GET /api/projects/{key}` | Normalized source, validation, identity, engine version, derived `engine` {kind, label}, byte revision |
 | `GET /api/projects/{key}/coloring` | Coloring books: saved revision and artwork library report (see [coloring books](coloring.md), which also lists the artwork import, removal, thumbnail and line-art preparation endpoints, and the coloring Print proof) |
 | `POST /api/projects/{key}/generation` | `{identity}`; saved-source batch report |
@@ -531,9 +543,17 @@ Public Sans remain ([design](../DESIGN.md)). Controls are 34-36 px on desktop an
 stack and include a preview jump. Tab lists use arrow keys; the cover canvas
 announces the selected layer and its keys, and moves are announced politely. Labels, fieldsets, explicit buttons, focus outlines,
 keyboard reorder controls, native discard/delete confirmations and polite status
-messages support keyboard operation. Solutions also use underlines and a textual
+messages support keyboard operation. Page views (coloring Pages designer, Print proof)
+zoom with Fit page, Fit width, steps and **Reset view**, pan by dragging, scroll bars
+or arrow keys, and take `+`, `-`, `0`; zooming resizes the same raster or Python
+boxes and never requests a new render. Undo and redo (Ctrl+Z, Ctrl+Shift+Z or
+Ctrl+Y) are scoped to one project's unsaved edits and are left to the browser inside
+text fields. New book moves focus to the details heading once a type is chosen. Solutions also use underlines and a textual
 one-based coordinate register; the API remains zero-based. Large grids scroll
 inside their region. Reduced-motion behavior remains.
+
+Authoring captures (New book, Settings, Pages designer, Print proof at 1440 and 390
+px) are in [images/authoring](images/authoring/) from `e2e/authoring.spec.ts`.
 
 Actual captures from disposable projects:
 [editor](images/studio/editor.png), [word editing](images/studio/word-editing.png),

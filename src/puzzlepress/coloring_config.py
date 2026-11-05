@@ -93,16 +93,46 @@ class ColoringDivider:
         return data
 
 
+MIN_PLACEMENT_SCALE = 0.5
+
+
+@dataclass(frozen=True)
+class Placement:
+    """Where one page prints its drawing inside the art box, losslessly.
+
+    `scale` is a fraction of the whole-drawing fit (1 fills the box on one axis);
+    `x` and `y` place the drawing within the space that leaves, from -1 (left,
+    bottom) through 0 (centred) to 1 (right, top). The drawing always stays whole
+    and inside the art box; its pixels are never resampled or cropped, only drawn
+    smaller, which raises the effective DPI.
+    """
+
+    scale: float = 1.0  # MIN_PLACEMENT_SCALE..1
+    x: float = 0.0  # -1..1
+    y: float = 0.0  # -1..1
+
+    def to_dict(self) -> dict[str, object]:
+        return {"scale": self.scale, "x": self.x, "y": self.y}
+
+
+CENTRED = Placement()
+
+
 @dataclass(frozen=True)
 class ColoringPage:
     """One entry in publication order: an artwork page, or a section divider."""
 
     artwork: str | None = None  # An artwork id.
     divider: ColoringDivider | None = None
+    # None is the whole drawing centred; a centred default is normalized to None, so
+    # it serializes and hashes as an entry without placement.
+    placement: Placement | None = None
 
     def to_dict(self) -> dict[str, object]:
         if self.divider is not None:
             return {"divider": self.divider.to_dict()}
+        if self.placement is not None:
+            return {"artwork": self.artwork, "placement": self.placement.to_dict()}
         return {"artwork": self.artwork}
 
 
@@ -124,6 +154,15 @@ class ColoringBook:
 
     def artwork_by_id(self, artwork_id: str) -> Artwork | None:
         return next((item for item in self.artwork if item.id == artwork_id), None)
+
+    @property
+    def placements(self) -> dict[int, Placement]:
+        """Authored placements by 1-based entry in `pages` (centred entries absent)."""
+        return {
+            number: page.placement
+            for number, page in enumerate(self.pages, start=1)
+            if page.placement is not None
+        }
 
     @property
     def artwork_pages(self) -> tuple[tuple[int, str], ...]:

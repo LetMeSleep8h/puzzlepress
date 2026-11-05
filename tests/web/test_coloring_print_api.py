@@ -5,6 +5,7 @@ Every drawing is SYNTHETIC (tests/coloring_helpers.py).
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -144,7 +145,21 @@ def test_frontend_fixtures_match_the_engine_output(client):
         )
 
     assert meaning(stored) == meaning(status)
-    assert detail["source"] == project["source"] and detail["engine"] == project["engine"]
+
+    def without_digests(source: dict) -> dict:
+        # The synthetic drawings are PNG-encoded on the machine running the test, and
+        # Pillow's bundled deflate differs between platforms, so their content-addressed
+        # names and digests do too (main's Linux CI, run 41849615371). Everything else
+        # in the source must match.
+        source = json.loads(json.dumps(source))
+        for artwork in source["coloring"]["artwork"]:
+            assert re.fullmatch(r"coloring-assets/drawing-\d-[0-9a-f]{12}\.png", artwork["path"])
+            assert artwork["path"][-16:-4] == artwork["sha256"][:12]
+            artwork["path"] = artwork["sha256"] = "<digest>"
+        return source
+
+    assert without_digests(detail["source"]) == without_digests(project["source"])
+    assert detail["engine"] == project["engine"]
 
 
 # ------------------------------------------------------------------ Pages composer (Interval 5)

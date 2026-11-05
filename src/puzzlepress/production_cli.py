@@ -211,6 +211,8 @@ def run_produce(args: argparse.Namespace) -> int:
         for issue in error.issues:
             print(f"  [{issue.code}] {issue.message}", file=sys.stderr)
         return 1
+    for note in result.notes:  # Only after an interrupted earlier run.
+        print(f"Recovered: {note}", file=sys.stderr)
     if args.json:
         _dump(result.validation.to_dict())
     else:

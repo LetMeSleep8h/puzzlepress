@@ -57,6 +57,7 @@ test('coloring artwork: import, check, refuse SVG, find look-alikes, remove', as
   const nav = page.getByRole('navigation', { name: 'Project' });
   await expect(nav.getByRole('link')).toHaveText([
     'Overview',
+    'Settings',
     'Artwork',
     'Pages',
     'Cover',

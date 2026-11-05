@@ -71,7 +71,7 @@ test('coloring books navigate to pages, cover and publishing in plain terms', as
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['Overview', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
+  ).toEqual(['Overview', 'Settings', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
   expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);
 });
 
@@ -222,4 +222,76 @@ test('an incomplete plan reports what blocks it', async () => {
   render(<App />);
   expect(await screen.findByText(/Add at least one drawing/)).toBeVisible();
   expect(screen.getByText('Incomplete')).toBeVisible();
+});
+
+test('redo and keyboard shortcuts step through edits; a save clears the history', async () => {
+  const { saves } = mockApi();
+  const user = userEvent.setup();
+  await open();
+  const undo = screen.getByRole('button', { name: 'Undo' });
+  const redo = screen.getByRole('button', { name: 'Redo' });
+  expect(undo).toBeDisabled();
+  expect(redo).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Move shape-03 up' }));
+  await user.click(screen.getByRole('button', { name: 'Move shape-03 up' }));
+  expect(order().slice(0, 3)).toEqual(['shape-03', 'shape-01', 'shape-02']);
+  await user.keyboard('{Control>}z{/Control}');
+  expect(order().slice(0, 3)).toEqual(['shape-01', 'shape-03', 'shape-02']);
+  await user.click(undo);
+  expect(order().slice(0, 3)).toEqual(['shape-01', 'shape-02', 'shape-03']);
+  expect(undo).toBeDisabled();
+  await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
+  expect(order().slice(0, 3)).toEqual(['shape-01', 'shape-03', 'shape-02']);
+  await user.click(redo);
+  expect(order().slice(0, 3)).toEqual(['shape-03', 'shape-01', 'shape-02']);
+  expect(redo).toBeDisabled();
+  // Typing in a field keeps the browser's own undo: no page edit is undone.
+  await user.click(screen.getByLabelText('Drawing to add'));
+  await user.keyboard('{Control>}z{/Control}');
+  expect(order()[0]).toBe('shape-03');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() => expect(saves).toHaveLength(1));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled());
+});
+
+test('the page designer replaces, places, duplicates and inserts around one entry', async () => {
+  const { plans } = mockApi();
+  const user = userEvent.setup();
+  await open();
+  await user.click(screen.getByRole('button', { name: 'Design shape-02' }));
+  const designer = screen.getByRole('region', { name: /Designing entry 2: shape-02/ });
+  expect(within(designer).getByText(/right-hand \(recto\)/)).toBeVisible();
+  expect(within(designer).getByRole('toolbar', { name: 'Selected page: view' })).toBeVisible();
+  await user.selectOptions(within(designer).getByLabelText('Drawing on this page'), 'shape-07');
+  expect(order().slice(0, 3)).toEqual(['shape-01', 'shape-07', 'shape-03']);
+  const size = within(designer).getByRole('slider', { name: 'Size' });
+  fireEvent.change(size, { target: { value: '0.7' } });
+  fireEvent.change(size, { target: { value: '0.65' } });
+  fireEvent.change(within(designer).getByRole('slider', { name: 'Vertical position' }), {
+    target: { value: '1' },
+  });
+  await waitFor(() =>
+    expect(plans.at(-1)!.source.coloring!.pages[1]).toEqual({
+      artwork: 'shape-07',
+      placement: { scale: 0.65, x: 0, y: 1 },
+    }),
+  );
+  expect(screen.getByText(/placed 65%/)).toBeVisible();
+  // One drag of the size slider is one undo step.
+  await user.click(screen.getByRole('button', { name: 'Undo' }));
+  expect(within(designer).getByRole('slider', { name: 'Vertical position' })).toHaveValue('0');
+  await user.click(screen.getByRole('button', { name: 'Undo' }));
+  expect(within(designer).getByRole('slider', { name: 'Size' })).toHaveValue('1');
+  await user.click(screen.getByRole('button', { name: 'Redo' }));
+  await user.click(within(designer).getByRole('button', { name: 'Reset placement' }));
+  await waitFor(() =>
+    expect(plans.at(-1)!.source.coloring!.pages[1]).toEqual({ artwork: 'shape-07' }),
+  );
+  await user.click(within(designer).getByRole('button', { name: 'Insert divider after' }));
+  expect(order().slice(0, 4)).toEqual(['shape-01', 'shape-07', 'Divider: New section', 'shape-03']);
+  // The divider is now selected; duplicating it adds a second one after it.
+  expect(screen.getByRole('region', { name: /Designing entry 3: Divider/ })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Duplicate page' }));
+  expect(order().slice(2, 5)).toEqual(['Divider: New section', 'Divider: New section', 'shape-03']);
+  expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);
 });

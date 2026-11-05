@@ -6,6 +6,7 @@ import { Cover } from './Cover';
 import { useDraft } from './draft';
 import { Print } from './Print';
 import { Publishing } from './Publishing';
+import { Settings } from './Settings';
 import type { ArtworkEntry, ColoringListing, Project } from './types';
 import { Empty, ErrorState, Loading, Status } from './ui';
 
@@ -13,13 +14,14 @@ import { Empty, ErrorState, Loading, Status } from './ui';
 // fact, finding, page and duplicate below is Python's; the browser only displays it,
 // edits the authored source and sends files.
 const SECTIONS: [string, string][] = [
+  ['settings', 'Settings'],
   ['artwork', 'Artwork'],
   ['pages', 'Pages'],
   ['cover', 'Cover'],
   ['print', 'Print proof'],
   ['publishing', 'Publishing'],
 ];
-const DRAFT_SECTIONS = ['pages', 'cover', 'publishing'];
+const DRAFT_SECTIONS = ['settings', 'pages', 'cover', 'publishing'];
 
 export function ColoringNav({ base, section }: { base: string; section: string }) {
   return (
@@ -60,7 +62,8 @@ export function ColoringWorkspace({
   onDirty?: (dirty: boolean) => void;
   onSaved?: (project: Project) => void;
 }) {
-  // One draft for Pages, Cover and Publishing, saved atomically with a revision check.
+  // One draft for Settings, Pages, Cover and Publishing, saved atomically with a
+  // revision check.
   const draft = useDraft(project, onSaved, onDirty);
   // The artwork panel saves imports, removals and settings directly. Coming back to the
   // draft sections, a clean draft reloads the saved source so it sees them; a draft
@@ -82,6 +85,7 @@ export function ColoringWorkspace({
   if (section === 'overview') return <ColoringOverview project={project} />;
   if (section === 'artwork') return <Artwork projectKey={project.key} />;
   if (section === 'print') return <Print project={draft.saved} dirty={draft.dirty} />;
+  if (section === 'settings') return <Settings d={draft} />;
   if (section === 'pages') return <ColoringPages d={draft} />;
   if (section === 'cover') return <Cover d={draft} />;
   if (section === 'publishing') return <Publishing d={draft} />;
@@ -143,17 +147,45 @@ function ColoringOverview({ project }: { project: Project }) {
           </dl>
         </section>
         <section className="review-start">
-          <h3>Start with the artwork.</h3>
-          <p>
-            Import PNG or JPEG line art. Studio keeps each original unchanged and reports its print
-            resolution and possible problems.
-          </p>
+          <h3>{coloring.artwork.length ? 'Your next steps' : 'Start with the artwork.'}</h3>
+          {!coloring.pages.some((page) => 'artwork' in page) && (
+            <p className="notice">
+              This book has no coloring pages yet, so it cannot pass the print and publishing
+              checks. Import drawings and put them on pages first.
+            </p>
+          )}
+          <ol className="journey">
+            <li>
+              <a href={`/books/${project.key}/settings`}>Settings</a>: title, author, language,
+              paper.
+            </li>
+            <li>
+              <a href={`/books/${project.key}/artwork`}>Artwork</a>: import PNG or JPEG line art and
+              prepare it ({coloring.artwork.length} drawings).
+            </li>
+            <li>
+              <a href={`/books/${project.key}/pages`}>Pages</a>: order, dividers, matter and
+              placement ({coloring.pages.length} entries).
+            </li>
+            <li>
+              <a href={`/books/${project.key}/print`}>Print proof</a>: build the interior PDF and
+              review every page.
+            </li>
+            <li>
+              <a href={`/books/${project.key}/cover`}>Cover</a>: designed and sized from the built
+              interior.
+            </li>
+            <li>
+              <a href={`/books/${project.key}/publishing`}>Publishing</a>: KDP details, your
+              declarations and the upload package.
+            </li>
+          </ol>
           <a className="button primary" href={`/books/${project.key}/artwork`}>
             Open the artwork library
           </a>
           <p className="small muted">
-            Print proof builds the interior PDF from the prepared artwork and checks it. Covers and
-            publishing for coloring books are not available in this version.
+            Studio keeps each original unchanged and reports its print resolution and possible
+            problems. Nothing is sent to Amazon; you upload the package yourself.
           </p>
         </section>
       </div>

@@ -132,6 +132,9 @@ class PrintService:
             ],
             "profile": _built_profile(artifacts.manifest) or DEFAULT_PROFILE,
         }
+        if project.printing is not None:
+            # The book's own choice (Settings); builds use it and Print proof shows it.
+            base["authored_profile"] = project.printing.profile
         if artifacts.pdf is None and artifacts.manifest is None:
             return {**base, "state": "missing", "report": None, "preview": None}
         cache_key = (
@@ -186,7 +189,17 @@ class PrintService:
                 raise StudioError(
                     409, "source_changed", "Saved source changed. Reload before building."
                 )
-            chosen = profile or _built_profile(read_interior_artifacts(directory).manifest)
+            authored = project.printing.profile if project.printing else None
+            if authored is not None and profile is not None and profile != authored:
+                raise StudioError(
+                    422,
+                    "profile_conflict",
+                    f"This book's print settings choose {authored}. Change the paper in "
+                    "Settings instead.",
+                )
+            chosen = (
+                authored or profile or _built_profile(read_interior_artifacts(directory).manifest)
+            )
             if chosen is not None and chosen not in PROFILES:
                 raise StudioError(422, "unsupported_profile", "Unknown print profile.")
             spec = PROFILES[chosen or DEFAULT_PROFILE]
@@ -226,7 +239,9 @@ class PrintService:
         source = self.store.source(key).parent
         with self.service.exclusive():
             _, _, _, directory = self._locate(key)
-            profile = _built_profile(read_interior_artifacts(directory).manifest)
+            profile = (project.printing.profile if project.printing else None) or _built_profile(
+                read_interior_artifacts(directory).manifest
+            )
             spec = PROFILES[profile or DEFAULT_PROFILE]
             identity = build_identity(project)
             publication = self._publications.get(identity)

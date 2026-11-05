@@ -208,3 +208,61 @@ def test_originals_are_never_written(made: Path, released) -> None:
         if path.is_file():
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             assert path.name.split("-")[-1].split(".")[0] == digest[:12]
+
+
+def test_an_interrupted_swap_is_repaired_before_the_next_run(
+    made: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A crash after the previous output was moved aside, before the new one moved in."""
+    output = tmp_path / "out"
+    produce(made, output)
+    before = _digests(output)
+    backup = tmp_path / ".out.produce-previous-crash"
+    output.rename(backup)
+    staging = tmp_path / ".out.produce-staging-crash"
+    staging.mkdir()
+    (staging / "interior.pdf").write_bytes(b"half written")
+    unrelated = tmp_path / ".other.produce-staging-x"  # Another output's: untouched.
+    unrelated.mkdir()
+
+    def broken(*args: object, **kwargs: object) -> object:
+        raise OSError("disk full")
+
+    # The next run fails, yet the restored previous output survives it.
+    monkeypatch.setattr(production, "_verify", broken)
+    with pytest.raises(OSError, match="disk full"):
+        produce(made, output)
+    assert _digests(output) == before
+    assert sorted(p.name for p in tmp_path.iterdir()) == [".other.produce-staging-x", "out"]
+    monkeypatch.undo()
+    result = produce(made, output)
+    assert result.notes == () and _digests(output) == before
+
+
+def test_recovery_reports_what_it_did(made: Path, tmp_path: Path) -> None:
+    output = tmp_path / "out"
+    produce(made, output)
+    leftover = tmp_path / ".out.produce-previous-old"
+    shutil.copytree(output, leftover)
+    (tmp_path / ".out.produce-staging-old").mkdir()
+    result = produce(made, output)
+    assert len(result.notes) == 2 and all("interrupted" in note for note in result.notes)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["out"]
+
+
+def test_a_live_run_holding_the_lock_is_refused(made: Path, tmp_path: Path) -> None:
+    from tests.test_production_lock import hold
+
+    output = tmp_path / "out"
+    produce(made, output)
+    before = _digests(output)
+    process, pid = hold(tmp_path, tmp_path / ".out.produce.lock", "hold")
+    try:
+        with pytest.raises(ProjectError) as raised:
+            produce(made, output)
+        assert raised.value.issues[0].code == "production_in_progress"
+        assert f"process {pid}" in raised.value.issues[0].message
+        assert _digests(output) == before
+    finally:
+        (tmp_path / "release").write_text("", encoding="utf-8")
+        process.wait(timeout=60)

@@ -14,6 +14,8 @@ import { Planning } from './Planning';
 import { Interior } from './Interior';
 import { useDraft } from './draft';
 import { ColoringNav, ColoringWorkspace } from './Coloring';
+import { CreateBook } from './CreateBook';
+import { Settings } from './Settings';
 
 function usePath(allow: (next: string, current: string) => boolean) {
   const [path, setPath] = useState(window.location.pathname);
@@ -72,6 +74,7 @@ function DraftWorkspace({
       <div hidden={section !== 'edit'}>
         <Editor d={draft} />
       </div>
+      {section === 'settings' && <Settings d={draft} />}
       {section === 'book' && <Composer d={draft} />}
       {section === 'interior' && <Interior d={draft} />}
       {section === 'cover' && <Cover d={draft} />}
@@ -124,6 +127,7 @@ function ProjectWorkspace({
   }, [projectKey, attempt]);
   const needsGeneration = ![
     'overview',
+    'settings',
     'edit',
     'book',
     'interior',
@@ -224,7 +228,7 @@ function ProjectWorkspace({
           <Planning projectKey={projectKey} onDirty={trackPlanDirty} />
         </div>
       )}
-      {['edit', 'book', 'interior', 'cover', 'publishing', 'planning'].includes(
+      {['settings', 'edit', 'book', 'interior', 'cover', 'publishing', 'planning'].includes(
         section,
       ) ? null : section === 'print' ? (
         <Print project={project} dirty={dirty} />
@@ -267,6 +271,7 @@ const NAV: { group: string; items: [string, string, string?][] }[] = [
   {
     group: 'Create',
     items: [
+      ['settings', 'Settings'],
       ['planning', 'Plan'],
       ['edit', 'Puzzles', 'count'],
       ['book', 'Book'],
@@ -370,9 +375,10 @@ export function App() {
     first.current = false;
   }, [path]);
   const match = path.match(
-    /^\/books\/([^/]+)(?:\/(puzzles|quality|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
+    /^\/books\/([^/]+)(?:\/(puzzles|quality|settings|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
   );
   const isLibrary = path === '/' || path === '/books' || path === '/books/';
+  const isCreate = path === '/create' || path === '/create/';
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -387,6 +393,9 @@ export function App() {
           <a href="/books" aria-current={isLibrary ? 'page' : undefined}>
             Books
           </a>
+          <a href="/create" aria-current={isCreate ? 'page' : undefined}>
+            New book
+          </a>
         </nav>
         <span className="appbar-note">Local studio · files stay on this machine</span>
       </header>
@@ -395,10 +404,13 @@ export function App() {
           <RenderBoundary>
             {isLibrary ? (
               <Library />
+            ) : isCreate ? (
+              <CreateBook />
             ) : match &&
               !(
                 [
                   'quality',
+                  'settings',
                   'edit',
                   'book',
                   'interior',

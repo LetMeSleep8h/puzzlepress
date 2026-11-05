@@ -35,15 +35,21 @@ output:
 | `content.items` | Ordered nonempty strings; omitted content/items defaults to an empty list. Duplicates and order are preserved. No puzzle-specific rules apply. |
 | `output.directory` | Relative path from the resolved YAML file's directory; defaults to `../build/<book.id>`. |
 | `word_search` | Optional banks, explicit difficulty profiles, themed puzzle definitions, and quality settings. See [batch schema](batch-quality.md). Omit for legacy projects; null is rejected. |
-| `coloring` | Optional coloring book (version 1): artwork library pinned by SHA-256, page order, adjustment settings, layout. Not with `word_search` (`engine_conflict`) or `composition` yet. Part of build identity. See [coloring books](coloring.md). |
+| `coloring` | Optional coloring book (version 1): artwork library pinned by SHA-256, page order with optional per-page placement, adjustment settings, layout. Not with `word_search` (`engine_conflict`). Part of build identity. See [coloring books](coloring.md). |
 | `composition` | Optional book composition: front/back matter, solution and page-number policy. Requires `word_search`. See [book composition](book-composition.md). |
 | `cover` | Optional versioned paperback cover: photograph, crop, type and fill. Requires `composition`. Excluded from build identity. See [cover](cover.md). |
 | `publishing` | Optional versioned KDP paperback metadata, AI disclosure and author confirmations. Requires `composition`. Excluded from build identity. See [publishing](publishing.md). |
+| `catalog` | Optional `{subject, collection}`: one line each, <=120 characters; how the author files the book in the Library. Read by nothing else; excluded from every identity. A collection is not a KDP series. |
+| `print` | Optional `{profile}`: `paperback-8.5x11` (white) or `paperback-8.5x11-cream`, i.e. trim and paper. Builds and `book produce` use it and refuse a different `--profile` (`profile_conflict`). Part of build identity when present, so a paper change stales the interior and cover. |
 
 The content engine is derived from the content section, never authored: a source
 without another engine's section (legacy ones included) is a `word_search` book.
 `inspect` prints it and Studio's project detail reports it; it is not serialized
 and not part of build identity.
+
+`puzzlepress book new FOLDER --type word_search|coloring --title ...` (and Studio's
+**New book**) writes a starter source; see
+[coloring-publishing.md](coloring-publishing.md#1-new-project).
 
 A book plan is not part of `book.yaml`: it is a separate versioned document,
 `planning.yaml`, beside it, with its own identity and revision. No build reads it.

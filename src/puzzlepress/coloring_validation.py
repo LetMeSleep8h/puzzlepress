@@ -10,11 +10,13 @@ import re
 
 from .coloring_config import (
     ARTWORK_DIRECTORY,
+    CENTRED,
     COLORING_VERSION,
     MAX_ARTWORK,
     MAX_DIVIDER_TEXT,
     MAX_PAGES,
     MAX_TITLE,
+    MIN_PLACEMENT_SCALE,
     Adjustments,
     Artwork,
     Border,
@@ -22,6 +24,7 @@ from .coloring_config import (
     ColoringDivider,
     ColoringLayout,
     ColoringPage,
+    Placement,
 )
 from .content_validation import _Reader
 from .errors import ValidationIssue
@@ -104,6 +107,18 @@ def _adjustments(reader: _Reader, raw: object, path: str) -> Adjustments:
         line_weight=_integer(reader, data.get("line_weight"), f"{path}.line_weight", -2, 2),
         invert=_flag(reader, data.get("invert"), f"{path}.invert", False),
     )
+
+
+def _placement(reader: _Reader, raw: object, path: str) -> Placement | None:
+    if raw is None:
+        return None
+    data = reader.mapping(raw, path, {"scale", "x", "y"})
+    placement = Placement(
+        _number(reader, data.get("scale"), f"{path}.scale", MIN_PLACEMENT_SCALE, 1.0, 1.0),
+        _number(reader, data.get("x"), f"{path}.x", -1.0, 1.0, 0.0),
+        _number(reader, data.get("y"), f"{path}.y", -1.0, 1.0, 0.0),
+    )
+    return None if placement == CENTRED else placement
 
 
 def _title(reader: _Reader, value: object, path: str) -> str | None:
@@ -215,8 +230,9 @@ def validate_coloring(value: object) -> tuple[ColoringBook | None, tuple[Validat
             if divider is not None:
                 pages.append(ColoringPage(divider=divider))
             continue
-        data = reader.mapping(raw, page_path, {"artwork"})
+        data = reader.mapping(raw, page_path, {"artwork", "placement"})
         reference = data.get("artwork")
+        placement = _placement(reader, data.get("placement"), f"{page_path}.placement")
         if not isinstance(reference, str) or not reference:
             reader.issue(
                 f"{page_path}.artwork",
@@ -230,7 +246,7 @@ def validate_coloring(value: object) -> tuple[ColoringBook | None, tuple[Validat
                 f"No artwork has the ID {reference!r}.",
             )
         else:
-            pages.append(ColoringPage(reference))
+            pages.append(ColoringPage(reference, placement=placement))
     layout_raw = root.get("layout")
     layout = ColoringLayout()
     if layout_raw is not None:

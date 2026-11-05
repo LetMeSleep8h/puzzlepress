@@ -4971,3 +4971,215 @@ button.primary.danger {
     gap: 2px;
   }
 }
+
+/* ---------------------------------------------------------- Interval 6: authoring */
+.page-viewport {
+  display: grid;
+  gap: var(--space-1);
+}
+.viewport-toolbar,
+.history-actions,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.viewport-toolbar select {
+  width: auto;
+}
+.viewport-canvas {
+  overflow: auto;
+  /* A fixed height, so Fit page fits this box rather than the drawing's own size. */
+  height: min(65vh, 640px);
+  min-height: 240px;
+  padding: 12px;
+  background: #e6e3da;
+  border-radius: var(--radius);
+  cursor: grab;
+  touch-action: pan-x pan-y;
+}
+.viewport-canvas.panning,
+.print-canvas.panning {
+  cursor: grabbing;
+  user-select: none;
+}
+.viewport-canvas:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+.viewport-content {
+  margin: 0 auto;
+}
+.designer-page {
+  display: block;
+  background: var(--paper);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+}
+.designer-page .trim {
+  fill: var(--paper);
+  stroke: var(--line);
+}
+.designer-page .live {
+  fill: none;
+  stroke: #4a7fa6;
+  stroke-dasharray: 6 4;
+  stroke-width: 1;
+}
+.designer-page .art {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 1;
+}
+.designer-page .placed {
+  fill: none;
+  stroke: var(--review);
+  stroke-width: 1.5;
+}
+.designer-page .guide {
+  stroke: #4a7fa6;
+  stroke-width: 0.5;
+  stroke-dasharray: 2 4;
+}
+.designer-page .label,
+.designer-page .side-label {
+  font: 14px var(--sans, sans-serif);
+  fill: var(--muted);
+}
+.page-designer {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.page-designer h4 {
+  margin: 0;
+}
+.placement-fields {
+  display: grid;
+  gap: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+}
+.slider-field input[type='range'] {
+  width: 100%;
+  min-height: 40px;
+}
+.page-order > li.selected {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+  background: var(--wash);
+}
+.page-card.selected {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  color: var(--green);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.settings-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+.settings-grid > section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  background: var(--paper);
+  min-width: 0;
+}
+.link-list,
+.journey {
+  padding-left: 1.2em;
+  display: grid;
+  gap: 6px;
+}
+.create-book {
+  display: grid;
+  gap: var(--space-3);
+}
+.type-choices {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+.type-card {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  cursor: pointer;
+}
+.type-card input {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+}
+.type-card.chosen {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px var(--green);
+}
+.type-card:focus-within {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+.type-card.unavailable {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.type-specimen {
+  width: 72px;
+  height: 72px;
+}
+.type-specimen .sheet {
+  fill: #fff;
+  stroke: var(--line);
+}
+.type-specimen .glyph {
+  font: 7px var(--sans, sans-serif);
+  fill: var(--ink);
+}
+.type-specimen .found {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 1.2;
+}
+.type-specimen .line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.4;
+}
+.create-details {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 900px;
+}
+.create-details h2:focus {
+  outline: none;
+}
+@media (max-width: 600px) {
+  .viewport-canvas {
+    height: 55vh;
+    padding: 6px;
+  }
+  .settings-grid > section,
+  .page-designer {
+    padding: 12px;
+  }
+}

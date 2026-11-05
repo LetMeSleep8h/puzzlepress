@@ -132,8 +132,9 @@ def _coloring_layout(
 
     assert project.coloring is not None
     border = project.coloring.layout.border
-    layout = layout_coloring(plan, content, spec, border)
-    issues = validate_coloring_layout(layout, plan, content, border)
+    placements = project.coloring.placements
+    layout = layout_coloring(plan, content, spec, border, placements)
+    issues = validate_coloring_layout(layout, plan, content, border, placements)
     if issues:
         raise InteriorError("layout_validation", issues)
     return layout

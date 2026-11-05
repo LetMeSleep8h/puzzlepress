@@ -59,11 +59,11 @@ test('a coloring book declares artwork origins and rights, in its own words', as
   expect(
     screen.getByRole('radio', { name: /KDP lists coloring books as not generally/ }),
   ).toBeChecked();
-  // Book details are edited in Pages for coloring books.
-  const details = screen.getByText(/Edit them under Book details in/);
-  expect(within(details).getByRole('link', { name: 'Pages' })).toHaveAttribute(
+  // Book details are edited in Settings for coloring books.
+  const details = screen.getByText(/Edit them in/);
+  expect(within(details).getByRole('link', { name: 'Settings' })).toHaveAttribute(
     'href',
-    '/books/coloring-pages/pages',
+    '/books/coloring-pages/settings',
   );
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(saves).toHaveLength(1));

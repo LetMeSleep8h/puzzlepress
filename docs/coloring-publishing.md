@@ -12,18 +12,44 @@ Reference: [coloring.md](coloring.md) (artwork, preparation, interior, preflight
 
 ## 1. New project
 
-A coloring book is a folder holding `book.yaml` with a `coloring` section:
+In Studio, **New book** (Library or the top bar) asks for the type, then the title,
+optional subtitle, author or pen name, language, folder name (empty: named after
+the title), subject, collection, paper (white, cream, or decide later; trim is
+8.5 x 11 in) and a starting point (Simple, or with instructions and a Notes page).
+Python creates the folder; a name that exists, contains path characters or is
+reserved is refused beside its field with your answers kept. From the CLI:
+
+```text
+puzzlepress book new books/woodland-coloring --type coloring --title "Woodland Coloring"
+```
+
+Either way the folder holds a `book.yaml` like this (the seed is derived from the
+folder name; `catalog` and `print` only when you set them):
 
 ```yaml
 schema_version: 1
 book: {id: woodland-coloring, title: Woodland Coloring, author: A. Artist, language: en}
-build: {seed: 1}
+build: {seed: 160829203453012}
 output: {directory: ../../build/woodland-coloring}
 coloring: {version: 1}
+composition: {front_matter: [{kind: title_page}], artwork: {start: recto}, ...}
+catalog: {subject: Nature}
+print: {profile: paperback-8.5x11-cream}
 ```
 
-`puzzlepress inspect BOOK` shows `Engine: coloring (Coloring book)`. Keep the
-output directory outside the book folder; PuzzlePress refuses to write inside it.
+A new coloring book has no drawings, so it cannot pass the print and publishing
+checks until you add them; nothing is filled in for you. Creation is atomic: the
+folder is reserved, `book.yaml` is staged and verified, and a failure removes only
+what it wrote. If a creation is interrupted, creating the same name again clears
+the half-made folder (only when it holds nothing but PuzzlePress's own staging
+files). Keep the output directory outside the book folder; PuzzlePress refuses to
+write inside it.
+
+**Settings** holds the book details (title, subtitle, author, imprint, language,
+your own description), the catalog (subject, collection; Library only, not a KDP
+series) and the paper. The paper is part of the build identity: changing it makes
+the interior and cover out of date, and builds then use it (a different `--profile`
+is refused as `profile_conflict`).
 
 ## 2. Artwork import
 
@@ -58,13 +84,16 @@ erasing detail is not. Findings are measurements, not judgements.
 
 ## 4. Page organization
 
-In Studio, **Pages** lists drawings and section dividers in printing order. Drag a
-row or use **Up** and **Down**; **Add drawing at the end**, **Repeat** (use a drawing
+In Studio, **Pages** lists drawings and section dividers in printing order. Select
+a page with **Design** to see it at any zoom with its margins and art box, replace
+its drawing, make it smaller and move it (it stays whole, never cropped or
+resampled), duplicate it or insert a divider after it. Drag a row or use **Up** and
+**Down**; **Add drawing at the end**, **Repeat** (use a drawing
 again on purpose, flagged), **Remove** (the file stays in the library), **Add
 section divider** (title and optional description). The front matter (title page,
 copyright notice you write yourself, instructions), back matter, blank backs,
-border, recto start and page numbering are on the same page. **Undo** steps back
-through your edits; **Save changes** writes `book.yaml` atomically and refuses if the
+border, recto start and page numbering are on the same page. **Undo** and **Redo** (Ctrl+Z, Ctrl+Shift+Z) step
+through your unsaved edits; **Save changes** writes `book.yaml` atomically and refuses if the
 saved file changed meanwhile.
 
 The preview is Python's plan of your draft: physical PDF pages as spreads, right-
@@ -163,6 +192,19 @@ and KDP metadata, `publishing-validation.json`/`.md`, `production.json`, and
 beside `release/` and swapped in only after every file is read back; a failed run
 leaves the previous release untouched. Exit 0 only with no blocking item.
 
+Only one run may write an output at a time. The lock `.release.produce.lock` beside
+it is an operating-system lock that ends with its process, so:
+
+- a second run while one is active is refused, naming the active run's process and
+  computer;
+- after a crash, the next run reclaims the lock (it reports this on stderr), puts
+  back a previous release that the crashed run had moved aside, and removes that
+  run's staging folder;
+- a lock file it cannot attribute (written by another computer on a shared drive,
+  empty, or unreadable, as earlier PuzzlePress versions left them) is never removed:
+  the run is refused with the file's path, to delete only once no run is active.
+
+
 An example from the synthetic test book (`python tests/coloring_production.py
 DIR` writes it, with SYNTHETIC declarations made for no real author):
 
@@ -197,23 +239,35 @@ submit:
 ## Real-artwork review
 
 PuzzlePress's thresholds were calibrated on synthetic drawings only; no genuine
-coloring artwork was available to this engine. Until a person has reviewed real
-artwork this way, treat every line-quality result as provisional:
+coloring artwork was available to this engine (Interval 6 looked again: the book
+repository holds automotive cover photographs, not line art, and their licence is
+not recorded). [coloring.md](coloring.md#calibration) lists which thresholds are
+empirical on synthetic data, which are conservative heuristics and which rest on one
+person's on-screen judgement. Until a person has reviewed real artwork, treat every
+line-quality result as provisional. The harness makes that review repeatable:
 
-1. Choose a small set you have the rights to use for testing, covering: detailed
-   automotive or mechanical line art, nature or landscape drawings, pencil-style
-   drawings, dense patterns, thin outlines, and light or low-contrast strokes.
-2. Import them into a scratch book (never the real book) and build the interior
-   with default settings.
-3. For each drawing, compare original, prepared and difference views at 100 %
-   zoom; note any loss of fine or light lines, background tint, broken outlines,
-   clipped details, overly dark areas and unbalanced line weights, and whether
-   PuzzlePress reported each one.
-4. Adjust settings until the page looks right; record the settings and whether a
-   finding appeared that should not have, or did not appear when it should.
-5. Order one printed proof of the scratch book and repeat step 3 on paper.
-6. Record the results (file, source and licence, settings, findings, what the eye
-   saw on screen and on paper) and update the thresholds only from that evidence.
+```text
+python tests/artwork_review.py REVIEW_INPUTS/ review-out/ [--set contrast=1.2 ...]
+python tests/artwork_review.py --synthetic review-out/     # exercise it on synthetic art
+```
+
+It reads the folder without changing it and writes, per drawing, full-resolution
+original, prepared and difference images and `measures.json` (inspection and
+preparation measures, findings and the thresholds used), then a print-size
+`print/interior.pdf` with coloring preflight from a scratch book of copies, and
+`review.md`. Its source-and-licence, on-screen, printed-proof and missed-or-false
+finding columns say "not recorded" until a person fills them in.
+
+1. Choose a set you have the rights to use for testing, covering: detailed
+   automotive or mechanical line art, nature or landscape drawings, fine pencil
+   drawings, dense patterns, hand-drawn illustration and low-contrast scans. A file
+   being on your disk or online is not a licence.
+2. Run the harness with default settings, then with the settings you would use.
+3. Compare original, prepared and difference images at 100 % zoom: fine and light
+   lines, background tint, specks, broken outlines, clipped detail, dark areas, line
+   weight. Record what you saw and whether a finding was missed or false.
+4. Order one printed proof of `print/interior.pdf` and repeat step 3 on paper.
+5. Change a threshold only from those recorded results.
 
 ## Measurements
 
@@ -241,10 +295,35 @@ The memo reuses line-quality measures and packed prepared pixels for the same
 verified bytes, settings and versions within one process; it skips no check and
 writes nothing to disk. A first preflight still measures every drawing.
 
+### Interval 6 (production lock, placement and the memo review)
+
+`python tests/coloring_benchmark.py DIR` (150 synthetic drawings, 302 pages, blank
+backs; build, two preflights and `book produce` in one process). Two runs each,
+alternating, same Windows machine and day, Python 3.13; main at `b42b5bd`:
+
+| Step | main, run 1 / run 2 | Interval 6, run 1 / run 2 |
+| --- | --- | --- |
+| `book build` | 20.3 s / 27.9 s | 22.8 s / 20.2 s |
+| first preflight after the build | 119.8 s / 111.8 s | 111.4 s / 144.3 s |
+| second preflight, same process | 14.9 s / 15.0 s | 15.7 s / 18.1 s |
+| `book produce` after both (memo warm) | 21.4 s / 22.8 s | 24.6 s / 22.9 s |
+| peak working set (run 2) | 174.0 MB | 173.8 MB |
+
+The run-to-run spread on one code base (up to 33 s on a first preflight) is larger
+than any difference between the two, so these runs show no measurable change; the
+lock adds a file open and an OS lock call per run. The four sample books of
+`tests/coloring_samples.py` build byte-identical PDFs with equal build and interior
+identities on both.
+
 ## Known limitations
 
 - One trim (8.5 x 11 in, white or cream paper), no bleed: art prints inside the
-  margins. No auto-crop, captions or per-page placement.
+  margins. No auto-crop or captions; placement only shrinks and moves a drawing
+  inside its art box.
+- The production lock relies on the operating system's file lock; on a network
+  share that does not pass locks between computers, two computers could still
+  write one output. A lock written by another computer is therefore never reclaimed
+  automatically.
 - No graphical illustration editor; preparation is a fixed set of adjustments.
 - Line-quality thresholds are synthetic-calibrated conventions; see Real-artwork
   review. Light-stroke detection cannot tell construction lines from detail.

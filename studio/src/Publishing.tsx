@@ -373,7 +373,7 @@ function Metadata({
           These come from the book and print on the cover, so KDP sees the same values.{' '}
           {coloring ? (
             <>
-              Edit them under Book details in <a href={`${base}/pages`}>Pages</a>.
+              Edit them in <a href={`${base}/settings`}>Settings</a>.
             </>
           ) : (
             <>

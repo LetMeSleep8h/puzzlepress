@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING
 from .. import __version__
 from ..models import Project
 from ..project import LoadedProject
+from .lock import production_lock
 
 if TYPE_CHECKING:
     from ..preflight.engine import PreflightResult
@@ -62,6 +63,8 @@ DUPLICATES_JSON = "artwork-duplicates.json"
 DUPLICATES_MD = "artwork-duplicates.md"
 READINESS_NAME = "publishing-readiness.json"
 METADATA_NAME = "kdp-metadata.json"
+# Prefixed with the output's name (`.<name>.produce-staging-…`), so recovery after a
+# crash only ever touches what a run for this output left.
 STAGING_PREFIX = ".produce-staging-"
 PREVIOUS_PREFIX = ".produce-previous-"
 
@@ -120,15 +123,55 @@ def environment() -> dict[str, object]:
     }
 
 
-def _lock(path: Path) -> int:
-    try:
-        return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError as error:
-        raise _fail(
-            "production_in_progress",
-            f"Another production run holds {path.name}. Wait for it to finish; if no run is "
-            "active (for example after a crash), delete that file and run again.",
-        ) from error
+def _recover(parent: Path, directory: Path, book_id: str) -> tuple[str, ...]:
+    """Under the lock: finish what an interrupted earlier run left beside the output.
+
+    A run interrupted between moving the previous output aside and moving the new
+    one in leaves the output missing and its previous version in a backup: that
+    backup is put back. Backups whose output is in place, and staging directories,
+    are removed. Only direct children with this output's own prefixes, real
+    directories (not links) holding this book's manifest (or, for staging, any
+    files) are touched; anything else is left and reported by nothing.
+    """
+    notes: list[str] = []
+    staging_prefix, previous_prefix = _prefixes(directory)
+
+    def ours(path: Path, prefix: str) -> bool:
+        return (
+            path.parent == parent
+            and path.name.startswith(prefix)
+            and not path.is_symlink()
+            and path.is_dir()
+        )
+
+    def owned(path: Path) -> bool:
+        try:
+            data = json.loads((path / MANIFEST_NAME).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError):
+            return False
+        return (
+            isinstance(data, dict) and data.get("kind") == KIND and data.get("book_id") == book_id
+        )
+
+    entries = sorted(parent.iterdir())
+    backups = [p for p in entries if ours(p, previous_prefix) and owned(p)]
+    if not directory.exists() and len(backups) == 1:
+        os.replace(backups[0], directory)
+        notes.append("Restored the previous output, which an interrupted run had moved aside.")
+        backups = []
+    for path in backups:
+        if directory.exists() and ours(path, previous_prefix):
+            shutil.rmtree(path)
+            notes.append(f"Removed {path.name}, a previous output an interrupted run kept.")
+    for path in entries:
+        if ours(path, staging_prefix):
+            shutil.rmtree(path)
+            notes.append(f"Removed {path.name}, the files of an interrupted run.")
+    return tuple(notes)
+
+
+def _prefixes(directory: Path) -> tuple[str, str]:
+    return f".{directory.name}{STAGING_PREFIX}", f".{directory.name}{PREVIOUS_PREFIX}"
 
 
 def _previous_environment(directory: Path) -> dict[str, object] | None:
@@ -150,25 +193,29 @@ def produce_coloring(
     directory = check_disjoint(Path(output), [source])
     parent = directory.parent
     parent.mkdir(parents=True, exist_ok=True)
-    if directory.exists():
-        _owned(directory, project.book.id)
     lock_path = parent / f".{directory.name}.produce.lock"
-    handle = _lock(lock_path)
-    staging: Path | None = None
-    try:
-        staging = Path(tempfile.mkdtemp(prefix=STAGING_PREFIX, dir=parent))
-        previous_environment = _previous_environment(directory) if directory.exists() else None
-        run = _run(project, source, staging, profile, previous_environment)
-        files = _manifest(project, staging, run)
-        _verify(staging, files)
-        _swap(staging, directory)
-        staging = None
-        return ProductionResult(directory, run.validation, files)
-    finally:
-        if staging is not None:
-            shutil.rmtree(staging, ignore_errors=True)
-        os.close(handle)
-        lock_path.unlink(missing_ok=True)
+    with production_lock(lock_path) as lock:
+        notes = _recover(parent, directory, project.book.id)
+        if lock.recovered is not None:
+            notes = (
+                f"Reclaimed an abandoned production lock ({lock.recovered.describe()}).",
+                *notes,
+            )
+        if directory.exists():
+            _owned(directory, project.book.id)
+        staging: Path | None = None
+        try:
+            staging = Path(tempfile.mkdtemp(prefix=_prefixes(directory)[0], dir=parent))
+            previous_environment = _previous_environment(directory) if directory.exists() else None
+            run = _run(project, source, staging, profile, previous_environment)
+            files = _manifest(project, staging, run)
+            _verify(staging, files)
+            _swap(staging, directory)
+            staging = None
+            return ProductionResult(directory, run.validation, files, notes)
+        finally:
+            if staging is not None:
+                shutil.rmtree(staging, ignore_errors=True)
 
 
 def _run(
@@ -192,8 +239,16 @@ def _run(
     )
     from ..interior.build import write_preflight_report
     from ..preflight import preflight_interior, read_interior_artifacts, report_bytes
+    from ..print_config import ProfileConflict, chosen_profile
 
-    spec = print_profile(profile or DEFAULT_PROFILE)
+    try:
+        chosen = chosen_profile(project.printing, profile)
+    except ProfileConflict as conflict:
+        raise InteriorError(
+            "print_spec",
+            (LayoutIssue("profile_conflict", str(conflict), region="print.profile"),),
+        ) from conflict
+    spec = print_profile(chosen or DEFAULT_PROFILE)
     if isinstance(spec, LayoutIssue):
         raise InteriorError("print_spec", (spec,))
     build = build_interior(project, spec, source)
@@ -600,7 +655,7 @@ def _swap(staging: Path, directory: Path) -> None:
     if not directory.exists():
         os.replace(staging, directory)
         return
-    backup = Path(tempfile.mkdtemp(prefix=PREVIOUS_PREFIX, dir=directory.parent))
+    backup = Path(tempfile.mkdtemp(prefix=_prefixes(directory)[1], dir=directory.parent))
     backup.rmdir()
     os.replace(directory, backup)
     try:
