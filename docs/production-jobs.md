@@ -69,7 +69,8 @@ is final: later lines never change it.
   35 % slower while other processes competed for the CPU, with no measured benefit to
   Studio's own latency (the server is a separate process either way). The job records
   what took effect (Interval 8 records without the field read as below normal). The
-  worker's peak memory is in the completed result. `worker.log` keeps its last 1 MB;
+  worker's peak memory is in the completed result. `worker.log` keeps its last 1 MB
+  (Windows: the replacement is retried for 2 s while a reader holds the log open);
   ten finished jobs are kept per release; an event log over 4 MB is refused as damaged.
 - **Source.** The worker refuses a job whose book.yaml no longer has the requested
   revision, and checks the produced manifest's build identity and book ID.

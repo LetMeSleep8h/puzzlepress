@@ -32,6 +32,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -53,6 +54,10 @@ LOGGER = logging.getLogger(__name__)
 MANIFEST = "production.json"
 STARTING_GRACE = 30.0  # Seconds a worker not started by this Studio may take to lock.
 LOG_LIMIT = 1024 * 1024  # worker.log keeps at most its last megabyte.
+# Windows refuses to replace a file another process has open (a reader of the log, an
+# indexer): the bound retries briefly instead of leaving the log unbounded.
+LOG_REPLACE_ATTEMPTS = 40
+LOG_REPLACE_PAUSE = 0.05
 STEP_LABELS = {
     "interior": "Building the interior PDF",
     "interior_preflight": "Checking the interior",
@@ -134,9 +139,23 @@ def _bound_log(path: Path) -> None:
         note = f"[worker.log: the first {size - LOG_LIMIT} bytes were removed]\n".encode()
         staged = path.with_name(path.name + ".tmp")
         staged.write_bytes(note + tail)
-        os.replace(staged, path)
     except OSError:
         LOGGER.warning("Could not bound %s", path)
+        return
+    for attempt in range(LOG_REPLACE_ATTEMPTS):
+        try:
+            os.replace(staged, path)
+            return
+        except PermissionError:
+            if attempt + 1 < LOG_REPLACE_ATTEMPTS:
+                time.sleep(LOG_REPLACE_PAUSE)
+        except OSError:
+            break
+    LOGGER.warning("Could not bound %s", path)
+    try:
+        staged.unlink()
+    except OSError:
+        pass
 
 
 def _manifest_digest(release: Path) -> str | None:

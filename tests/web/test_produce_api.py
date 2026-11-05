@@ -665,3 +665,46 @@ def test_worker_logs_are_bounded(
         assert time.monotonic() < deadline, len(data)
         time.sleep(0.1)
     assert data.startswith(b"[worker.log: the first ")
+
+
+def _flaky_replace(monkeypatch: pytest.MonkeyPatch, refusals: int | None) -> list[tuple[str, str]]:
+    """os.replace refused `refusals` times (None: always), as Windows refuses while
+    another process has the target open."""
+    real = producing.os.replace
+    calls: list[tuple[str, str]] = []
+
+    def replace(source: object, target: object) -> None:
+        calls.append((str(source), str(target)))
+        if refusals is None or len(calls) <= refusals:
+            raise PermissionError(13, "The process cannot access the file")
+        real(source, target)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(producing.os, "replace", replace)
+    monkeypatch.setattr(producing, "LOG_REPLACE_PAUSE", 0.0)
+    return calls
+
+
+def test_a_briefly_open_log_is_still_bounded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log = tmp_path / jobs.LOG_NAME
+    log.write_bytes(b"x" * (producing.LOG_LIMIT + 5000))
+    calls = _flaky_replace(monkeypatch, 3)
+    producing._bound_log(log)
+    data = log.read_bytes()
+    assert len(calls) == 4 and data.startswith(b"[worker.log: the first 5000 bytes")
+    assert len(data) <= producing.LOG_LIMIT + 100
+    assert sorted(p.name for p in tmp_path.iterdir()) == [jobs.LOG_NAME]
+
+
+def test_a_log_that_stays_open_is_kept_whole_and_leaves_no_staged_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log = tmp_path / jobs.LOG_NAME
+    original = b"y" * (producing.LOG_LIMIT + 5000)
+    log.write_bytes(original)
+    calls = _flaky_replace(monkeypatch, None)
+    producing._bound_log(log)  # Bounded attempts, then gives up with a warning.
+    assert len(calls) == producing.LOG_REPLACE_ATTEMPTS
+    assert log.read_bytes() == original
+    assert sorted(p.name for p in tmp_path.iterdir()) == [jobs.LOG_NAME]
