@@ -6,6 +6,7 @@ import { Cover } from './Cover';
 import { useDraft } from './draft';
 import { Print } from './Print';
 import { Publishing } from './Publishing';
+import { Produce } from './Produce';
 import { Settings } from './Settings';
 import type { ArtworkEntry, ColoringListing, Project } from './types';
 import { Empty, ErrorState, Loading, Status } from './ui';
@@ -20,6 +21,7 @@ const SECTIONS: [string, string][] = [
   ['cover', 'Cover'],
   ['print', 'Print proof'],
   ['publishing', 'Publishing'],
+  ['produce', 'Produce'],
 ];
 const DRAFT_SECTIONS = ['settings', 'pages', 'cover', 'publishing'];
 
@@ -89,6 +91,7 @@ export function ColoringWorkspace({
   if (section === 'pages') return <ColoringPages d={draft} />;
   if (section === 'cover') return <Cover d={draft} />;
   if (section === 'publishing') return <Publishing d={draft} />;
+  if (section === 'produce') return <Produce project={draft.saved} dirty={draft.dirty} />;
   return (
     <Empty title="This page does not exist for coloring books">Use the navigation above.</Empty>
   );

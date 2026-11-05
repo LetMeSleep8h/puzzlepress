@@ -63,6 +63,7 @@ test('coloring artwork: import, check, refuse SVG, find look-alikes, remove', as
     'Cover',
     'Print proof',
     'Publishing',
+    'Produce',
   ]);
   await expect(page.getByRole('main')).not.toHaveText(WORD_SEARCH_TERMS);
   await page.getByRole('link', { name: 'Open the artwork library' }).click();

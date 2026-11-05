@@ -28,6 +28,7 @@ from .designing import DesignService
 from .editing import DraftStore
 from .planning import PlanningInvalid, PlanningService
 from .printing import PrintService
+from .producing import ProducingService
 from .production import ProductionService
 from .publishing import PublishingService
 from .reviewing import ReviewService
@@ -230,6 +231,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     reviews = ReviewService(service)
     production = ProductionService(service)
     creating = CreationService(service)
+    producing = ProducingService(service)
     app = FastAPI(title="PuzzlePress Studio", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
@@ -472,6 +474,42 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     def remove_proof(key: str, body: ProofRemoveRequest) -> dict[str, object]:
         return reviews.remove_proof(key, body.revision, body.id)
 
+    @app.get("/api/projects/{key}/produce")
+    def produce_status(key: str) -> dict[str, object]:
+        return producing.status(key)
+
+    @app.post("/api/projects/{key}/produce")
+    def produce_start(key: str, body: BuildRequest) -> dict[str, object]:
+        return producing.start(key, body.revision)
+
+    @app.post("/api/projects/{key}/produce/cancel")
+    def produce_cancel(key: str) -> dict[str, object]:
+        return producing.cancel(key)
+
+    @app.get("/api/projects/{key}/produce/file")
+    def produce_file(key: str, name: str) -> Response:
+        data, filename = producing.file(key, name)
+        kind = (
+            "application/pdf"
+            if filename.endswith(".pdf")
+            else "application/json"
+            if filename.endswith(".json")
+            else "text/markdown; charset=utf-8"
+        )
+        return Response(
+            data,
+            media_type=kind,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.get("/api/projects/{key}/produce/package.zip")
+    def produce_package(key: str) -> Response:
+        return Response(
+            producing.package_zip(key),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{key}-kdp-package.zip"'},
+        )
+
     @app.get("/api/projects/{key}/production")
     def production_status(key: str) -> dict[str, object]:
         return production.status(key)
@@ -665,6 +703,7 @@ def create_app(books: Path, frontend: Path) -> FastAPI:
     @app.get("/create")
     @app.get("/books/{key}")
     @app.get("/books/{key}/settings")
+    @app.get("/books/{key}/produce")
     @app.get("/books/{key}/puzzles")
     @app.get("/books/{key}/quality")
     @app.get("/books/{key}/edit")

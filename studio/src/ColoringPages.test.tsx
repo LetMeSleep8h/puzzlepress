@@ -71,7 +71,16 @@ test('coloring books navigate to pages, cover and publishing in plain terms', as
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['Overview', 'Settings', 'Artwork', 'Pages', 'Cover', 'Print proof', 'Publishing']);
+  ).toEqual([
+    'Overview',
+    'Settings',
+    'Artwork',
+    'Pages',
+    'Cover',
+    'Print proof',
+    'Publishing',
+    'Produce',
+  ]);
   expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);
 });
 

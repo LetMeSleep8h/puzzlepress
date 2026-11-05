@@ -22,7 +22,7 @@ import hashlib
 import json
 import os
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -94,6 +94,20 @@ class Validation:
             "note": "Checks cover the constraints PuzzlePress models; Amazon KDP decides "
             "acceptance. Nothing here is a KDP approval.",
         }
+
+
+# Hears the name of each production step as it starts (Studio shows it).
+Progress = Callable[[str], None]
+
+
+class ProductionCancelled(Exception):
+    """A coloring run stopped on request at a step boundary, before its output was
+    swapped in; the previous output is untouched. Word-search runs write in place and
+    are never cancelled."""
+
+    def __init__(self, step: str) -> None:
+        self.step = step
+        super().__init__(f"Production was cancelled before {step}.")
 
 
 @dataclass(frozen=True)
@@ -293,8 +307,19 @@ def produce(
     thresholds: object | None = None,
     photo_manifest: str | Path | None = None,
     profile: str | None = None,
+    progress: Progress | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> ProductionResult:
-    """Build everything into `output`; raises only for unusable inputs or outputs."""
+    """Build everything into `output`; raises only for unusable inputs or outputs.
+
+    `progress` hears each step as it starts. `cancelled` applies to coloring books only
+    (staged, so stopping leaves the previous output); word-search production writes
+    in place and runs to the end."""
+
+    def step(name: str) -> None:
+        if progress is not None:
+            progress(name)
+
     from ..answer_key import check_answer_key
     from ..cover.build import build_cover, write_cover, write_cover_preflight
     from ..cover.issues import CoverError
@@ -343,7 +368,7 @@ def produce(
             )
         from .coloring import produce_coloring
 
-        return produce_coloring(loaded, output, profile)
+        return produce_coloring(loaded, output, profile, progress, cancelled)
     source = loaded.source_path.parent
     protected = [source, *(Path(p) for p in previous)]
     manifest = None
@@ -377,16 +402,20 @@ def produce(
         spec = print_profile(chosen or DEFAULT_PROFILE)
         if isinstance(spec, LayoutIssue):
             raise InteriorError("print_spec", (spec,))
+        step("interior")
         build = build_interior(project, spec, source)
         written = write_interior(build, directory, source)
+        step("interior_preflight")
         interior = preflight_interior(
             project, read_interior_artifacts(directory), build, source_directory=source
         )
         write_preflight_report(report_bytes(interior.report), project.book.id, directory, source)
+        step("answer_key")
         answer_key = check_answer_key(written.pdf)
 
         cover_report = None
         cover_error: str | None = None
+        step("cover")
         if project.cover is not None:
             try:
                 cover = build_cover(project, source, directory)
@@ -399,6 +428,7 @@ def produce(
                     cover_report_bytes(cover_report), project.book.id, directory, source
                 )
 
+        step("duplicates")
         duplicates = None
         if previous:
             new = inventory_from_project(loaded.source_path)
@@ -417,6 +447,7 @@ def produce(
             photos = check_photos(manifest, folder)
             write_file(directory, "photo-check.json", _json_bytes(photos.to_dict()))
 
+        step("validation")
         validation = classify(
             interior.report, cover_report, project.cover is not None, duplicates, photos, answer_key
         )
@@ -430,6 +461,7 @@ def produce(
         write_file(directory, "publishing-validation.json", _json_bytes(validation.to_dict()))
         write_file(directory, "publishing-validation.md", validation_markdown(validation).encode())
 
+        step("manifest")
         names = sorted(
             p.name
             for p in directory.iterdir()

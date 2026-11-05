@@ -16,6 +16,7 @@ import { useDraft } from './draft';
 import { ColoringNav, ColoringWorkspace } from './Coloring';
 import { CreateBook } from './CreateBook';
 import { Settings } from './Settings';
+import { Produce } from './Produce';
 
 function usePath(allow: (next: string, current: string) => boolean) {
   const [path, setPath] = useState(window.location.pathname);
@@ -128,6 +129,7 @@ function ProjectWorkspace({
   const needsGeneration = ![
     'overview',
     'settings',
+    'produce',
     'edit',
     'book',
     'interior',
@@ -232,6 +234,8 @@ function ProjectWorkspace({
         section,
       ) ? null : section === 'print' ? (
         <Print project={project} dirty={dirty} />
+      ) : section === 'produce' ? (
+        <Produce project={project} dirty={dirty} />
       ) : section === 'overview' ? (
         <Overview project={project} />
       ) : !project.source?.word_search ? (
@@ -287,7 +291,13 @@ const NAV: { group: string; items: [string, string, string?][] }[] = [
       ['quality', 'Quality'],
     ],
   },
-  { group: 'Publish', items: [['publishing', 'Publishing']] },
+  {
+    group: 'Publish',
+    items: [
+      ['publishing', 'Publishing'],
+      ['produce', 'Produce'],
+    ],
+  },
 ];
 
 function ProjectNav({ base, section, count }: { base: string; section: string; count: number }) {
@@ -375,7 +385,7 @@ export function App() {
     first.current = false;
   }, [path]);
   const match = path.match(
-    /^\/books\/([^/]+)(?:\/(puzzles|quality|settings|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
+    /^\/books\/([^/]+)(?:\/(puzzles|quality|settings|produce|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
   );
   const isLibrary = path === '/' || path === '/books' || path === '/books/';
   const isCreate = path === '/create' || path === '/create/';
@@ -411,6 +421,7 @@ export function App() {
                 [
                   'quality',
                   'settings',
+                  'produce',
                   'edit',
                   'book',
                   'interior',
