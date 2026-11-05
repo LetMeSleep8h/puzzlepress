@@ -6,9 +6,16 @@ Interval 2 (coloring schema, artwork import and library, merged as PR #16),
 Interval 3 (line-art preparation) and Interval 4 (composition, lossless interior
 and coloring preflight; guide [coloring.md](coloring.md)) are merged (PR #18).
 Interval 5 (cover, publishing, production, and the Studio Pages composer; guide
-[coloring-publishing.md](coloring-publishing.md)) is implemented on branch
-`feat/coloring-publishing`; Interval 6's remaining Studio items (project creation
-API and type picker, generic undo/redo hook, zoom and pan) and Interval 7 are not.
+[coloring-publishing.md](coloring-publishing.md)) is merged (PR #19). Interval 6
+(visual authoring: project creation, Settings, the Pages designer with per-page
+placement, shared undo/redo, zoom and pan, crash-safe production locks and an
+artwork review harness; walkthrough
+[studio-coloring-walkthrough.md](studio-coloring-walkthrough.md)) is on branch
+`feat/studio-visual-authoring`. Interval 6 differs from section 3.9 in three places:
+the creation route is `/create` (a book may be named `new`); Settings is a section
+of both engines' navigation rather than a separate Book/Interior pair for coloring;
+and catalog fields live in an optional `catalog` section (D5 option a) beside an
+optional `print` section for the paper.
 Interval 4 differs from section 3 in three places: dividers
 and reverse blanks live in `coloring.pages` and `coloring.layout` (composition has
 only `artwork.start`); manual-review prompts use the existing `info` severity; and
@@ -335,3 +342,24 @@ report; and a commit on this branch. Studio suites run from Interval 6 on.
 
 Rich-text and publishing-readiness regressions (PRs #9 and #13) stay covered by
 their existing tests, which are run in every interval and never edited to pass.
+
+## 6. Roadmap for future engines (not built)
+
+These remain future work. Each needs its own interval with a schema section, an
+engine in the registry, its own preflight additions and Studio screens; Studio's
+New book lists them as not available until then.
+
+| Engine | Shape | Main new work |
+| --- | --- | --- |
+| Maze | Generated puzzle with a seed, a solution and digest refs (word-search shape) | Maze generator and solver verified independently; solution pages; line-weight and passage-width print checks |
+| Crossword | Generated or authored grid, clues, solution | Clue authoring and licensing, grid fill and uniqueness checks, clue typography |
+| Sudoku | Generated puzzle with a unique solution | Generator with uniqueness proof, difficulty grading, solution pages |
+| Mixed activity book | An ordered list of engine sections in `composition` | Shared plan assigning parity and numbering across engines; per-section matter; mixed preflight |
+| Educational workbook | Authored exercises, answer keys, reading level | Exercise schema, answer-key verification, age and curriculum claims with provenance |
+| Photography book | Imported photographs with captions (coloring shape) | Color or grayscale photo interior, bleed profile, image quality checks, captions |
+| Illustrated book | Imported art with text flow (coloring shape plus text) | Text layout across pages, image placement, fonts and widow/orphan control |
+
+Every engine keeps the shared contracts: derived engine kind, explicit seeds,
+identities that change only with their inputs, observational preflight and one
+writer per artifact.
+

@@ -4985,9 +4985,13 @@ button.primary.danger {
   align-items: center;
   gap: var(--space-1);
 }
+.viewport-toolbar select {
+  width: auto;
+}
 .viewport-canvas {
   overflow: auto;
-  max-height: min(70vh, 720px);
+  /* A fixed height, so Fit page fits this box rather than the drawing's own size. */
+  height: min(65vh, 640px);
   min-height: 240px;
   padding: 12px;
   background: #e6e3da;
@@ -5171,7 +5175,7 @@ button.primary.danger {
 }
 @media (max-width: 600px) {
   .viewport-canvas {
-    max-height: 60vh;
+    height: 55vh;
     padding: 6px;
   }
   .settings-grid > section,

@@ -180,7 +180,7 @@ export function CreateBook() {
         </div>
       </section>
       {type && (
-        <form className="create-details" onSubmit={(e) => void submit(e)} aria-busy={busy}>
+        <form className="editor create-details" onSubmit={(e) => void submit(e)} aria-busy={busy}>
           <h2 ref={details} tabIndex={-1}>
             2. About your {type.kind === 'coloring' ? 'coloring book' : 'word search book'}
           </h2>

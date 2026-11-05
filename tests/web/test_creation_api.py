@@ -100,3 +100,27 @@ def test_an_interrupted_creation_is_hidden_then_recovered(
         "/api/projects", json={"kind": "coloring", "key": "crashed", "title": "T"}
     )
     assert response.status_code == 201 and response.json()["recovered"] is True
+
+
+def test_a_created_book_builds_with_its_own_paper(client: TestClient) -> None:
+    created = client.post(
+        "/api/projects",
+        json={
+            "kind": "word_search",
+            "key": "cream-book",
+            "title": "Cream",
+            "profile": "paperback-8.5x11-cream",
+        },
+    ).json()
+    revision = created["revision"]
+    conflict = client.post(
+        "/api/projects/cream-book/interior/build",
+        json={"revision": revision, "profile": "paperback-8.5x11"},
+    )
+    assert conflict.status_code == 422
+    assert conflict.json()["error"]["code"] == "profile_conflict"
+    built = client.post("/api/projects/cream-book/interior/build", json={"revision": revision})
+    assert built.status_code == 200, built.text
+    status = built.json()
+    assert status["build"] == {"success": True}
+    assert status["profile"] == status["authored_profile"] == "paperback-8.5x11-cream"
