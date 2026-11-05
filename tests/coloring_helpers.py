@@ -151,6 +151,37 @@ def noisy_scan(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
     return image
 
 
+def aged_scan(
+    paper: int = 226,
+    *,
+    ink: int = 70,
+    blur: float = 0.8,
+    grain: int = 14,
+    gradient: int = 0,
+    art: Image.Image | None = None,
+    seed: int = 3,
+) -> Image.Image:
+    """A scan-like page in the manner of the Interval 7 patent-drawing scans: the line
+    art (default `fine_detail`) inked at `ink` rather than black, blurred over its rim
+    as a scanner does, multiplied onto grainy paper of level `paper`, optionally
+    darkening by `gradient` levels from top to bottom (uneven aging)."""
+    from PIL import ImageFilter
+
+    lines = (art if art is not None else fine_detail()).convert("L")
+    size = lines.size
+    lines = lines.point(lambda v: ink + (255 - ink) * v // 255)
+    lines = lines.filter(ImageFilter.GaussianBlur(blur)) if blur else lines
+    rng = random.Random(seed)
+    width, height = size
+    noise = Image.frombytes("L", size, rng.randbytes(width * height))
+    noise = noise.point(lambda v: v * grain // 255)
+    base = Image.new("L", size, paper - grain // 2)
+    if gradient:
+        ramp = Image.linear_gradient("L").resize(size).point(lambda v: v * gradient // 255)
+        base = ImageChops.subtract(base, ramp)
+    return ImageChops.multiply(lines, ImageChops.add(base, noise))
+
+
 def white_on_black(seed: int, size: tuple[int, int] = FULL_SIZE) -> Image.Image:
     return ImageChops.invert(line_art(seed, size))
 

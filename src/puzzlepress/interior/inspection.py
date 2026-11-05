@@ -14,6 +14,7 @@ from pypdf import PageObject, PdfReader
 from pypdf.errors import PyPdfError
 from pypdf.generic import ArrayObject, DictionaryObject
 
+from ..cancellation import checkpoint
 from .issues import LayoutIssue
 from .model import Box, ImageBlock, InteriorLayout
 
@@ -71,7 +72,12 @@ def read_pdf_facts(data: bytes) -> PdfFacts | LayoutIssue:
             reader.decrypt("")
         catalog = reader.root_object
         info: dict[str, object] = dict(reader.metadata or {})
-        pages = tuple(_page_facts(number, page) for number, page in enumerate(reader.pages, 1))
+        count = len(reader.pages)
+        facts: list[PdfPageFacts] = []
+        for number, page in enumerate(reader.pages, 1):
+            checkpoint("inspect_pdf", number - 1, count)
+            facts.append(_page_facts(number, page))
+        pages = tuple(facts)
         return PdfFacts(
             page_count=len(pages),
             encrypted=reader.is_encrypted,

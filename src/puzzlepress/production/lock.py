@@ -127,6 +127,29 @@ def read_lock(path: Path) -> LockRecord | None:
         os.close(fd)
 
 
+def lock_held(path: Path) -> bool:
+    """Whether a live process holds the production lock at `path` right now.
+
+    Probes by taking and at once releasing the lock, never waiting and never writing
+    or removing the file. A run that tries to start during the probe's instant is
+    refused as if another run were active (it reports so and can be started again),
+    so Studio probes only for jobs whose worker it did not start itself.
+    """
+    try:
+        fd = os.open(path, os.O_RDWR | _BINARY)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True  # Unreadable: cannot show it is free, so treat it as held.
+    try:
+        if not _try_lock(fd):
+            return True
+        _unlock(fd)
+        return False
+    finally:
+        os.close(fd)
+
+
 def _same_file(fd: int, path: Path) -> bool:
     try:
         return os.path.samestat(os.fstat(fd), os.stat(path))

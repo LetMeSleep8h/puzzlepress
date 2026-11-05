@@ -26,7 +26,7 @@ def test_added_profiles_are_kdp_sizes_with_the_letter_gutter() -> None:
         assert not spec.bleed and spec.ink.value == "black"
         assert spec.paper is (Paper.CREAM if pid.endswith("-cream") else Paper.WHITE)
         assert KDP.trim_supported(spec.trim.width, spec.trim.height)
-        assert KDP.max_pages_for_trim(spec.trim.name) is not None
+        assert KDP.max_pages_for(spec.trim.name, spec.paper) is not None
         # Same gutter as 8.5 x 11 (KDP's minimum up to 700 pages) and outside margin.
         assert spec.margins.inside == letter.margins.inside == inches(0.75)
         assert spec.margins.outside >= KDP.min_outside_margin
@@ -73,3 +73,26 @@ def test_cover_wraps_every_supported_trim(trim) -> None:  # type: ignore[no-unty
     assert geometry.media.width == pytest.approx(
         2 * inches(0.125) + 2 * trim.width + inches(120 * 0.002252)
     )
+
+
+@pytest.mark.parametrize(
+    ("trim", "white", "cream"),
+    [("8.5x11", 590, 550), ("8.5x8.5", 590, 550), ("6x9", 828, 776), ("8x10", 828, 776)],
+)
+def test_page_maximum_follows_trim_and_paper(trim: str, white: int, cream: int) -> None:
+    """KDP's "Set Trim Size, Bleed, and Margins" table, read 2026-11-05 (ruleset 5)."""
+    assert KDP.max_pages_for(trim, Paper.WHITE) == white
+    assert KDP.max_pages_for(trim, Paper.CREAM) == cream
+    assert KDP.max_pages_for("5x8", Paper.WHITE) is None  # Not a supported profile.
+
+
+def test_full_bleed_stays_unavailable_everywhere() -> None:
+    """Interval 8 assessed full bleed against KDP's rules but did not build it: no
+    profile offers it and the specification refuses it with the reason."""
+    from dataclasses import replace
+
+    assert all(not spec.bleed for spec in PROFILES.values())
+    assert all("no bleed" in spec.description for spec in PROFILES.values())
+    issues = validate_print_spec(replace(PROFILES["paperback-8.5x11"], bleed=True))
+    refusal = next(i for i in issues if i.code == "unsupported_bleed_configuration")
+    assert "not available" in refusal.message

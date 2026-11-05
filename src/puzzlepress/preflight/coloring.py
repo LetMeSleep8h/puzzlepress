@@ -21,6 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..cancellation import checkpoint
 from ..coloring.content import ColoringContent
 from ..coloring.duplicates import DuplicateReport, find_duplicates
 from ..coloring.inspection import Inspection, inspect_artwork
@@ -58,7 +59,9 @@ from .rules import (
 
 RULESET_ID = "puzzlepress-kdp-coloring"
 # 2: line quality also reports light strokes of the original that preparation erased.
-RULESET_VERSION = 2
+# 3: line measures read each image relative to its own paper (measures version 2), so
+#    background cleanup of tinted scans is no longer reported as fine-line loss.
+RULESET_VERSION = 3
 COLORING_CONTRACT = "PuzzlePress coloring interior contract (docs/coloring.md)"
 QUALITY = "PuzzlePress line-art conventions (docs/coloring.md#calibration)"
 
@@ -127,9 +130,11 @@ def load_artwork(project_directory: Path | None, project: Project) -> dict[str, 
     if book is None:
         return {}
     checks: dict[str, ArtworkCheck] = {}
+    total = len({artwork_id for _, artwork_id in book.artwork_pages})
     for _, artwork_id in book.artwork_pages:
         if artwork_id in checks:
             continue
+        checkpoint("measure_artwork", len(checks), total)
         artwork = book.artwork_by_id(artwork_id)
         assert artwork is not None
         if project_directory is None:

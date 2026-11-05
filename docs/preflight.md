@@ -123,7 +123,7 @@ Formatting Issues" and "Print Options".
 | Code | Requirement | Source | Basis |
 | --- | --- | --- | --- |
 | `kdp_minimum_page_count` | At least 24 pages | Submission Guidelines | requirement |
-| `kdp_maximum_page_count` | At most 550 pages (8.5 x 11 in) | Print Options | ambiguous |
+| `kdp_maximum_page_count` | At most the trim's maximum on the profile's paper (8.5 x 11 / 8.5 x 8.5: 590 white, 550 cream; 6 x 9 / 8 x 10: 828 / 776) | Set Trim Size, Bleed, and Margins | requirement |
 | `kdp_trim_size` | Trim within 4-8.5 x 6-11.69 in | Print Options | requirement |
 | `kdp_page_size` | Single trim-size pages, no spreads | Submission Guidelines | requirement |
 | `kdp_no_bleed` | No-bleed: no BleedBox beyond trim | Set Trim Size, Bleed, and Margins | requirement |
@@ -150,10 +150,14 @@ frames include half their line width), with 0.01 pt tolerance.
 
 Ambiguities, recorded rather than resolved:
 
-- **Maximum pages.** The rendered official Print Options table (2026-10-07) lists
-  only 5 x 8 in under amazon.com paperbacks; KDP says the maximum "depends on ink,
-  paper, and trim size". A search-indexed copy of the page lists 24-590 (white)
-  and 24-550 (cream) for 8.5 x 11 in. Paper is not modeled, so 550 applies.
+- **Maximum pages (resolved in ruleset 5).** Until ruleset 4 the official table had
+  no 8.5 x 11 row and 550 (cream) applied to both papers. The 2026-11-05 reading of
+  "Set Trim Size, Bleed, and Margins" lists every supported trim by paper, so the
+  rule now uses the profile's paper. Reports name ruleset 5; the golden baseline
+  records the change as a migration (`tests/fixtures/golden/migrations.json`).
+- **Odd page counts.** Submission Guidelines (2026-11-05): "Page counts are rounded
+  up to an even number when necessary." PuzzlePress never pads; an odd count is
+  reported as built, and KDP adds the last page.
 - **Full embedding.** Formatting Issues says fonts "should be fully embedded";
   Submission Guidelines says "embedded". PuzzlePress embeds TrueType subsets that
   contain every glyph used, so this is a warning to review, not a block.

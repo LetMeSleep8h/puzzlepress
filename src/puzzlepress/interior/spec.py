@@ -23,6 +23,13 @@ def to_inches(points: float) -> float:
     return points / POINTS_PER_INCH
 
 
+class Paper(StrEnum):
+    """Interior paper stock. It sets cover spine width; it is never inferred."""
+
+    WHITE = "white"
+    CREAM = "cream"
+
+
 @dataclass(frozen=True)
 class KdpConstraints:
     """The one home of KDP paperback values. Provenance: docs/preflight.md.
@@ -48,20 +55,20 @@ class KdpConstraints:
     # Paperback custom trim range (width, height) in points, inclusive.
     custom_trim_width: tuple[float, float] = (inches(4), inches(8.5))
     custom_trim_height: tuple[float, float] = (inches(6), inches(11.69))
-    # Maximum black-ink page count per trim. The rendered official table omits the
-    # 8.5 x 11 row (2026-10-07); a search-indexed copy lists 24-590 white and
-    # 24-550 cream. Profiles now state paper, but the white value is unverified on
-    # the official table, so the lower value applies to both papers. Re-verify.
-    #
-    # The 2026-11-05 reading of "Set Trim Size, Bleed, and Margins" lists every trim
-    # here: 8.5 x 11 and 8.5 x 8.5 at 24-590 white / 24-550 cream, 6 x 9 and 8 x 10 at
-    # 24-828 white / 24-776 cream. The key is the trim only, so each trim's lower
-    # (cream) value applies to both papers; 8.5 x 11 keeps its value and wording.
-    max_pages_by_trim: tuple[tuple[str, int], ...] = (
-        ("8.5x11", 550),
-        ("6x9", 776),
-        ("8x10", 776),
-        ("8.5x8.5", 550),
+    # Maximum black-ink page count per trim and paper (preflight ruleset 5). Read
+    # 2026-11-05 on the official "Set Trim Size, Bleed, and Margins" page, whose table
+    # now lists every row: 8.5 x 11 and 8.5 x 8.5 at 24-590 white / 24-550 cream,
+    # 6 x 9 and 8 x 10 at 24-828 white / 24-776 cream. Rulesets 3-4 applied the lower
+    # (cream) value to both papers because the 8.5 x 11 row was then missing.
+    max_pages_by_print: tuple[tuple[str, Paper, int], ...] = (
+        ("8.5x11", Paper.WHITE, 590),
+        ("8.5x11", Paper.CREAM, 550),
+        ("6x9", Paper.WHITE, 828),
+        ("6x9", Paper.CREAM, 776),
+        ("8x10", Paper.WHITE, 828),
+        ("8x10", Paper.CREAM, 776),
+        ("8.5x8.5", Paper.WHITE, 590),
+        ("8.5x8.5", Paper.CREAM, 550),
     )
     # (maximum page count, minimum inside margin) in ascending order.
     gutter_table: tuple[tuple[int, float], ...] = (
@@ -87,8 +94,12 @@ class KdpConstraints:
                 return gutter
         return None
 
-    def max_pages_for_trim(self, trim_name: str) -> int | None:
-        return dict(self.max_pages_by_trim).get(trim_name)
+    def max_pages_for(self, trim_name: str, paper: Paper) -> int | None:
+        """KDP's black-ink maximum for this trim on this paper; None when not modeled."""
+        for trim, stock, maximum in self.max_pages_by_print:
+            if trim == trim_name and stock is paper:
+                return maximum
+        return None
 
     def trim_supported(self, width: float, height: float) -> bool:
         (low_w, high_w), (low_h, high_h) = self.custom_trim_width, self.custom_trim_height
@@ -108,13 +119,6 @@ class FolioPlacement(StrEnum):
 
 class Ink(StrEnum):
     BLACK = "black"
-
-
-class Paper(StrEnum):
-    """Interior paper stock. It sets cover spine width; it is never inferred."""
-
-    WHITE = "white"
-    CREAM = "cream"
 
 
 @dataclass(frozen=True)
@@ -327,7 +331,9 @@ def validate_print_spec(spec: PrintSpecification) -> tuple[LayoutIssue, ...]:
         issues.append(
             LayoutIssue(
                 "unsupported_bleed_configuration",
-                "Bleed is not supported: no puzzle-book element prints to the trim edge.",
+                "Full-bleed interiors are not available in this version: page boxes, "
+                "bleed margins, art placed past the trim and their preflight rules are not "
+                "built (docs/print-interior.md, Full bleed). Use a no-bleed profile.",
                 region="print.bleed",
             )
         )

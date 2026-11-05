@@ -24,7 +24,9 @@ Every step is a Pillow lookup table, rank filter or the bounded region scan in
 give identical pixels. The cache key names all four.
 
 Measures compare the processed image with the reference: the same original with
-only steps 1 and 2 applied (what the author drew). Thresholds are PuzzlePress
+only steps 1 and 2 applied (what the author drew). Line measures read both images
+relative to their own paper (`paper_relative`, MEASURES_VERSION 2), so whitening a
+tinted page is not counted as losing the strokes on it. Thresholds are PuzzlePress
 conventions calibrated on synthetic fixtures (tests/coloring_helpers.py); see
 `calibration` in docs/coloring.md. They flag measurable damage, not print quality.
 """
@@ -34,7 +36,7 @@ import io
 import json
 from dataclasses import dataclass
 
-from PIL import Image, ImageChops, ImageFilter
+from PIL import Image, ImageChops, ImageFilter, ImageMath
 from PIL import __version__ as PILLOW_VERSION
 
 from ..coloring_config import Adjustments
@@ -82,8 +84,20 @@ FAINT_CORE = 64  # 75% ink.
 FAINT_LEVEL = 200
 FAINT_KEPT = 224
 FAINT_NEIGHBORS = 3
+FAINT_RIM = 2  # Pixels around ink that belong to the ink line, not a light stroke.
 FAINT_MIN_SHARE = 0.001  # Measured only when faint strokes cover 0.1 % of the page.
 FAINT_ERASED = 0.50  # Share kept below which the faint strokes are reported.
+# Measures version 2 (Interval 8): line measures (fine lines, line work, strokes, light
+# strokes, dust) read each image relative to its own paper (`paper_relative`). Version 1
+# read absolute levels, so cleanup that whitened tinted paper counted every stroke edge
+# lighter than 128 after the stretch as lost (47-89 % "kept" on scans whose ink still
+# printed at 99.3-100 %). Prepared pixels and PREPARATION_VERSION are unchanged.
+MEASURES_VERSION = 2
+BACKGROUND_BLOCK = 4  # Pixels per side averaged into one paper sample.
+BACKGROUND_WINDOW = 5  # Blocks searched for the brightest nearby paper (20 px).
+BACKGROUND_GRID = 128  # Coarse samples along the longer side before smoothing.
+BACKGROUND_FLOOR = 0.80  # Of the 95th-percentile level: solid ink is not paper.
+WHITE_PAPER = 250  # Paper at least this light everywhere is read as white.
 
 
 def cache_key(sha256: str, adjustments: Adjustments) -> str:
@@ -160,14 +174,16 @@ def _count(mask: Image.Image) -> int:
 def faint_mask(reference: Image.Image) -> Image.Image:
     """Faint stroke pixels of the original: lighter than ink, at most FAINT_LEVEL, with
     at least FAINT_NEIGHBORS drawn pixels (faint or ink) in their 3 x 3 block, and not
-    touching ink: the gray rim of an anti-aliased black line is part of that line, and
-    a threshold that drops the rim keeps the line."""
+    within FAINT_RIM pixels of ink: the gray rim of an anti-aliased or scanner-blurred
+    ink line is part of that line, and a threshold that drops the rim keeps the line.
+    (Measures version 1 excluded only pixels touching ink; scans blur a stroke's rim
+    over two pixels.)"""
     drawn = reference.point(lambda v: 255 if v <= FAINT_LEVEL else 0)
     # Sum of the 3 x 3 drawn pixels, as a count 0..9 scaled by 255.
     density = drawn.filter(ImageFilter.Kernel((3, 3), [1] * 9, scale=9))
     dense = density.point(lambda v: 255 if v * 9 >= FAINT_NEIGHBORS * 255 - 4 else 0)
     faint = reference.point(lambda v: 255 if INK_LEVEL < v <= FAINT_LEVEL else 0)
-    near_ink = _mask(reference).filter(ImageFilter.MaxFilter(3))
+    near_ink = _mask(reference).filter(ImageFilter.MaxFilter(2 * FAINT_RIM + 1))
     return ImageChops.subtract(ImageChops.darker(faint, dense), near_ink)
 
 
@@ -198,9 +214,13 @@ class PreparationMeasures:
     # 0 when under FAINT_MIN_SHARE of the original is gray 129-200 (not counted then).
     faint_line_pixels: int = 0
     faint_line_retention: float | None = None
+    # The original has no ink at all, only pale gray stroke-like marks (absolute gray
+    # INK_LEVEL+1..FAINT_LEVEL as printed): chooses the wording of a blank page.
+    pale_strokes_without_ink: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "measures_version": MEASURES_VERSION,
             "not_measured": list(self.not_measured),
             "new_edges": list(self.new_edges),
             "pixels": list(self.pixels),
@@ -218,6 +238,7 @@ class PreparationMeasures:
             "line_core_level": self.line_core_level,
             "faint_line_pixels": self.faint_line_pixels,
             "faint_line_retention": self.faint_line_retention,
+            "pale_strokes_without_ink": self.pale_strokes_without_ink,
         }
 
 
@@ -340,22 +361,90 @@ def _line_work(gray: Image.Image) -> tuple[int, int] | None:
     return len(labeling.areas) - specks, specks
 
 
+def paper_background(gray: Image.Image) -> Image.Image | None:
+    """The local paper level of a page (mode L, full size), or None on white paper.
+
+    Paper is what lies between the strokes, so it is estimated from the brightest
+    nearby areas, not the average: fine strokes are lifted by a 3 x 3 maximum, the
+    page is reduced by mean in BACKGROUND_BLOCK pixel blocks, the brightest block
+    within BACKGROUND_WINDOW blocks is taken, and that is reduced again to a coarse
+    grid, smoothed and scaled back. Solid ink wider than the window cannot pull the
+    estimate below BACKGROUND_FLOOR of the page's 95th-percentile level. A page whose
+    estimate is at least WHITE_PAPER everywhere is white paper: None, and every
+    measure reads it exactly as before.
+    """
+    width, height = gray.size
+    floor = round(_percentile(gray.histogram(), 0.95) * BACKGROUND_FLOOR)
+
+    def estimate(source: Image.Image) -> Image.Image:
+        block = max(1, min(BACKGROUND_BLOCK, width // 4, height // 4))
+        small = source.reduce(block) if block > 1 else source
+        local = small.filter(ImageFilter.MaxFilter(BACKGROUND_WINDOW))
+        coarse = max(1, -(-max(local.size) // BACKGROUND_GRID))
+        if coarse > 1:
+            local = local.reduce(coarse)
+        return local.point(lambda v: max(v, floor, 1)).filter(ImageFilter.BoxBlur(1))
+
+    # Every step is monotone, and the 3 x 3 maximum only raises levels, so the
+    # estimate without it is a lower bound: white there means white with it, and the
+    # full-size filter is skipped for most white pages (same result, less work).
+    if estimate(gray).getextrema()[0] >= WHITE_PAPER:  # type: ignore[operator]
+        return None
+    # A 3 x 3 maximum lifts one- and two-pixel strokes to the paper beside them, so
+    # fine hatching closer than a block still reads as paper.
+    local = estimate(gray.filter(ImageFilter.MaxFilter(3)))
+    if local.getextrema()[0] >= WHITE_PAPER:  # type: ignore[operator]
+        return None
+    return local.resize((width, height), Image.Resampling.BILINEAR)
+
+
+def paper_relative(gray: Image.Image) -> Image.Image:
+    """The page as printed on white paper of its own level: each pixel divided by the
+    local paper level (`paper_background`) and scaled to 0..255, rounded. White-paper
+    pages come back unchanged (the same object), so their measures are as before.
+
+    Background cleanup stretches the paper to white, which lightens every stroke by
+    the same ratio; on this scale such a stroke keeps its level, so cleanup is no
+    longer counted as line loss, while erasing, thinning or lightening a stroke
+    relative to its paper still is.
+    """
+    background = paper_background(gray)
+    if background is None:
+        return gray
+    # Integer arithmetic, rounded: (g * 255 / b) + 0.5 == (g * 510 + b) / (2 * b).
+    relative = ImageMath.lambda_eval(
+        lambda a: a["convert"](a["min"]((a["g"] * 510 + a["b"]) / (a["b"] * 2), 255), "L"),
+        g=gray,
+        b=background,
+    )
+    assert isinstance(relative, Image.Image)
+    return relative
+
+
 def _measure(reference: Image.Image, out: Image.Image, removed: int) -> PreparationMeasures:
     width, height = reference.size
     total = width * height
     not_measured: list[str] = []
+    # Line measures compare strokes relative to each image's own paper (measures
+    # version 2): background cleanup that whitens tinted paper is not line loss.
+    # Printing measures (ink, specks, paper level, core level, edges, change) read the
+    # prepared pixels as they print.
+    relative_reference = paper_relative(reference)
+    relative_out = relative_reference if out is reference else paper_relative(out)
     # The reference's line work: isolated specks removed, so dust never counts as fine
     # lines and despeckling (which removes only isolated specks) cannot lose any.
     try:
-        dust = isolated_specks(reference, INK_LEVEL, SPECK_LIMIT, SPECK_RADIUS, MAX_ANALYZED_INK)
-        lines = paint_white(reference, dust) if dust else reference
+        dust = isolated_specks(
+            relative_reference, INK_LEVEL, SPECK_LIMIT, SPECK_RADIUS, MAX_ANALYZED_INK
+        )
+        lines = paint_white(relative_reference, dust) if dust else relative_reference
     except TooMuchInk:
-        lines = reference
+        lines = relative_reference
         not_measured.append("dust")
     before = _mask(lines)
-    after = _mask(out)
+    after = _mask(relative_out)
     ink_before = _count(_mask(reference))
-    ink_after = _count(after)
+    ink_after = _count(_mask(out))
     line_ink = _count(before)
     # Fine lines: line work an opening (3 x 3 erosion, then dilation) cannot restore,
     # so strokes at most two pixels wide; edges of wider strokes come back.
@@ -366,11 +455,16 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     detail_kept = _count(ImageChops.darker(before, after))
     # Strokes are counted on the ink both images share, so growing marks (thickening)
     # can never look like breaks; cutting lines (thinning, a low threshold) can.
-    counted_before = _line_work(reference)
+    counted_before = _line_work(relative_reference)
     counted_after = (
-        counted_before if out is reference else _line_work(ImageChops.lighter(reference, out))
+        counted_before
+        if out is reference
+        else _line_work(ImageChops.lighter(relative_reference, relative_out))
     )
-    produced = counted_before if out is reference else _line_work(out)
+    # Specks are counted as they print: on the prepared pixels themselves.
+    produced = (
+        counted_before if out is reference and relative_reference is reference else _line_work(out)
+    )
     strokes_before = strokes_after = None
     if counted_before is None or counted_after is None:
         not_measured.append("strokes")
@@ -389,15 +483,18 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
     core = _line_core(out.histogram(), total)
     # Light strokes are a subset of the gray 129-200 pixels: when the histogram shows
     # too few of those to measure, the filters are skipped (the result is the same).
-    candidates = sum(reference.histogram()[INK_LEVEL + 1 : FAINT_LEVEL + 1])
+    candidates = sum(relative_reference.histogram()[INK_LEVEL + 1 : FAINT_LEVEL + 1])
     faint_pixels = faint_kept = 0
     if candidates >= FAINT_MIN_SHARE * total:
-        faint = faint_mask(reference)
+        faint = faint_mask(relative_reference)
         faint_pixels = _count(faint)
         faint_kept = (
-            faint_pixels if out is reference else _count(ImageChops.darker(faint, _visible(out)))
+            faint_pixels
+            if out is reference
+            else _count(ImageChops.darker(faint, _visible(relative_out)))
         )
     measurable = faint_pixels >= FAINT_MIN_SHARE * total
+    pale = ink_before < BLANK_INK * total and _count(faint_mask(reference)) > 0
     return PreparationMeasures(
         pixels=(width, height),
         ink_before=round(ink_before / total, 4),
@@ -416,6 +513,7 @@ def _measure(reference: Image.Image, out: Image.Image, removed: int) -> Preparat
         line_core_level=core,
         faint_line_pixels=faint_pixels,
         faint_line_retention=round(faint_kept / faint_pixels, 4) if measurable else None,
+        pale_strokes_without_ink=pale,
     )
 
 
@@ -460,7 +558,7 @@ def _findings(m: PreparationMeasures, adjustments: Adjustments) -> tuple[Artwork
             )
         elif m.ink_before >= BLANK_INK:
             why = "The settings remove all line work: the prepared page is blank."
-        elif m.faint_line_pixels:
+        elif m.pale_strokes_without_ink or m.faint_line_pixels:
             # Pale gray strokes, not colored ones (a chalk drawing in the real-artwork
             # review): they print, if at all, only as pale gray.
             why = (
@@ -621,7 +719,10 @@ FAINT_ERASED_COLOR = (232, 134, 0)
 
 def difference_image(reference: Image.Image, prepared: Image.Image) -> Image.Image:
     """Ink kept in dark gray, ink removed in red, ink added in blue; light strokes kept in
-    light gray and light strokes erased in orange; paper white."""
+    light gray and light strokes erased in orange; paper white. Read relative to each
+    image's paper, as the line measures read them (cleanup is not drawn as removal)."""
+    reference = paper_relative(reference)
+    prepared = paper_relative(prepared)
     before = _mask(reference)
     after = _mask(prepared)
     image = Image.new("RGB", reference.size, (255, 255, 255))

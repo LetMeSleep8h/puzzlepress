@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import platform
 import shutil
 import tempfile
@@ -36,8 +35,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .. import __version__
+from ..cancellation import checkpoint
 from ..models import Project
 from ..project import LoadedProject
+from . import release
 from .lock import production_lock
 
 if TYPE_CHECKING:
@@ -51,7 +52,6 @@ from .produce import (
     ProductionResult,
     Progress,
     Validation,
-    _fail,
     _json_bytes,
     _owned,
     check_disjoint,
@@ -127,50 +127,12 @@ def environment() -> dict[str, object]:
 
 
 def _recover(parent: Path, directory: Path, book_id: str) -> tuple[str, ...]:
-    """Under the lock: finish what an interrupted earlier run left beside the output.
-
-    A run interrupted between moving the previous output aside and moving the new
-    one in leaves the output missing and its previous version in a backup: that
-    backup is put back. Backups whose output is in place, and staging directories,
-    are removed. Only direct children with this output's own prefixes, real
-    directories (not links) holding this book's manifest (or, for staging, any
-    files) are touched; anything else is left and reported by nothing.
-    """
-    notes: list[str] = []
+    """Under the lock: finish what an interrupted earlier run left beside the output
+    (`release.recover`): a backup whose output is missing is put back, other backups
+    and staging directories with this output's own prefixes are removed."""
+    del parent  # The output's own parent; kept for the existing call sites.
     staging_prefix, previous_prefix = _prefixes(directory)
-
-    def ours(path: Path, prefix: str) -> bool:
-        return (
-            path.parent == parent
-            and path.name.startswith(prefix)
-            and not path.is_symlink()
-            and path.is_dir()
-        )
-
-    def owned(path: Path) -> bool:
-        try:
-            data = json.loads((path / MANIFEST_NAME).read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, ValueError):
-            return False
-        return (
-            isinstance(data, dict) and data.get("kind") == KIND and data.get("book_id") == book_id
-        )
-
-    entries = sorted(parent.iterdir())
-    backups = [p for p in entries if ours(p, previous_prefix) and owned(p)]
-    if not directory.exists() and len(backups) == 1:
-        os.replace(backups[0], directory)
-        notes.append("Restored the previous output, which an interrupted run had moved aside.")
-        backups = []
-    for path in backups:
-        if directory.exists() and ours(path, previous_prefix):
-            shutil.rmtree(path)
-            notes.append(f"Removed {path.name}, a previous output an interrupted run kept.")
-    for path in entries:
-        if ours(path, staging_prefix):
-            shutil.rmtree(path)
-            notes.append(f"Removed {path.name}, the files of an interrupted run.")
-    return tuple(notes)
+    return release.recover(directory, book_id, staging_prefix, previous_prefix)
 
 
 def _prefixes(directory: Path) -> tuple[str, str]:
@@ -425,7 +387,8 @@ def _duplicates(project: Project, source: Path) -> dict[str, object]:
     book = project.coloring
     assert book is not None
     inspections: dict[str, Inspection | None] = {}
-    for art in book.artwork:
+    for index, art in enumerate(book.artwork):
+        checkpoint("compare_artwork", index, len(book.artwork))
         try:
             inspections[art.id] = inspect_artwork(read_artwork(source, art), art.path)
         except ArtworkError:
@@ -619,13 +582,7 @@ def classify_coloring(
 
 
 def _listing(staging: Path) -> list[str]:
-    names = []
-    for path in sorted(staging.rglob("*")):
-        if path.is_file():
-            relative = path.relative_to(staging).as_posix()
-            if not any(part.startswith(".") for part in relative.split("/")):
-                names.append(relative)
-    return [name for name in names if name != MANIFEST_NAME]
+    return release.listing(staging)
 
 
 def _manifest(
@@ -671,26 +628,9 @@ def _manifest(
 
 def _verify(staging: Path, files: tuple[tuple[str, str, int], ...]) -> None:
     """Every staged file is present with the bytes the manifest lists, and nothing else."""
-    expected = {name: (digest, size) for name, digest, size in files}
-    if set(_listing(staging)) != set(expected):
-        raise _fail("verification_failed", "The staged files differ from the manifest's list.")
-    for name, (digest, size) in expected.items():
-        data = (staging / name).read_bytes()
-        if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
-            raise _fail("verification_failed", f"Staged {name} does not match the manifest.")
+    release.verify(staging, files)
 
 
 def _swap(staging: Path, directory: Path) -> None:
     """Put the verified run in place; the previous output survives until it is."""
-    if not directory.exists():
-        os.replace(staging, directory)
-        return
-    backup = Path(tempfile.mkdtemp(prefix=_prefixes(directory)[1], dir=directory.parent))
-    backup.rmdir()
-    os.replace(directory, backup)
-    try:
-        os.replace(staging, directory)
-    except OSError as error:
-        os.replace(backup, directory)
-        raise _fail("write_failed", f"Could not put the new output in place: {error}") from error
-    shutil.rmtree(backup, ignore_errors=True)
+    release.swap_in(staging, directory, _prefixes(directory)[1])

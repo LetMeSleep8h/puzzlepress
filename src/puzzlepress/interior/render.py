@@ -16,6 +16,7 @@ from reportlab.pdfbase import pdfdoc
 from reportlab.pdfgen.canvas import Canvas
 
 from .. import __version__
+from ..cancellation import checkpoint
 from .fonts import font_name
 from .model import (
     Anchor,
@@ -67,7 +68,8 @@ def render_pdf(layout: InteriorLayout, images: EncodedImages | None = None) -> b
     canvas.setSubject("")
     canvas.setKeywords("")
     canvas.setCreator(f"PuzzlePress {__version__}")
-    for page in layout.pages:
+    for number, page in enumerate(layout.pages):
+        checkpoint("render_pages", number, len(layout.pages))
         media, trim = page.frame.media, page.frame.trim
         canvas.setPageSize((media.width, media.height))
         canvas.setTrimBox((trim.x, trim.y, trim.right, trim.top))

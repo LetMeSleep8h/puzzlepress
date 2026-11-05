@@ -775,17 +775,19 @@ def _min_pages(r: PreflightRule, ctx: Context) -> Check:
     Scope.KDP,
     Category.PAGE,
     "Maximum page count",
-    "Page count is within KDP's black-ink maximum for the trim. KDP's current table "
-    "omits the 8.5 x 11 in row; the lower indexed value (550, cream) is used.",
-    PRINT_OPTIONS,
-    basis=Basis.KDP_AMBIGUOUS,
+    "Page count is within KDP's black-ink maximum for the trim on the profile's paper "
+    "(8.5 x 11 and 8.5 x 8.5 in: 590 white, 550 cream; 6 x 9 and 8 x 10 in: 828 white, "
+    "776 cream).",
+    MARGINS,
 )
 def _max_pages(r: PreflightRule, ctx: Context) -> Check:
     if ctx.facts is None or ctx.spec is None:
         return _skip(NO_PDF if ctx.facts is None else NO_PROFILE)
-    maximum = KDP.max_pages_for_trim(ctx.spec.trim.name)
+    maximum = KDP.max_pages_for(ctx.spec.trim.name, ctx.spec.paper)
     if maximum is None:
-        return _skip(f"No verified maximum for trim {ctx.spec.trim.name}.")
+        return _skip(
+            f"No verified maximum for trim {ctx.spec.trim.name} on {ctx.spec.paper} paper."
+        )
     count = ctx.facts.page_count
     measure = Measure(count, maximum, "pages", "at_most")
     if count > maximum:

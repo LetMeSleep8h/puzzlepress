@@ -1,0 +1,90 @@
+{
+  "migration_version": 1,
+  "migrations": [
+    {
+      "changes": {
+        "/books/composition-demo/interior_preflight/stdout_sha256": {
+          "now": "5d937a58dccba1de3641a085cac7bcdfc472f6ca92c7928ef4a1bb6db2b73377",
+          "was": "b8e384d186c023aca029746dad6eab2694680e46ab88c1f2a6249bebdac381de"
+        },
+        "/books/composition-demo/produce/stdout_sha256": {
+          "now": "5933f8dbd677d1848bd4d3619c28e159a2d0a64f9442a3bde2ef19c21a3e3cd0",
+          "was": "d4d7034a1d30d53db2fbf3cda591a2d7e49281189f2019c92657e979145c1eac"
+        },
+        "/books/composition-demo/produce_files/preflight.json": {
+          "now": "5d937a58dccba1de3641a085cac7bcdfc472f6ca92c7928ef4a1bb6db2b73377",
+          "was": "b8e384d186c023aca029746dad6eab2694680e46ab88c1f2a6249bebdac381de"
+        },
+        "/books/composition-demo/produce_files/production.json": {
+          "now": "007936b3bcc5fbcdc0673a385a044cd9c4ed740643d4429ac080cecd77d501fc",
+          "was": "e277d0fec6e4121b21463a8e17593d14da5be74cf35803cefda5706e2da07b33"
+        },
+        "/books/cover-demo/interior_preflight/stdout_sha256": {
+          "now": "1cd9e467445322195a7aca0aef9e699905b354800d87b6f9ecf3c038f0fb9753",
+          "was": "f2d3e1f174760b2094cdc073eab9fb33e95320f1c382842361ac54806d16c3c6"
+        },
+        "/books/cover-demo/produce/stdout_sha256": {
+          "now": "8cc2870c82d9255476d96cf44b33abb2d5b19bbd20e15663a3330016028262d0",
+          "was": "f15febee2f28d8448b0fd22bfacb184520d7abcb34e11f1c5d3e24c8574311e2"
+        },
+        "/books/cover-demo/produce_files/preflight.json": {
+          "now": "1cd9e467445322195a7aca0aef9e699905b354800d87b6f9ecf3c038f0fb9753",
+          "was": "f2d3e1f174760b2094cdc073eab9fb33e95320f1c382842361ac54806d16c3c6"
+        },
+        "/books/cover-demo/produce_files/production.json": {
+          "now": "3d659cea3a9c9aad64831dccacf41d2161ff366a7947d48c62669333e43ac012",
+          "was": "7136dc3f83b70fa7f11b38fb0b7acb54288d507d39d35d26cb1c416fdac55ae5"
+        },
+        "/books/publishing-demo/interior_preflight/stdout_sha256": {
+          "now": "26a6e70f522a312d4e0481864ca03871dbc0abf7f84826543c2c02a9db8aadef",
+          "was": "6e85efbb5c9403295dcab147c21f06f3a5c0b12937d47c3115df7569bf6386c6"
+        },
+        "/books/publishing-demo/produce/stdout_sha256": {
+          "now": "8b1a7e4534cab49cfa4c74af77834ece4f6b87d45a16a82b5cb0773e5fb77739",
+          "was": "c815c6efe2ae0de89aaf02cd10f45f363534c828dbeb9df71f97d4259aac596e"
+        },
+        "/books/publishing-demo/produce_files/preflight.json": {
+          "now": "26a6e70f522a312d4e0481864ca03871dbc0abf7f84826543c2c02a9db8aadef",
+          "was": "6e85efbb5c9403295dcab147c21f06f3a5c0b12937d47c3115df7569bf6386c6"
+        },
+        "/books/publishing-demo/produce_files/production.json": {
+          "now": "46eb28ba6da10afe4c9ccb01d64da7283e795d0623558c73ebdee83ae2881ce6",
+          "was": "4c74566a299773ba667c4419d96b449183e8e9968aae7b8ceeef0bcc3e0cd8c5"
+        },
+        "/books/publishing-demo/publish_inspect/stdout_sha256": {
+          "now": "3b0c9720dff296949224ac84d10f8a2daf77cd57adbecdfc251ee8c9a7984e99",
+          "was": "5509324ac69ce198d0c75f414d55415d7494f4f8960334f4bd4675de5225b441"
+        },
+        "/books/synthetic-production/interior_preflight/stdout_sha256": {
+          "now": "1c5a072a1b6d20b7aff3d58b6c7f865b65f8b12b63e6a918e7106ac36c067e42",
+          "was": "bae3510d39e311f7162ed137d4832f46a2de6c938a57cf50289a548e8268675f"
+        },
+        "/books/synthetic-production/produce/stdout_sha256": {
+          "now": "e79d845a2cb7603261aab63229bf3e3c10188b2f97775a6ae0180243ab64d1b0",
+          "was": "53d4faf8ce2e017aa0054611937d2b2db5d23775ebaa47d8596f1f07d2d4c437"
+        },
+        "/books/synthetic-production/produce_files/preflight.json": {
+          "now": "1c5a072a1b6d20b7aff3d58b6c7f865b65f8b12b63e6a918e7106ac36c067e42",
+          "was": "bae3510d39e311f7162ed137d4832f46a2de6c938a57cf50289a548e8268675f"
+        },
+        "/books/synthetic-production/produce_files/production.json": {
+          "now": "73141a1c67c82dbb7c53a9fb5d461bd1d04cce0bcfb7bf8be31e6e738437c955",
+          "was": "972c9cbb6d0e5e754bb9d5111322c0b53b2ebbaf47742282bee7a346ab7a0659"
+        },
+        "/books/synthetic-production/publish_inspect/stdout_sha256": {
+          "now": "3a3010e4a0121cf5d8d023b33a61dc447c225e1a02690c0c0ee4d0db4510c8a2",
+          "was": "fe59a0bc1d06f3dcd193634d52c9136b2bad67dd77c30888e22d260070d0b3f4"
+        }
+      },
+      "from_baseline_version": 3,
+      "id": "interval-8-kdp-page-maximum",
+      "reason": "Interior preflight ruleset 5: kdp_maximum_page_count follows the trim and the profile's paper, verified 2026-11-05 on KDP's 'Set Trim Size, Bleed, and Margins' table (8.5 x 11 white 590; rulesets 3-4 used the cream 550 for both papers while the official row was missing). KDP values re-read 2026-11-05.",
+      "report_changes": [
+        "ruleset.version 4 -> 5",
+        "ruleset.kdp_rules_checked 2026-10-07 -> 2026-11-05",
+        "kdp_maximum_page_count: basis kdp_ambiguous -> kdp_requirement, source Print Options -> Set Trim Size, Bleed, and Margins, description, measure.required 550 -> 590, note"
+      ],
+      "unchanged": "Every PDF, build/interior/cover identity, plan, batch, validation, cover report and publish validate output; only reports that contain the interior preflight report (and production.json, which lists its digest) change."
+    }
+  ]
+}

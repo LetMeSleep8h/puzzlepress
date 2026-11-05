@@ -19,6 +19,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from ..cancellation import checkpoint
 from ..coloring_config import Artwork
 from ..errors import ProjectError, ValidationIssue
 from ..identity import build_identity
@@ -109,9 +110,11 @@ def prepare_content(project: Project, source_directory: Path | None) -> Coloring
         )
     art: dict[str, PreparedArt] = {}
     failures: dict[str, ArtworkError] = {}
+    total = len({artwork_id for _, artwork_id in book.artwork_pages})
     for _, artwork_id in book.artwork_pages:
         if artwork_id in art or artwork_id in failures:
             continue
+        checkpoint("prepare_artwork", len(art) + len(failures), total)
         artwork = book.artwork_by_id(artwork_id)
         if artwork is None:  # Validation guarantees every page names known artwork.
             raise RuntimeError(f"Page names unknown artwork {artwork_id!r}")

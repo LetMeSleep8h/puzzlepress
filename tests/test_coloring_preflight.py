@@ -92,7 +92,7 @@ def test_a_clean_coloring_interior_is_valid_and_ready(ready):
     assert report.findings == () or codes(report) == ["kdp_full_font_embedding"]
     data = report.to_dict()
     assert data["ruleset"]["id"] == COLORING_ID == "puzzlepress-kdp-coloring"
-    assert data["ruleset"]["version"] == 2  # 2: light strokes erased (Interval 5)
+    assert data["ruleset"]["version"] == 3  # 3: paper-relative line measures (Interval 8)
     assert set(data["counts"]["severity"]) == {"error", "warning", "info"}
     assert all(set(page["findings"]) == {"error", "warning", "info"} for page in data["pages"])
     for code in ("coloring_image_integrity", "coloring_page_parity", "coloring_art_placement"):
@@ -177,8 +177,8 @@ def test_word_search_reports_keep_their_ruleset_and_severities():
     data = preflight_interior(project, artifacts, build).report.to_dict()
     assert data["ruleset"] == {
         "id": "puzzlepress-kdp-paperback",
-        "version": 4,
-        "kdp_rules_checked": "2026-10-07",
+        "version": 5,  # 5: page maximum by trim and paper (Interval 8)
+        "kdp_rules_checked": "2026-11-05",
     }
     assert set(data["counts"]["severity"]) == {"error", "warning", "info"}
     assert not any(r["code"].startswith("coloring_") for r in data["rules"])
@@ -200,7 +200,7 @@ def test_cli_exit_codes_and_report_bytes(ready, tmp_path, capsys):
     assert (output / "preflight.json").read_bytes() == report_bytes(result.report)
     assert main(["book", "preflight", str(directory), "--output", str(output)]) == 0
     text = capsys.readouterr().out
-    assert "ruleset puzzlepress-kdp-coloring v2" in text and "Manual review: none" in text
+    assert "ruleset puzzlepress-kdp-coloring v3" in text and "Manual review: none" in text
 
 
 # --------------------------------------------------------------- stale and altered
