@@ -14,9 +14,7 @@ from puzzlepress.publication import PageKind
 from tests.helpers import DEMO
 
 ADDED = [
-    pid
-    for pid in PROFILES
-    if not pid.startswith("paperback-8.5x11") and not PROFILES[pid].bleed
+    pid for pid in PROFILES if not pid.startswith("paperback-8.5x11") and not PROFILES[pid].bleed
 ]
 BLEED = [pid for pid in PROFILES if PROFILES[pid].bleed]
 
