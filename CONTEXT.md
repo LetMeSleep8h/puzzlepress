@@ -868,6 +868,27 @@ small external-editor race remains. Drafts memory-only; no autosave/undo/merge.
 
 ## Actual local verification
 
+Published-book audit (Interval 11), 2026-11-11 (Windows, Python 3.13):
+
+- Baseline on main 17ed02e: 2360 passed, 10 skipped. Branch, full suite: **2391
+  passed, 10 skipped** (12.1 min); golden baseline passes unchanged (no migration).
+  Ruff lint and format, strict mypy (175 files), pip check, `git diff --check`.
+  Studio: tsc, eslint, Prettier (passes with `--end-of-line auto`; this Windows
+  checkout has CRLF working files, which plain `prettier --check` reports for every
+  file, before and after this change), 142 Vitest tests, build, 43 Playwright specs
+  (new `audit.spec.ts`: desktop and 375 px without overflow, axe clean, a page link
+  opens `print?page=95`). The browser run's regenerated screenshots were discarded.
+- AGENTS.md commands: all exit as before (publishing-demo validate/inspect 1 by
+  design). `book audit` of publishing-demo and the synthetic production book: 1.
+- Real books (puzzlepress-books, read only; reports kept outside both repositories;
+  that repository is unchanged): Classic Cars 0 high / 3 medium / 10 low, Automotive
+  10 / 5 / 7, Volume 2 10 / 3 / 6 (each compared with the other two; about 7 s each).
+  The audit reproduces the earlier manual review's automatable findings: 95 and 77
+  pages (KDP counts 96 and 78), keywords repeating title words, the diagonal-word
+  pattern by level and puzzle 58's sparse backward words, title words in word lists;
+  no puzzle repeats between the books. Automotive and Volume 2 sources record no
+  cover and undecided publishing answers.
+
 Real-artwork validation and release readiness (Interval 10), 2026-11-05 (Windows,
 Python 3.13):
 
@@ -1288,6 +1309,17 @@ Production design and publishing polish (Windows, Python 3.13.15, Node 24.18.0):
   status and 15 recorded file digests were identical before and after.
 
 ## Limits and decisions for review
+
+Interval 11: the audit reads only the source and built files; it cannot see what
+is live on Amazon, so a book uploaded with files or metadata not recorded in its
+`book.yaml` (Automotive and Volume 2 have no cover or decided publishing section
+here) is audited as its source says. Claim checks read numbers before levels,
+parts, sections, themes and puzzles only, in English; theme counts are a question,
+not an error. Keyword overlap is word-level with a simple singular. Difficulty
+facts describe generated grids, not solver difficulty. Priorities and the 10 %,
+half-median and half-word limits are conventions. Studio compares only books in
+the same collection of one library. KDP's handling of the rounded page count and
+any spine tolerance is not documented; only Print Previewer and a proof settle it.
 
 Interval 10: no book is ready for KDP. The only artwork with a recorded rights basis
 is approved for testing, not sale; every publishing decision in the demonstration is
