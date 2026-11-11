@@ -2,9 +2,41 @@
 
 ## Completed scope
 
-Coloring Interval 10 (real-artwork validation and release readiness) on branch
-`feat/coloring-release-readiness`, cut from main after Interval 9 merged (PR #24);
-committed locally, not pushed. Guides: docs/release-readiness.md,
+Interval 11 (published-book quality and KDP readiness) on branch
+`feat/book-audit-kdp-readiness`, cut from main after Interval 10 merged (PR #25).
+Guide: docs/book-audit.md.
+
+- `book audit PROJECT [--output DIR] [--previous PROJECT ...] [--json] [--report DIR]`
+  (`audit/`, `audit_cli.py`): read-only, prioritized recommendations (high, medium,
+  low) with category, basis (`kdp_help` with the official URL, `measured`,
+  `judgment`), evidence, action, field, physical pages and puzzle IDs. Listing:
+  counts of levels, parts (dividers) and puzzles stated in the title, subtitle,
+  `book.description`, KDP description or cover text checked against the book
+  (partial counts and "one" ignored; theme counts accept level-suffixed labels and
+  are a medium question); keywords whose words repeat the title, subtitle,
+  contributors or categories; unused keyword and category slots; planned audience
+  named or not. Print: odd page counts (KDP rounds up to even; spine for both counts),
+  blank share. Content (word search): difficulty facts per level, easier settings
+  after harder ones, levels allowing directions some puzzles never use, sparse
+  backward words, title words in word lists. Series: repeats against compared books
+  (`puzzle compare` thresholds) and differing author, imprint, profile, solutions per
+  page, layout, interior style. Evidence: the production overview's open items.
+  Manual checks with proof status; "not assessed" always names Amazon data. Exit 0
+  without high priority, 1 otherwise. `audit.json` deterministic; `--report` refuses
+  book folders and foreign files. Nothing in any ruleset, report, identity, PDF or
+  golden value changed.
+- `inventory_from_report` (the inventory of an already generated batch; equal to
+  `inventory_from_project`, tested); `publishing.text.count_claims`, `singular`.
+- Studio: **Audit** page (Review group; coloring after Produce), category filter,
+  links to the editing page and to `print?page=N`, Markdown download, comparison with
+  library books in the same collection; `GET /api/projects/{key}/audit` cached by the
+  overview's bytes plus siblings' revisions. Print proof opens the page a `?page=N`
+  link asks for; the client router keeps query strings.
+- KDP pages re-read 2026-11-11: Paperback Submission Guidelines (even rounding,
+  excessive blank pages) and the keywords page (avoid metadata and category words).
+
+Earlier: Coloring Interval 10 (real-artwork validation and release readiness) on branch
+`feat/coloring-release-readiness`, merged as PR #25. Guides: docs/release-readiness.md,
 docs/artwork-validation/findings.md (Interval 10), proof-status.md,
 bleed-proof-checklist.md.
 
