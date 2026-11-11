@@ -131,6 +131,11 @@ def keyword_variant(keyword: str) -> str:
     return "".join(_singular(w) for w in re.findall(r"\w+", keyword.casefold()))
 
 
+def singular(word: str) -> str:
+    """A conservative singular form: puzzles -> puzzle, searches -> search, glass stays."""
+    return _singular(word)
+
+
 def _singular(word: str) -> str:
     if len(word) > 4 and word.endswith("es") and word[:-2].endswith(("ch", "sh", "x", "s", "z")):
         return word[:-2]
@@ -195,3 +200,12 @@ def drawing_claims(text: str) -> list[tuple[str, int]]:
 def puzzle_claims(text: str) -> list[tuple[str, int]]:
     """Each (phrase, number) in which the description counts its puzzles."""
     return [(m.group(0), number_value(m.group(1))) for m in PUZZLE_CLAIM.finditer(text)]
+
+
+def count_claims(text: str, nouns: str) -> list[tuple[str, int]]:
+    """Each (phrase, number) counting `nouns` (a regex alternation), as puzzle_claims does."""
+    pattern = re.compile(
+        rf"(?<![x×]\s)(?<![x×])\b({_NUMBER})\b(?!\s?[x×]){_GAP}[\s-]+(?:{nouns})\b",
+        re.IGNORECASE,
+    )
+    return [(m.group(0), number_value(m.group(1))) for m in pattern.finditer(text)]

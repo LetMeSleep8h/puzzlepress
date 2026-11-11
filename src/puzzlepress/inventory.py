@@ -26,7 +26,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .cancellation import checkpoint
 from .errors import ProjectError, ValidationIssue
@@ -35,6 +35,10 @@ INVENTORY_KIND = "puzzlepress-puzzle-inventory"
 INVENTORY_VERSION = 1
 MAX_PDF_BYTES = 512 * 1024 * 1024
 MAX_PUZZLES = 2000
+
+if TYPE_CHECKING:
+    from .batch import BatchReport
+    from .models import Project
 
 _WORD = re.compile(r"^[A-Z]+(?: [A-Z]+)*$")
 _LETTER = re.compile(r"^[A-Z]$")
@@ -176,14 +180,21 @@ def normalize_word(display: str) -> str:
 def inventory_from_project(path: str | Path, label: str | None = None) -> Inventory:
     """Regenerate every puzzle of a project with the engine (authoritative)."""
     from .batch import generate_batch
-    from .identity import build_identity
     from .project import load_project
 
     loaded = load_project(path)
     project = loaded.project
     if project.word_search is None:
         raise _fail("word_search", "no_puzzles", "The project defines no word-search puzzles.")
-    report = generate_batch(project)
+    return inventory_from_report(project, generate_batch(project), loaded.source_path.name, label)
+
+
+def inventory_from_report(
+    project: Project, report: BatchReport, source_name: str, label: str | None = None
+) -> Inventory:
+    """The inventory of an already generated batch: equal to regenerating the project."""
+    from .identity import build_identity
+
     puzzles: list[InventoryPuzzle] = []
     for result in report.puzzles:
         if result.puzzle is None:
@@ -222,7 +233,7 @@ def inventory_from_project(path: str | Path, label: str | None = None) -> Invent
     return Inventory(
         label or project.book.id,
         "project",
-        loaded.source_path.name,
+        source_name,
         build_identity(project),
         tuple(puzzles),
         coverage,
