@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -8,9 +9,11 @@ from puzzlepress.cli import main
 from tests.helpers import installed_puzzlepress
 
 
-def run_cli(*args):
+def run_cli(*args, cwd=None, env=None):
     return subprocess.run(
         [sys.executable, "-m", "puzzlepress", *map(str, args)],
+        cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -97,37 +100,61 @@ def test_unexpected_programmer_error_is_not_misreported(monkeypatch):
         main(["validate", "anything"])
 
 
-def test_puzzle_cli_success_determinism_and_solution():
+def test_puzzle_cli_success_determinism_and_solution(tmp_path):
+    width, height = 8, 6
     args = (
         "puzzle",
         "generate",
         "--width",
-        "8",
+        width,
         "--height",
-        "6",
-        "--seed",
-        "2026",
+        height,
         "--word",
-        "FUEL PUMP",
+        "QUARTZ",
         "--word",
         "AXLE",
-        "--solution",
+        "--word",
+        "FUEL PUMP",
     )
-    result = run_cli(*args)
-    assert result.returncode == 0
-    assert not result.stderr
-    assert result.stdout == run_cli(*args).stdout
-    for expected in (
-        "Seed: 2026",
-        "Grid: 8 x 6",
-        "FUEL PUMP; AXLE",
-        "Verified:",
-        "zero-based",
-        "FUELPUMP",
-    ):
-        assert expected in result.stdout
-    assert len(result.stdout.splitlines()[2:8]) == 6
-    assert "Solution" not in run_cli(*args[:-1]).stdout
+
+    def generate(seed, hash_seed):
+        result = run_cli(
+            *args,
+            "--seed",
+            seed,
+            "--solution",
+            cwd=tmp_path,
+            env={**os.environ, "PYTHONHASHSEED": hash_seed},
+        )
+        assert result.returncode == 0, result.stderr
+        assert not result.stderr
+        seed_line, grid_size, *body = result.stdout.splitlines()
+        assert seed_line == f"Seed: {seed}"
+        assert grid_size == f"Grid: {width} x {height}"
+        grid = [row.split() for row in body[:height]]
+        assert len(grid) == height
+        assert all(len(row) == width for row in grid)
+
+        targets, verification, solution, *placements = body[height:]
+        assert targets == "Targets: QUARTZ; AXLE; FUEL PUMP"
+        assert verification.startswith("Verified:")
+        assert solution == "Solution (zero-based column, row):"
+        assert [line.strip().split(" (", 1)[0] for line in placements] == [
+            "word-1: QUARTZ",
+            "word-2: AXLE",
+            "word-3: FUELPUMP",
+        ]
+        return grid, placements
+
+    grid, placements = generate(2026, "1")
+    assert generate(2026, "98765") == (grid, placements)
+    other_grid, _ = generate(2027, "1")
+    assert other_grid != grid
+
+    without_solution = run_cli(*args, "--seed", "2026", cwd=tmp_path)
+    assert without_solution.returncode == 0
+    assert not without_solution.stderr
+    assert "Solution" not in without_solution.stdout
 
 
 @pytest.mark.parametrize(
@@ -137,6 +164,7 @@ def test_puzzle_cli_success_determinism_and_solution():
         (("--word", "ABCD"), "cannot_fit"),
         (("--word", "ABC", "--word", "DEF", "--max-restarts", "0"), "search_exhausted"),
         (("--word", "A", "--seed", "-1"), "seed"),
+        (("--word", "A", "--seed", "20x6"), "seed"),
         (("--word", "A", "--width", "0"), "range"),
         (("--word", "A", "--word", "a"), "duplicate_search"),
     ],
