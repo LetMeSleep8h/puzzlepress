@@ -80,6 +80,7 @@ test('coloring books navigate to pages, cover and publishing in plain terms', as
     'Print proof',
     'Publishing',
     'Produce',
+    'Audit',
   ]);
   expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);
 });

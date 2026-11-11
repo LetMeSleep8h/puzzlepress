@@ -61,6 +61,7 @@ test('a coloring book opens its own workspace without word-search sections', asy
     'Print proof',
     'Publishing',
     'Produce',
+    'Audit',
   ]);
   expect(screen.getByText('Book type').nextElementSibling).toHaveTextContent('Coloring book');
   expect(screen.getByRole('main')).not.toHaveTextContent(WORD_SEARCH_TERMS);

@@ -1534,3 +1534,59 @@ export interface ColoringPlanResult {
     }
   >;
 }
+
+// Book audit (GET /api/projects/{key}/audit): Python's read-only recommendations.
+export interface AuditRecommendation {
+  code: string;
+  priority: 'high' | 'medium' | 'low';
+  category: 'listing' | 'print' | 'content' | 'series' | 'evidence';
+  basis: 'kdp_help' | 'measured' | 'judgment';
+  title: string;
+  evidence: string;
+  action: string;
+  area: string;
+  field: string | null;
+  source: string | null;
+  pages: number[];
+  puzzles: string[];
+}
+
+export interface AuditLevel {
+  profile: string;
+  puzzles: number;
+  first_puzzle: string;
+  last_puzzle: string;
+  grids: string[];
+  words: { min: number; max: number };
+  allowed_directions: number;
+  allows_diagonal: boolean;
+  allows_backward: boolean;
+  placed_diagonal: { min: number; max: number };
+  placed_backward: { min: number; max: number };
+  longest_word: number;
+}
+
+export interface AuditReport {
+  kind: 'puzzlepress-book-audit';
+  audit_version: number;
+  book_id: string;
+  engine: string;
+  title: string;
+  page_count: number | null;
+  counts: { high: number; medium: number; low: number };
+  recommendations: AuditRecommendation[];
+  manual_checks: { code: string; title: string; why: string; status: string }[];
+  levels: AuditLevel[];
+  compared_books: string[];
+  not_assessed: string[];
+  statement: string;
+}
+
+export interface AuditResponse {
+  key: string;
+  revision: string;
+  audit: AuditReport;
+  markdown: string;
+  collection: string | null;
+  compared: string[];
+}

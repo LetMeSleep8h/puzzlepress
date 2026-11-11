@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .audit_cli import add_audit_action, run_audit
 from .batch import BatchReport
 from .creation_cli import add_new_action, run_new
 from .engines.kind import EngineKind
@@ -30,6 +31,7 @@ def add_book_command(commands: "argparse._SubParsersAction[argparse.ArgumentPars
     actions = book.add_subparsers(dest="book_command", required=True)
     add_book_actions(actions)
     add_new_action(actions)
+    add_audit_action(actions)
     plan = actions.add_parser("plan", help="Plan and verify the logical publication order")
     plan.add_argument("project", help="YAML file or directory containing book.yaml")
     plan.add_argument("--json", action="store_true", help="Print the structured plan")
@@ -103,6 +105,8 @@ def run_book_command(args: argparse.Namespace) -> int:
         return run_produce(args)
     if args.book_command == "new":
         return run_new(args)
+    if args.book_command == "audit":
+        return run_audit(args)
     loaded = load_project(args.project)
     project = loaded.project
     engine = engine_for(project)

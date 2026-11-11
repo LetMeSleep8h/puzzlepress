@@ -17,6 +17,7 @@ import { ColoringNav, ColoringWorkspace } from './Coloring';
 import { CreateBook } from './CreateBook';
 import { Settings } from './Settings';
 import { Produce } from './Produce';
+import { Audit } from './Audit';
 
 function usePath(allow: (next: string, current: string) => boolean) {
   const [path, setPath] = useState(window.location.pathname);
@@ -43,9 +44,11 @@ function usePath(allow: (next: string, current: string) => boolean) {
       )
         return;
       event.preventDefault();
-      if (link.pathname === window.location.pathname) return;
+      if (link.pathname === window.location.pathname && link.search === window.location.search)
+        return;
       if (!allow(link.pathname, path)) return;
-      history.pushState(null, '', link.pathname);
+      // The query (such as Print's ?page=N) travels with the link.
+      history.pushState(null, '', link.pathname + link.search);
       update();
     };
     window.addEventListener('popstate', update);
@@ -130,6 +133,7 @@ function ProjectWorkspace({
     'overview',
     'settings',
     'produce',
+    'audit',
     'edit',
     'book',
     'interior',
@@ -236,6 +240,8 @@ function ProjectWorkspace({
         <Print project={project} dirty={dirty} />
       ) : section === 'produce' ? (
         <Produce project={project} dirty={dirty} />
+      ) : section === 'audit' ? (
+        <Audit project={project} />
       ) : section === 'overview' ? (
         <Overview project={project} />
       ) : !project.source?.word_search ? (
@@ -289,6 +295,7 @@ const NAV: { group: string; items: [string, string, string?][] }[] = [
       ['print', 'Print proof'],
       ['puzzles', 'Solutions'],
       ['quality', 'Quality'],
+      ['audit', 'Audit'],
     ],
   },
   {
@@ -385,7 +392,7 @@ export function App() {
     first.current = false;
   }, [path]);
   const match = path.match(
-    /^\/books\/([^/]+)(?:\/(puzzles|quality|settings|produce|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
+    /^\/books\/([^/]+)(?:\/(puzzles|quality|settings|produce|audit|edit|book|interior|print|cover|publishing|planning|artwork|pages)(?:\/([^/]+))?)?\/?$/,
   );
   const isLibrary = path === '/' || path === '/books' || path === '/books/';
   const isCreate = path === '/create' || path === '/create/';
@@ -422,6 +429,7 @@ export function App() {
                   'quality',
                   'settings',
                   'produce',
+                  'audit',
                   'edit',
                   'book',
                   'interior',

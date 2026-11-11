@@ -541,6 +541,7 @@ produce identical YAML bytes. No YAML dependency or schema change was added.
 | `POST /api/projects/{key}/proofs/record` | `{revision, record}`; 409 `artifacts_changed` when the named artifacts are not the current ones |
 | `POST /api/projects/{key}/proofs/remove` | `{revision, id}` |
 | `GET /api/projects/{key}/production` | Overview items, stages, proofing steps, artifact assessment, review summary, proofs |
+| `GET /api/projects/{key}/audit` | Book audit of the saved revision: `{key, revision, audit, markdown, collection, compared}`; compares the library's books in the same collection; writes nothing ([book-audit.md](book-audit.md)) |
 | `POST /api/projects/{key}/rebuild` | `{revision}`; runs the planned steps for the saved revision and returns the recomputed overview with per-step results (`source_changed` if an edit lands mid-run) |
 | `GET /api/projects/{key}/publishing` | Readiness report, KDP metadata record, checklist, package identity, export state (`none`, `current`, `stale`, `damaged`), location, built cover digest |
 | `POST /api/projects/{key}/draft/publishing` | `{source}`; `{metadata, upgrade}`: findings and confirmation states with current review identities for the draft, and the version 2 form of a version 1 section; writes nothing |
