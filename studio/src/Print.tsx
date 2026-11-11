@@ -73,6 +73,12 @@ export function pageLabel(page: PreviewPage | undefined, number: number) {
 }
 
 // Facing pages as a bound book shows them: page 1 alone on the right.
+/** The page a `?page=N` link asks for, when it exists in this PDF; otherwise page 1. */
+export function requestedPage(search: string, total: number): number {
+  const value = Number(new URLSearchParams(search).get('page'));
+  return Number.isInteger(value) && value >= 1 && value <= total ? value : 1;
+}
+
 export function spreadOf(page: number, total: number): [number | null, number | null] {
   const left = page % 2 === 0 ? page : page - 1;
   return [left >= 2 ? left : null, left + 1 <= total ? left + 1 : null];
@@ -530,8 +536,9 @@ function Viewer({ status }: { status: InteriorStatus }) {
   const preview = status.preview!;
   const report = status.report!;
   const total = preview.page_count;
-  const [page, setPage] = useState(1);
-  const [typed, setTyped] = useState('1');
+  // A link such as /books/<key>/print?page=12 (from the audit) opens that page.
+  const [page, setPage] = useState(() => requestedPage(window.location.search, total));
+  const [typed, setTyped] = useState(() => String(requestedPage(window.location.search, total)));
   const [spread, setSpread] = useState(false);
   const [zoom, setZoom] = useState<Zoom>('fit');
   const [overlays, setOverlays] = useState<Set<Overlay>>(new Set());

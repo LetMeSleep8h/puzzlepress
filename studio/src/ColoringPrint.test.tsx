@@ -56,6 +56,7 @@ test('the coloring proof shows physical pages, blank backs and manual-review pro
     'Print proof',
     'Publishing',
     'Produce',
+    'Audit',
   ]);
   // Every physical page, including each drawing's blank back, is a thumbnail.
   const pages = screen.getByRole('navigation', { name: 'Pages' });

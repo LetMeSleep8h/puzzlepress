@@ -22,6 +22,7 @@ from puzzlepress.creation import NewProject
 from puzzlepress.errors import ProjectError
 
 from .assets import AssetService
+from .auditing import AuditService
 from .coloring import ColoringService, PreparationService
 from .covering import CoverService
 from .creating import CreationService
@@ -236,6 +237,7 @@ def create_app(
     preparation = PreparationService(service, coloring)
     reviews = ReviewService(service)
     production = ProductionService(service)
+    auditing = AuditService(service, production)
     creating = CreationService(service)
     producing = production_jobs(service)
     app = FastAPI(title="PuzzlePress Studio", docs_url=None, redoc_url=None, openapi_url=None)
@@ -524,6 +526,10 @@ def create_app(
     def production_status(key: str) -> dict[str, object]:
         return production.status(key)
 
+    @app.get("/api/projects/{key}/audit")
+    def book_audit(key: str) -> dict[str, object]:
+        return auditing.audit(key)
+
     @app.post("/api/projects/{key}/rebuild")
     def rebuild_outdated(key: str, body: BuildRequest) -> dict[str, object]:
         return production.rebuild(key, body.revision)
@@ -714,6 +720,7 @@ def create_app(
     @app.get("/books/{key}")
     @app.get("/books/{key}/settings")
     @app.get("/books/{key}/produce")
+    @app.get("/books/{key}/audit")
     @app.get("/books/{key}/puzzles")
     @app.get("/books/{key}/quality")
     @app.get("/books/{key}/edit")

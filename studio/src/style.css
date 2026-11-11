@@ -5321,3 +5321,54 @@ button.primary.danger {
   color: #c98b7b;
   border-top-style: solid;
 }
+
+/* Book audit: Python's recommendations, highest priority first. */
+.audit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.audit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+.audit-filter {
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.audit-list,
+.audit-manual {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.audit-list li,
+.audit-manual li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.audit-list li.audit-high {
+  border-left: 3px solid var(--fail);
+  padding-left: 10px;
+}
+.audit-list p {
+  margin: 4px 0 0;
+}
+.audit-pages a {
+  margin-right: 6px;
+}
+.audit-levels {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.audit-levels th,
+.audit-levels td {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
